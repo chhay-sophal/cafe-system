@@ -1,16 +1,23 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import CartSidebar from "./components/CartSidebar.vue";
 import CategoryTabs from "./components/CategoryTabs.vue";
+import ModifierModal from "./components/ModifierModal.vue";
 import ProductGrid from "./components/ProductGrid.vue";
-import { fetchCategories, fetchProducts } from "./lib/api";
+import { useCart } from "./composables/useCart";
+import { fetchCategories, fetchProductModifiers, fetchProducts } from "./lib/api";
 import type { Category, Product } from "./types/catalog";
+import type { CartModifier, ModifierGroup } from "./types/cart";
 
 const categories = ref<Category[]>([]);
 const products = ref<Product[]>([]);
 const selectedCategoryId = ref<string | null>(null);
 const isLoading = ref(true);
 const errorMessage = ref<string | null>(null);
-const lastAddedProduct = ref<Product | null>(null);
+const activeModalProduct = ref<Product | null>(null);
+const activeModalGroups = ref<ModifierGroup[]>([]);
+
+const cart = useCart();
 
 const filteredProducts = computed(() => {
   if (selectedCategoryId.value === null) {
@@ -23,8 +30,34 @@ function selectCategory(categoryId: string | null) {
   selectedCategoryId.value = categoryId;
 }
 
-function handleProductSelect(product: Product) {
-  lastAddedProduct.value = product;
+async function handleProductSelect(product: Product) {
+  let groups: ModifierGroup[] = [];
+  try {
+    groups = await fetchProductModifiers(product.id);
+  } catch (error) {
+    console.error("Failed to load modifiers for product", product.id, error);
+  }
+
+  if (groups.length === 0) {
+    cart.addItem(product, []);
+    return;
+  }
+
+  activeModalProduct.value = product;
+  activeModalGroups.value = groups;
+}
+
+function handleModifierConfirm(modifiers: CartModifier[]) {
+  if (activeModalProduct.value) {
+    cart.addItem(activeModalProduct.value, modifiers);
+  }
+  activeModalProduct.value = null;
+  activeModalGroups.value = [];
+}
+
+function handleModifierCancel() {
+  activeModalProduct.value = null;
+  activeModalGroups.value = [];
 }
 
 onMounted(async () => {
@@ -44,22 +77,43 @@ onMounted(async () => {
   <main class="pos-screen">
     <header class="pos-header">
       <h1 class="pos-header__title">Cafe POS</h1>
-      <p v-if="lastAddedProduct" class="pos-header__last-added">
-        Added: {{ lastAddedProduct.name }}
-      </p>
     </header>
 
-    <CategoryTabs
-      :categories="categories"
-      :selected-category-id="selectedCategoryId"
-      @select="selectCategory"
-    />
+    <div class="pos-body">
+      <div class="pos-catalog">
+        <CategoryTabs
+          :categories="categories"
+          :selected-category-id="selectedCategoryId"
+          @select="selectCategory"
+        />
 
-    <ProductGrid
-      :products="filteredProducts"
-      :is-loading="isLoading"
-      :error-message="errorMessage"
-      @select="handleProductSelect"
+        <ProductGrid
+          :products="filteredProducts"
+          :is-loading="isLoading"
+          :error-message="errorMessage"
+          @select="handleProductSelect"
+        />
+      </div>
+
+      <CartSidebar
+        :items="cart.items.value"
+        :subtotal="cart.subtotal.value"
+        :tax-amount="cart.taxAmount.value"
+        :discount-amount="cart.discountAmount.value"
+        :total-amount="cart.totalAmount.value"
+        @increment="cart.incrementQuantity"
+        @decrement="cart.decrementQuantity"
+        @remove="cart.removeItem"
+        @update:discount="cart.setDiscount"
+      />
+    </div>
+
+    <ModifierModal
+      v-if="activeModalProduct"
+      :product="activeModalProduct"
+      :groups="activeModalGroups"
+      @confirm="handleModifierConfirm"
+      @cancel="handleModifierCancel"
     />
   </main>
 </template>
@@ -86,10 +140,17 @@ onMounted(async () => {
   margin: 0;
 }
 
-.pos-header__last-added {
-  margin: 0;
-  font-size: 0.9rem;
-  color: #9fe6b8;
+.pos-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.pos-catalog {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 </style>
 

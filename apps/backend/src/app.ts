@@ -3,10 +3,10 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { randomUUID } from 'crypto';
-import { eq, sql, gte, lte, and } from 'drizzle-orm';
+import { eq, sql, gte, lte, and, inArray } from 'drizzle-orm';
 import { db } from './db/index.js';
 import {
-  users, categories, products, modifierGroups, modifiers,
+  users, categories, products, modifierGroups, modifiers, productModifiers,
   inventoryItems, recipes, stockAdjustments, orders, orderItems,
   orderItemModifiers, payments,
 } from './db/schema.js';
@@ -114,9 +114,18 @@ function createApp() {
     }
   });
 
-  app.get('/api/products/:id/modifiers', async (_req, res) => {
+  app.get('/api/products/:id/modifiers', async (req, res) => {
+    const { id } = req.params;
+
     try {
-      const groups = db.select().from(modifierGroups).all();
+      const links = db.select().from(productModifiers).where(eq(productModifiers.productId, id)).all();
+      const groupIds = links.map((link) => link.groupId);
+
+      if (groupIds.length === 0) {
+        return res.json([]);
+      }
+
+      const groups = db.select().from(modifierGroups).where(inArray(modifierGroups.id, groupIds)).all();
       const result = groups.map((group) => {
         const options = db.select().from(modifiers).where(eq(modifiers.groupId, group.id)).all();
         return { ...group, options };
