@@ -6,7 +6,7 @@ import { drizzle } from 'drizzle-orm/better-sqlite3';
 import * as schema from './schema.js';
 
 const backendDir = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.resolve(backendDir, '..', 'data', 'store_data.db');
+const dbPath = path.resolve(backendDir, '..', '..', 'data', 'store_data.db');
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 
 // Open SQLite DB file
