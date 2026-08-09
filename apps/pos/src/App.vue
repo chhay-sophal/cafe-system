@@ -2,8 +2,11 @@
 import { computed, onMounted, ref } from "vue";
 import CartSidebar from "./components/CartSidebar.vue";
 import CategoryTabs from "./components/CategoryTabs.vue";
+import CheckoutModal from "./components/CheckoutModal.vue";
+import LoginScreen from "./components/LoginScreen.vue";
 import ModifierModal from "./components/ModifierModal.vue";
 import ProductGrid from "./components/ProductGrid.vue";
+import { useAuth } from "./composables/useAuth";
 import { useCart } from "./composables/useCart";
 import { fetchCategories, fetchProductModifiers, fetchProducts } from "./lib/api";
 import type { Category, Product } from "./types/catalog";
@@ -16,7 +19,9 @@ const isLoading = ref(true);
 const errorMessage = ref<string | null>(null);
 const activeModalProduct = ref<Product | null>(null);
 const activeModalGroups = ref<ModifierGroup[]>([]);
+const isCheckoutOpen = ref(false);
 
+const auth = useAuth();
 const cart = useCart();
 
 const filteredProducts = computed(() => {
@@ -60,6 +65,15 @@ function handleModifierCancel() {
   activeModalGroups.value = [];
 }
 
+function handleCheckoutCancel() {
+  isCheckoutOpen.value = false;
+}
+
+function handleCheckoutDone() {
+  isCheckoutOpen.value = false;
+  cart.reset();
+}
+
 onMounted(async () => {
   try {
     const [categoryList, productList] = await Promise.all([fetchCategories(), fetchProducts()]);
@@ -74,9 +88,15 @@ onMounted(async () => {
 </script>
 
 <template>
-  <main class="pos-screen">
+  <LoginScreen v-if="!auth.session.value" />
+
+  <main v-else class="pos-screen">
     <header class="pos-header">
       <h1 class="pos-header__title">Cafe POS</h1>
+      <div class="pos-header__account">
+        <span class="pos-header__cashier">{{ auth.session.value.user.name }}</span>
+        <button type="button" class="pos-header__logout" @click="auth.logout()">Log out</button>
+      </div>
     </header>
 
     <div class="pos-body">
@@ -105,6 +125,7 @@ onMounted(async () => {
         @decrement="cart.decrementQuantity"
         @remove="cart.removeItem"
         @update:discount="cart.setDiscount"
+        @checkout="isCheckoutOpen = true"
       />
     </div>
 
@@ -114,6 +135,18 @@ onMounted(async () => {
       :groups="activeModalGroups"
       @confirm="handleModifierConfirm"
       @cancel="handleModifierCancel"
+    />
+
+    <CheckoutModal
+      v-if="isCheckoutOpen"
+      :items="cart.items.value"
+      :subtotal="cart.subtotal.value"
+      :tax-amount="cart.taxAmount.value"
+      :discount-amount="cart.discountAmount.value"
+      :total-amount="cart.totalAmount.value"
+      :token="auth.session.value.token"
+      @cancel="handleCheckoutCancel"
+      @done="handleCheckoutDone"
     />
   </main>
 </template>
@@ -138,6 +171,28 @@ onMounted(async () => {
   font-size: 1.25rem;
   font-weight: 700;
   margin: 0;
+}
+
+.pos-header__account {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.pos-header__cashier {
+  color: #cccccc;
+}
+
+.pos-header__logout {
+  border: 2px solid #444444;
+  background: transparent;
+  color: #ffffff;
+  border-radius: 8px;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .pos-body {

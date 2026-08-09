@@ -15,6 +15,7 @@ const emit = defineEmits<{
   decrement: [cartItemId: string];
   remove: [cartItemId: string];
   "update:discount": [amount: number];
+  checkout: [];
 }>();
 
 const currencyFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
@@ -75,6 +76,15 @@ function handleDiscountInput(event: Event) {
         <span>Total</span>
         <span>{{ format(props.totalAmount) }}</span>
       </div>
+
+      <button
+        type="button"
+        class="cart-sidebar__checkout"
+        :disabled="items.length === 0"
+        @click="emit('checkout')"
+      >
+        Checkout
+      </button>
     </footer>
   </aside>
 </template>
@@ -167,6 +177,24 @@ function handleDiscountInput(event: Event) {
   color: #1a1a1a;
 }
 
+.cart-sidebar__checkout {
+  margin-top: 0.5rem;
+  min-height: 52px;
+  border-radius: 12px;
+  border: 2px solid #111111;
+  background: #111111;
+  color: #ffffff;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.cart-sidebar__checkout:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 @media (max-width: 900px) {
   .cart-sidebar {
     width: 300px;
@@ -201,6 +229,12 @@ function handleDiscountInput(event: Event) {
   .cart-sidebar__row--total {
     color: #f2f2f2;
     border-top-color: #444444;
+  }
+
+  .cart-sidebar__checkout {
+    background: #ffffff;
+    border-color: #ffffff;
+    color: #111111;
   }
 }
 </style>

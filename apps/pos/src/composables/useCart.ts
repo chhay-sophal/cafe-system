@@ -84,6 +84,11 @@ export function useCart() {
     discountAmount.value = Number.isFinite(amount) ? amount : 0;
   }
 
+  function reset() {
+    items.value = [];
+    discountAmount.value = 0;
+  }
+
   return {
     items,
     subtotal,
@@ -96,5 +101,6 @@ export function useCart() {
     decrementQuantity,
     removeItem,
     setDiscount,
+    reset,
   };
 }
