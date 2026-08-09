@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build outputs
+/dist/
+/build/
+/coverage/
+**/dist/
+**/build/
+**/coverage/
+*.tsbuildinfo
+
+# Backend / Drizzle / local data
+apps/backend/.drizzle/
+apps/backend/.cache/
+apps/backend/*.sqlite
+apps/backend/*.sqlite3
+apps/backend/.env.local
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Logs
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Tauri / Rust
+apps/pos/src-tauri/target/
+apps/pos/src-tauri/gen/
+apps/pos/src-tauri/wix/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+
+# Temporary files
+tmp/
+temp/
