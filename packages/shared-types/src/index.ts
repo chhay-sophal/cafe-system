@@ -33,3 +33,14 @@ export const inventoryAdjustmentSchema = z.object({
   type: z.enum(['RESTOCK', 'WASTAGE', 'AUDIT_CORRECTION']),
   notes: z.string().trim().optional(),
 });
+
+export const recipeUpdateSchema = z.object({
+  productId: z.string().min(1).optional(),
+  modifierId: z.string().min(1).optional(),
+  ingredients: z.array(z.object({
+    inventoryItemId: z.string().min(1),
+    quantityRequired: z.number().positive('Quantity must be greater than zero'),
+  })),
+}).refine((data) => Boolean(data.productId) !== Boolean(data.modifierId), {
+  message: 'Exactly one of productId or modifierId must be provided',
+});

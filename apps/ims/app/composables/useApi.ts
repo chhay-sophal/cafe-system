@@ -1,5 +1,7 @@
 import type { AuthSession } from "~/types/auth";
+import type { Category, ModifierGroup, Product } from "~/types/catalog";
 import type { InventoryItem, StockAdjustmentPayload } from "~/types/inventory";
+import type { RecipeIngredientRecord, RecipeTarget, RecipeUpdatePayload } from "~/types/recipe";
 
 export class HttpError extends Error {
   status: number;
@@ -35,14 +37,14 @@ export function useApi() {
     return response.json() as Promise<T>;
   }
 
-  async function postJson<T>(path: string, body: unknown, token?: string): Promise<T> {
+  async function sendJson<T>(method: "POST" | "PUT", path: string, body: unknown, token?: string): Promise<T> {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (token) {
       headers.Authorization = `Bearer ${token}`;
     }
 
     const response = await fetch(`${baseUrl}${path}`, {
-      method: "POST",
+      method,
       headers,
       body: JSON.stringify(body),
     });
@@ -59,12 +61,42 @@ export function useApi() {
   }
 
   function login(pin: string): Promise<AuthSession> {
-    return postJson<AuthSession>("/api/auth/login", { pin });
+    return sendJson<AuthSession>("POST", "/api/auth/login", { pin });
   }
 
   function adjustInventory(payload: StockAdjustmentPayload, token: string): Promise<{ success: boolean }> {
-    return postJson<{ success: boolean }>("/api/inventory/adjust", payload, token);
+    return sendJson<{ success: boolean }>("POST", "/api/inventory/adjust", payload, token);
   }
 
-  return { fetchInventory, login, adjustInventory };
+  function fetchCategories(): Promise<Category[]> {
+    return getJson<Category[]>("/api/categories");
+  }
+
+  function fetchProducts(): Promise<Product[]> {
+    return getJson<Product[]>("/api/products");
+  }
+
+  function fetchModifiers(): Promise<ModifierGroup[]> {
+    return getJson<ModifierGroup[]>("/api/modifiers");
+  }
+
+  function fetchRecipe(target: RecipeTarget): Promise<RecipeIngredientRecord[]> {
+    const query = target.kind === "product" ? `productId=${target.id}` : `modifierId=${target.id}`;
+    return getJson<RecipeIngredientRecord[]>(`/api/recipes?${query}`);
+  }
+
+  function saveRecipe(payload: RecipeUpdatePayload, token: string): Promise<{ success: boolean }> {
+    return sendJson<{ success: boolean }>("PUT", "/api/recipes", payload, token);
+  }
+
+  return {
+    fetchInventory,
+    login,
+    adjustInventory,
+    fetchCategories,
+    fetchProducts,
+    fetchModifiers,
+    fetchRecipe,
+    saveRecipe,
+  };
 }

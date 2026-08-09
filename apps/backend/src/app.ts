@@ -17,6 +17,7 @@ import {
   managerApprovalSchema,
   orderSchema,
   pinLoginSchema,
+  recipeUpdateSchema,
 } from './shared-schemas.js';
 
 function createApp() {
@@ -134,6 +135,20 @@ function createApp() {
       res.json(result);
     } catch (error) {
       res.status(500).json({ error: 'Failed to fetch product modifiers' });
+    }
+  });
+
+  app.get('/api/modifiers', async (_req, res) => {
+    try {
+      const groups = db.select().from(modifierGroups).all();
+      const result = groups.map((group) => {
+        const options = db.select().from(modifiers).where(eq(modifiers.groupId, group.id)).all();
+        return { ...group, options };
+      });
+
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch modifiers' });
     }
   });
 
@@ -284,6 +299,63 @@ function createApp() {
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: 'Failed to update stock adjustment' });
+    }
+  });
+
+  app.get('/api/recipes', async (req, res) => {
+    const { productId, modifierId } = req.query;
+
+    if (!productId && !modifierId) {
+      return res.status(400).json({ error: 'productId or modifierId query parameter is required' });
+    }
+
+    try {
+      const condition = productId && typeof productId === 'string'
+        ? eq(recipes.productId, productId)
+        : eq(recipes.modifierId, String(modifierId));
+
+      const rows = db.select({
+        id: recipes.id,
+        inventoryItemId: recipes.inventoryItemId,
+        quantityRequired: recipes.quantityRequired,
+        inventoryItemName: inventoryItems.name,
+        inventoryItemUnit: inventoryItems.unit,
+      }).from(recipes)
+        .innerJoin(inventoryItems, eq(recipes.inventoryItemId, inventoryItems.id))
+        .where(condition)
+        .all();
+
+      res.json(rows);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch recipe' });
+    }
+  });
+
+  app.put('/api/recipes', authenticate, requireRole(['MANAGER', 'ADMIN']), validateBody(recipeUpdateSchema), async (req, res) => {
+    const { productId, modifierId, ingredients } = req.body;
+
+    try {
+      db.transaction(() => {
+        const condition = productId
+          ? eq(recipes.productId, productId)
+          : eq(recipes.modifierId, modifierId);
+
+        db.delete(recipes).where(condition).run();
+
+        for (const ingredient of ingredients) {
+          db.insert(recipes).values({
+            id: randomUUID(),
+            productId: productId ?? null,
+            modifierId: modifierId ?? null,
+            inventoryItemId: ingredient.inventoryItemId,
+            quantityRequired: ingredient.quantityRequired,
+          }).run();
+        }
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to save recipe' });
     }
   });
 

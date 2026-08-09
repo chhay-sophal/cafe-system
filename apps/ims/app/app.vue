@@ -5,6 +5,7 @@ import type { InventoryItem } from "~/types/inventory";
 const auth = useAuth();
 const store = useInventoryStore();
 
+const activeView = ref<"inventory" | "recipes">("inventory");
 const isAdjustOpen = ref(false);
 const selectedItem = ref<InventoryItem | null>(null);
 
@@ -34,7 +35,27 @@ watch(
 
   <div v-else class="min-h-screen bg-slate-100">
     <header class="flex items-center justify-between bg-white px-6 py-4 shadow-sm">
-      <h1 class="text-lg font-bold text-slate-900">Inventory Manager</h1>
+      <div class="flex items-center gap-6">
+        <h1 class="text-lg font-bold text-slate-900">Inventory Manager</h1>
+        <nav class="flex gap-1">
+          <button
+            type="button"
+            class="rounded-lg px-3 py-1.5 text-sm font-semibold"
+            :class="activeView === 'inventory' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'"
+            @click="activeView = 'inventory'"
+          >
+            Stock
+          </button>
+          <button
+            type="button"
+            class="rounded-lg px-3 py-1.5 text-sm font-semibold"
+            :class="activeView === 'recipes' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'"
+            @click="activeView = 'recipes'"
+          >
+            Recipes
+          </button>
+        </nav>
+      </div>
       <div class="flex items-center gap-3 text-sm">
         <span class="text-slate-500">{{ auth.session.value.user.name }}</span>
         <button
@@ -48,7 +69,8 @@ watch(
     </header>
 
     <main class="mx-auto max-w-6xl p-6">
-      <StockTable @adjust="openAdjustModal" />
+      <StockTable v-if="activeView === 'inventory'" @adjust="openAdjustModal" />
+      <RecipeEditor v-else />
     </main>
 
     <StockAdjustmentModal v-model:open="isAdjustOpen" :item="selectedItem" />
