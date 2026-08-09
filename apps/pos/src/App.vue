@@ -1,16 +1,21 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import CartSidebar from "./components/CartSidebar.vue";
 import CategoryTabs from "./components/CategoryTabs.vue";
 import CheckoutModal from "./components/CheckoutModal.vue";
 import LoginScreen from "./components/LoginScreen.vue";
 import ModifierModal from "./components/ModifierModal.vue";
+import NetworkStatusBar from "./components/NetworkStatusBar.vue";
 import ProductGrid from "./components/ProductGrid.vue";
 import { useAuth } from "./composables/useAuth";
 import { useCart } from "./composables/useCart";
+import { useNetworkStatus } from "./composables/useNetworkStatus";
+import { useOfflineQueue } from "./composables/useOfflineQueue";
 import { fetchCategories, fetchProductModifiers, fetchProducts } from "./lib/api";
 import type { Category, Product } from "./types/catalog";
 import type { CartModifier, ModifierGroup } from "./types/cart";
+
+const SYNC_RETRY_INTERVAL_MS = 15000;
 
 const categories = ref<Category[]>([]);
 const products = ref<Product[]>([]);
@@ -23,6 +28,8 @@ const isCheckoutOpen = ref(false);
 
 const auth = useAuth();
 const cart = useCart();
+const network = useNetworkStatus();
+const offlineQueue = useOfflineQueue();
 
 const filteredProducts = computed(() => {
   if (selectedCategoryId.value === null) {
@@ -74,6 +81,12 @@ function handleCheckoutDone() {
   cart.reset();
 }
 
+let syncIntervalId: ReturnType<typeof setInterval> | undefined;
+
+function handleOnline() {
+  offlineQueue.syncPending();
+}
+
 onMounted(async () => {
   try {
     const [categoryList, productList] = await Promise.all([fetchCategories(), fetchProducts()]);
@@ -83,6 +96,27 @@ onMounted(async () => {
     errorMessage.value = error instanceof Error ? error.message : "Failed to load menu.";
   } finally {
     isLoading.value = false;
+  }
+
+  // Primary trigger: the browser/OS telling us connectivity is back.
+  window.addEventListener("online", handleOnline);
+  if (network.isOnline.value) {
+    offlineQueue.syncPending();
+  }
+
+  // Fallback: some outages (server unreachable but interface "online") never
+  // fire the online event, so poll while anything is still queued.
+  syncIntervalId = setInterval(() => {
+    if (offlineQueue.pendingCount.value > 0) {
+      offlineQueue.syncPending();
+    }
+  }, SYNC_RETRY_INTERVAL_MS);
+});
+
+onUnmounted(() => {
+  window.removeEventListener("online", handleOnline);
+  if (syncIntervalId) {
+    clearInterval(syncIntervalId);
   }
 });
 </script>
@@ -94,10 +128,24 @@ onMounted(async () => {
     <header class="pos-header">
       <h1 class="pos-header__title">Cafe POS</h1>
       <div class="pos-header__account">
+        <span
+          v-if="offlineQueue.pendingCount.value > 0"
+          class="pos-header__pending-badge"
+        >
+          {{ offlineQueue.pendingCount.value }} pending
+        </span>
+        <span
+          class="pos-header__network"
+          :class="{ 'pos-header__network--offline': !network.isOnline.value }"
+        >
+          {{ network.isOnline.value ? "Online" : "Offline" }}
+        </span>
         <span class="pos-header__cashier">{{ auth.session.value.user.name }}</span>
         <button type="button" class="pos-header__logout" @click="auth.logout()">Log out</button>
       </div>
     </header>
+
+    <NetworkStatusBar />
 
     <div class="pos-body">
       <div class="pos-catalog">
@@ -159,6 +207,7 @@ onMounted(async () => {
 }
 
 .pos-header {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -182,6 +231,36 @@ onMounted(async () => {
 
 .pos-header__cashier {
   color: #cccccc;
+}
+
+.pos-header__pending-badge {
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  background: #c0392b;
+  color: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.pos-header__network {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #6fd08c;
+}
+
+.pos-header__network::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.pos-header__network--offline {
+  color: #ff8a7a;
 }
 
 .pos-header__logout {

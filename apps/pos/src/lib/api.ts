@@ -4,17 +4,44 @@ import type { ModifierGroup } from "../types/cart";
 import type { OrderPayload, OrderResult } from "../types/order";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
+const REQUEST_TIMEOUT_MS = 5000;
+
+// Thrown only when the server actually responded with a non-2xx status - as
+// opposed to the fetch itself failing (unreachable host, timeout, DNS, etc.),
+// which surfaces as a plain/Abort error. Callers use this distinction to tell
+// "the server rejected the request" apart from "we couldn't reach the server"
+// (the latter being the trigger for offline queueing).
+export class HttpError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "HttpError";
+    this.status = status;
+  }
+}
 
 async function parseErrorMessage(response: Response): Promise<string> {
   const body = await response.json().catch(() => null);
   return body?.error ?? `Request failed with status ${response.status}`;
 }
 
+async function fetchWithTimeout(input: string, init: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function getJson<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`);
+  const response = await fetchWithTimeout(`${API_BASE_URL}${path}`, {});
 
   if (!response.ok) {
-    throw new Error(await parseErrorMessage(response));
+    throw new HttpError(await parseErrorMessage(response), response.status);
   }
 
   return response.json() as Promise<T>;
@@ -26,14 +53,14 @@ async function postJson<T>(path: string, body: unknown, token?: string): Promise
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetchWithTimeout(`${API_BASE_URL}${path}`, {
     method: "POST",
     headers,
     body: JSON.stringify(body),
   });
 
   if (!response.ok) {
-    throw new Error(await parseErrorMessage(response));
+    throw new HttpError(await parseErrorMessage(response), response.status);
   }
 
   return response.json() as Promise<T>;

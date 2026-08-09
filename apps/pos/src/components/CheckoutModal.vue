@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { submitOrder } from "../lib/api";
+import { HttpError, submitOrder } from "../lib/api";
+import { useNetworkStatus } from "../composables/useNetworkStatus";
+import { useOfflineQueue } from "../composables/useOfflineQueue";
 import type { CartLineItem } from "../types/cart";
-import type { OrderResult, PaymentMethod } from "../types/order";
+import type { OrderPayload, OrderResult, PaymentMethod } from "../types/order";
 
 const props = defineProps<{
   items: CartLineItem[];
@@ -30,11 +32,15 @@ const FAST_CASH_AMOUNTS = [10, 20, 50];
 
 const currencyFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
+const network = useNetworkStatus();
+const offlineQueue = useOfflineQueue();
+
 const phase = ref<Phase>("payment");
 const paymentMethod = ref<PaymentMethod>("CASH");
 const amountTendered = ref(0);
 const errorMessage = ref<string | null>(null);
 const orderResult = ref<OrderResult | null>(null);
+const isQueuedOffline = ref(false);
 
 const isCash = computed(() => paymentMethod.value === "CASH");
 
@@ -42,6 +48,22 @@ const changeDue = computed(() => Math.max(0, amountTendered.value - props.totalA
 const amountShort = computed(() => Math.max(0, props.totalAmount - amountTendered.value));
 const isInsufficient = computed(() => isCash.value && amountTendered.value < props.totalAmount);
 const canComplete = computed(() => !isInsufficient.value);
+
+const successLabel = computed(() => {
+  if (isQueuedOffline.value) {
+    return "Order Queued";
+  }
+  return isCash.value ? "Change Due" : "Payment Complete";
+});
+
+// Offline orders have no server-confirmed change/total yet, so fall back to
+// the client-side calculation until the sync engine reconciles them.
+const successAmount = computed(() => {
+  if (isCash.value) {
+    return isQueuedOffline.value ? changeDue.value : orderResult.value?.changeGiven ?? changeDue.value;
+  }
+  return isQueuedOffline.value ? props.totalAmount : orderResult.value?.totalAmount ?? props.totalAmount;
+});
 
 function format(value: number): string {
   return currencyFormatter.format(value);
@@ -69,6 +91,36 @@ function handleTenderedInput(event: Event) {
   amountTendered.value = Number.isFinite(value) && value >= 0 ? value : 0;
 }
 
+function buildOrderPayload(): OrderPayload {
+  return {
+    items: props.items.map((item) => ({
+      productId: item.productId,
+      productName: item.productName,
+      quantity: item.quantity,
+      unitPrice: item.unitBasePrice,
+      selectedModifiers: item.modifiers,
+    })),
+    paymentMethod: paymentMethod.value,
+    amountTendered: amountTendered.value,
+    taxAmount: props.taxAmount,
+    discountAmount: props.discountAmount,
+  };
+}
+
+async function queueOffline(payload: OrderPayload) {
+  try {
+    await offlineQueue.enqueue(payload);
+    orderResult.value = null;
+    isQueuedOffline.value = true;
+    phase.value = "success";
+  } catch (error) {
+    // Even local persistence can fail (e.g. IndexedDB unavailable/full) - the
+    // cashier still needs to know the sale did not go through anywhere.
+    errorMessage.value = error instanceof Error ? error.message : "Failed to save order locally.";
+    phase.value = "error";
+  }
+}
+
 async function handleComplete() {
   if (!canComplete.value || phase.value === "submitting") {
     return;
@@ -76,30 +128,32 @@ async function handleComplete() {
 
   phase.value = "submitting";
   errorMessage.value = null;
+  const payload = buildOrderPayload();
+
+  // Already known offline - skip the network round trip entirely so the
+  // cashier never sits staring at a spinner waiting for a doomed request.
+  if (!network.isOnline.value) {
+    await queueOffline(payload);
+    return;
+  }
 
   try {
-    const result = await submitOrder(
-      {
-        items: props.items.map((item) => ({
-          productId: item.productId,
-          productName: item.productName,
-          quantity: item.quantity,
-          unitPrice: item.unitBasePrice,
-          selectedModifiers: item.modifiers,
-        })),
-        paymentMethod: paymentMethod.value,
-        amountTendered: amountTendered.value,
-        taxAmount: props.taxAmount,
-        discountAmount: props.discountAmount,
-      },
-      props.token,
-    );
-
+    const result = await submitOrder(payload, props.token);
     orderResult.value = result;
+    isQueuedOffline.value = false;
     phase.value = "success";
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : "Failed to complete payment.";
-    phase.value = "error";
+    if (error instanceof HttpError) {
+      // Server was reached and rejected the request - a real error, not a
+      // connectivity problem, so surface it instead of silently queueing.
+      errorMessage.value = error.message;
+      phase.value = "error";
+      return;
+    }
+
+    // navigator.onLine said we were connected but the request still failed
+    // outright (unreachable host, timed out) - treat it the same as offline.
+    await queueOffline(payload);
   }
 }
 
@@ -199,11 +253,10 @@ function handleDone() {
       </div>
 
       <div v-else-if="phase === 'success'" class="checkout-modal__body checkout-modal__body--centered">
-        <p class="checkout-success__label">{{ isCash ? "Change Due" : "Payment Complete" }}</p>
-        <p class="checkout-success__amount">
-          {{ isCash ? format(orderResult?.changeGiven ?? 0) : format(orderResult?.totalAmount ?? totalAmount) }}
-        </p>
-        <p class="checkout-success__order">Order #{{ orderResult?.orderNumber }}</p>
+        <p class="checkout-success__label">{{ successLabel }}</p>
+        <p class="checkout-success__amount">{{ format(successAmount) }}</p>
+        <p v-if="isQueuedOffline" class="checkout-success__order">Saved offline - will sync automatically</p>
+        <p v-else class="checkout-success__order">Order #{{ orderResult?.orderNumber }}</p>
         <button type="button" class="checkout-modal__complete" @click="handleDone">Done</button>
       </div>
 
