@@ -11,6 +11,13 @@ import {
   orderItemModifiers, payments,
 } from './db/schema.js';
 import { authenticate, hashPin, requireRole, signToken, verifyPin } from './middleware/auth.js';
+import { validateBody } from './middleware/validate.js';
+import {
+  inventoryAdjustmentSchema,
+  managerApprovalSchema,
+  orderSchema,
+  pinLoginSchema,
+} from './shared-schemas.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -34,7 +41,7 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
  * POST /api/auth/login
  * Fast numeric PIN authentication for POS cashiers & IMS managers
  */
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', validateBody(pinLoginSchema), async (req, res) => {
   const { pin } = req.body;
 
   if (!pin) {
@@ -101,7 +108,7 @@ app.post('/api/auth/logout', authenticate, (_req, res) => {
   res.json({ success: true, message: 'Logged out successfully' });
 });
 
-app.post('/api/auth/manager-approval', authenticate, requireRole(['MANAGER', 'ADMIN']), (req, res) => {
+app.post('/api/auth/manager-approval', authenticate, requireRole(['MANAGER', 'ADMIN']), validateBody(managerApprovalSchema), (req, res) => {
   const { action = 'general-approval', reason = 'Approved locally' } = req.body;
 
   res.json({
@@ -186,12 +193,12 @@ app.get('/api/products/:id/modifiers', async (req, res) => {
  * Atomic order processing: saves order, items, modifiers, payment,
  * and deducts stock automatically based on drink/modifier recipes.
  */
-app.post('/api/orders', authenticate, async (req, res) => {
-  const { items, paymentMethod, amountTendered, taxAmount = 0, discountAmount = 0 } = req.body;
+app.post('/api/orders', authenticate, validateBody(orderSchema), async (req, res) => {
+  const { items, paymentMethod, amountTendered = 0, taxAmount = 0, discountAmount = 0 } = req.body;
   const actingUserId = req.user?.id;
 
-  if (!actingUserId || !items || !items.length || !paymentMethod) {
-    return res.status(400).json({ error: 'Invalid order payload' });
+  if (!actingUserId) {
+    return res.status(401).json({ error: 'Authentication required' });
   }
 
   try {
@@ -347,7 +354,7 @@ app.get('/api/inventory', async (req, res) => {
  * POST /api/inventory/adjust
  * Manual stock adjustment endpoint (Restock, Spoilage, Audits)
  */
-app.post('/api/inventory/adjust', authenticate, requireRole(['MANAGER', 'ADMIN']), async (req, res) => {
+app.post('/api/inventory/adjust', authenticate, requireRole(['MANAGER', 'ADMIN']), validateBody(inventoryAdjustmentSchema), async (req, res) => {
   const { inventoryItemId, quantityChanged, type, notes } = req.body;
   const actingUserId = req.user?.id;
 
