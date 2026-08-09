@@ -5,7 +5,7 @@ import type { InventoryItem } from "~/types/inventory";
 const auth = useAuth();
 const store = useInventoryStore();
 
-const activeView = ref<"inventory" | "recipes">("inventory");
+const activeView = ref<"inventory" | "recipes" | "analytics">("inventory");
 const isAdjustOpen = ref(false);
 const selectedItem = ref<InventoryItem | null>(null);
 
@@ -54,6 +54,14 @@ watch(
           >
             Recipes
           </button>
+          <button
+            type="button"
+            class="rounded-lg px-3 py-1.5 text-sm font-semibold"
+            :class="activeView === 'analytics' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'"
+            @click="activeView = 'analytics'"
+          >
+            Analytics
+          </button>
         </nav>
       </div>
       <div class="flex items-center gap-3 text-sm">
@@ -70,7 +78,8 @@ watch(
 
     <main class="mx-auto max-w-6xl p-6">
       <StockTable v-if="activeView === 'inventory'" @adjust="openAdjustModal" />
-      <RecipeEditor v-else />
+      <RecipeEditor v-else-if="activeView === 'recipes'" />
+      <AnalyticsDashboard v-else />
     </main>
 
     <StockAdjustmentModal v-model:open="isAdjustOpen" :item="selectedItem" />

@@ -2,6 +2,7 @@ import type { AuthSession } from "~/types/auth";
 import type { Category, ModifierGroup, Product } from "~/types/catalog";
 import type { InventoryItem, StockAdjustmentPayload } from "~/types/inventory";
 import type { RecipeIngredientRecord, RecipeTarget, RecipeUpdatePayload } from "~/types/recipe";
+import type { DailySummaryReport } from "~/types/reports";
 
 export class HttpError extends Error {
   status: number;
@@ -89,6 +90,10 @@ export function useApi() {
     return sendJson<{ success: boolean }>("PUT", "/api/recipes", payload, token);
   }
 
+  function fetchDailySummary(startDate: string, endDate: string): Promise<DailySummaryReport> {
+    return getJson<DailySummaryReport>(`/api/reports/daily-summary?startDate=${startDate}&endDate=${endDate}`);
+  }
+
   return {
     fetchInventory,
     login,
@@ -98,5 +103,6 @@ export function useApi() {
     fetchModifiers,
     fetchRecipe,
     saveRecipe,
+    fetchDailySummary,
   };
 }

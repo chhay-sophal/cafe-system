@@ -362,25 +362,47 @@ function createApp() {
   app.get('/api/reports/daily-summary', async (req, res) => {
     const startDate = (req.query.startDate as string) || new Date().toISOString().split('T')[0];
     const endDate = (req.query.endDate as string) || startDate;
+    const dateCondition = and(
+      gte(orders.createdAt, `${startDate} 00:00:00`),
+      lte(orders.createdAt, `${endDate} 23:59:59`),
+      eq(orders.status, 'COMPLETED'),
+    );
 
     try {
+      // SUM() over zero matching rows returns NULL, not 0 - coalesce so an
+      // empty date range reports clean zeros instead of nulls the frontend
+      // would have to guard against.
       const summary = db.select({
         totalOrders: sql<number>`count(${orders.id})`,
-        grossRevenue: sql<number>`sum(${orders.subtotal})`,
-        totalTax: sql<number>`sum(${orders.taxAmount})`,
-        totalDiscounts: sql<number>`sum(${orders.discountAmount})`,
-        netRevenue: sql<number>`sum(${orders.totalAmount})`,
-      }).from(orders).where(and(gte(orders.createdAt, `${startDate} 00:00:00`), lte(orders.createdAt, `${endDate} 23:59:59`), eq(orders.status, 'COMPLETED'))).get();
+        grossRevenue: sql<number>`coalesce(sum(${orders.subtotal}), 0)`,
+        totalTax: sql<number>`coalesce(sum(${orders.taxAmount}), 0)`,
+        totalDiscounts: sql<number>`coalesce(sum(${orders.discountAmount}), 0)`,
+        netRevenue: sql<number>`coalesce(sum(${orders.totalAmount}), 0)`,
+      }).from(orders).where(dateCondition).get();
 
       const paymentBreakdown = db.select({
         method: payments.paymentMethod,
         totalAmount: sql<number>`sum(${payments.amountTendered} - ${payments.changeGiven})`,
-      }).from(payments).innerJoin(orders, eq(payments.orderId, orders.id)).where(and(gte(orders.createdAt, `${startDate} 00:00:00`), lte(orders.createdAt, `${endDate} 23:59:59`), eq(orders.status, 'COMPLETED'))).groupBy(payments.paymentMethod).all();
+      }).from(payments).innerJoin(orders, eq(payments.orderId, orders.id)).where(dateCondition).groupBy(payments.paymentMethod).all();
+
+      const hourlyRows = db.select({
+        hour: sql<string>`strftime('%H', ${orders.createdAt})`,
+        orderCount: sql<number>`count(${orders.id})`,
+        revenue: sql<number>`coalesce(sum(${orders.totalAmount}), 0)`,
+      }).from(orders).where(dateCondition).groupBy(sql`strftime('%H', ${orders.createdAt})`).all();
+
+      const hourlyByHour = new Map(hourlyRows.map((row) => [Number(row.hour), row]));
+      const hourlyVolume = Array.from({ length: 24 }, (_, hour) => ({
+        hour,
+        orderCount: hourlyByHour.get(hour)?.orderCount ?? 0,
+        revenue: hourlyByHour.get(hour)?.revenue ?? 0,
+      }));
 
       res.json({
         dateRange: { startDate, endDate },
         metrics: summary || { totalOrders: 0, grossRevenue: 0, totalTax: 0, totalDiscounts: 0, netRevenue: 0 },
         paymentBreakdown,
+        hourlyVolume,
       });
     } catch (error) {
       res.status(500).json({ error: 'Failed to generate report' });
