@@ -5,11 +5,12 @@ import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
 import { eq, sql, gte, lte, and } from 'drizzle-orm';
 import { db } from './db/index.js';
-import { 
-  users, categories, products, modifierGroups, modifiers, 
-  inventoryItems, recipes, stockAdjustments, orders, orderItems, 
-  orderItemModifiers, payments 
+import {
+  users, categories, products, modifierGroups, modifiers,
+  inventoryItems, recipes, stockAdjustments, orders, orderItems,
+  orderItemModifiers, payments,
 } from './db/schema.js';
+import { authenticate, hashPin, requireRole, signToken, verifyPin } from './middleware/auth.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -35,20 +36,49 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
  */
 app.post('/api/auth/login', async (req, res) => {
   const { pin } = req.body;
-  
+
   if (!pin) {
     return res.status(400).json({ error: 'PIN is required' });
   }
 
   try {
-    // Note: Replace with bcrypt/argon2 compare in production
-    const user = db.select().from(users).where(eq(users.pinHash, pin)).get();
+    const normalizedPin = String(pin).trim();
+    const candidates = db.select().from(users).all();
+    let user = null as (typeof candidates[number] | null);
 
-    if (!user || !user.isActive) {
+    for (const candidate of candidates) {
+      if (!candidate.isActive) {
+        continue;
+      }
+
+      const isValidPin = await verifyPin(normalizedPin, candidate.pinHash);
+      if (isValidPin) {
+        user = candidate;
+        break;
+      }
+    }
+
+    if (!user) {
       return res.status(401).json({ error: 'Invalid PIN or inactive user' });
     }
 
+    if (!/\$2[aby]\$\d{2}\$/.test(user.pinHash)) {
+      const nextHash = await hashPin(normalizedPin);
+      db.update(users)
+        .set({ pinHash: nextHash })
+        .where(eq(users.id, user.id))
+        .run();
+    }
+
+    const token = signToken({
+      id: user.id,
+      name: user.name,
+      role: user.role,
+    });
+
     res.json({
+      token,
+      expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
       user: {
         id: user.id,
         name: user.name,
@@ -56,8 +86,30 @@ app.post('/api/auth/login', async (req, res) => {
       },
     });
   } catch (error) {
+    console.error('Login error:', error);
     res.status(500).json({ error: 'Authentication failed' });
   }
+});
+
+app.get('/api/auth/me', authenticate, (req, res) => {
+  res.json({
+    user: req.user,
+  });
+});
+
+app.post('/api/auth/logout', authenticate, (_req, res) => {
+  res.json({ success: true, message: 'Logged out successfully' });
+});
+
+app.post('/api/auth/manager-approval', authenticate, requireRole(['MANAGER', 'ADMIN']), (req, res) => {
+  const { action = 'general-approval', reason = 'Approved locally' } = req.body;
+
+  res.json({
+    success: true,
+    approvedBy: req.user?.name,
+    action,
+    reason,
+  });
 });
 
 // ============================================================================
@@ -134,10 +186,11 @@ app.get('/api/products/:id/modifiers', async (req, res) => {
  * Atomic order processing: saves order, items, modifiers, payment,
  * and deducts stock automatically based on drink/modifier recipes.
  */
-app.post('/api/orders', async (req, res) => {
-  const { userId, items, paymentMethod, amountTendered, taxAmount = 0, discountAmount = 0 } = req.body;
+app.post('/api/orders', authenticate, async (req, res) => {
+  const { items, paymentMethod, amountTendered, taxAmount = 0, discountAmount = 0 } = req.body;
+  const actingUserId = req.user?.id;
 
-  if (!userId || !items || !items.length || !paymentMethod) {
+  if (!actingUserId || !items || !items.length || !paymentMethod) {
     return res.status(400).json({ error: 'Invalid order payload' });
   }
 
@@ -173,7 +226,7 @@ app.post('/api/orders', async (req, res) => {
       // 1. Insert Master Order Record
       db.insert(orders).values({
         id: orderId,
-        userId,
+        userId: actingUserId,
         orderNumber,
         subtotal,
         taxAmount,
@@ -294,10 +347,11 @@ app.get('/api/inventory', async (req, res) => {
  * POST /api/inventory/adjust
  * Manual stock adjustment endpoint (Restock, Spoilage, Audits)
  */
-app.post('/api/inventory/adjust', async (req, res) => {
-  const { inventoryItemId, userId, quantityChanged, type, notes } = req.body;
+app.post('/api/inventory/adjust', authenticate, requireRole(['MANAGER', 'ADMIN']), async (req, res) => {
+  const { inventoryItemId, quantityChanged, type, notes } = req.body;
+  const actingUserId = req.user?.id;
 
-  if (!inventoryItemId || !userId || quantityChanged === undefined || !type) {
+  if (!inventoryItemId || !actingUserId || quantityChanged === undefined || !type) {
     return res.status(400).json({ error: 'Missing required adjustment parameters' });
   }
 
@@ -307,7 +361,7 @@ app.post('/api/inventory/adjust', async (req, res) => {
       db.insert(stockAdjustments).values({
         id: randomUUID(),
         inventoryItemId,
-        userId,
+        userId: actingUserId,
         quantityChanged,
         type,
         notes,
