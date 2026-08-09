@@ -104,11 +104,9 @@ function createApp() {
     const { categoryId } = req.query;
 
     try {
-      let query = db.select().from(products).where(eq(products.isAvailable, true));
-
-      if (categoryId && typeof categoryId === 'string') {
-        query = db.select().from(products).where(and(eq(products.isAvailable, true), eq(products.categoryId, categoryId)));
-      }
+      const query = categoryId && typeof categoryId === 'string'
+        ? db.select().from(products).where(eq(products.categoryId, categoryId))
+        : db.select().from(products);
 
       res.json(query.all());
     } catch (error) {
