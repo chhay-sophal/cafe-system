@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import fs from 'fs';
+import multer from 'multer';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { randomUUID } from 'crypto';
@@ -13,15 +15,19 @@ import {
 import { authenticate, hashPin, requireRole, signToken, verifyPin } from './middleware/auth.js';
 import { validateBody } from './middleware/validate.js';
 import {
+  categorySchema,
   inventoryAdjustmentSchema,
   inventoryItemSchema,
   managerApprovalSchema,
   orderSchema,
   pinLoginSchema,
+  productSchema,
   recipeUpdateSchema,
   userCreateSchema,
   userUpdateSchema,
 } from './shared-schemas.js';
+
+const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 const USER_PUBLIC_COLUMNS = {
   id: users.id,
@@ -39,6 +45,39 @@ function createApp() {
   app.use(cors());
   app.use(express.json());
   app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+  const productImageUpload = multer({
+    storage: multer.diskStorage({
+      destination: (_req, _file, cb) => {
+        const dir = path.join(__dirname, '../uploads/products');
+        fs.mkdirSync(dir, { recursive: true });
+        cb(null, dir);
+      },
+      filename: (_req, file, cb) => {
+        cb(null, `${randomUUID()}${path.extname(file.originalname).toLowerCase()}`);
+      },
+    }),
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      if (!ALLOWED_IMAGE_TYPES.has(file.mimetype)) {
+        cb(new Error('Only JPEG, PNG, and WEBP images are allowed'));
+        return;
+      }
+      cb(null, true);
+    },
+  });
+
+  app.post('/api/upload', authenticate, requireRole(['MANAGER', 'ADMIN']), (req, res) => {
+    productImageUpload.single('image')(req, res, (error: unknown) => {
+      if (error) {
+        return res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to upload image' });
+      }
+      if (!req.file) {
+        return res.status(400).json({ error: 'No image file provided' });
+      }
+      res.status(201).json({ url: `/uploads/products/${req.file.filename}` });
+    });
+  });
 
   app.post('/api/auth/login', validateBody(pinLoginSchema), async (req, res) => {
     const { pin } = req.body;
@@ -165,6 +204,39 @@ function createApp() {
     }
   });
 
+  app.post('/api/categories', authenticate, requireRole(['MANAGER', 'ADMIN']), validateBody(categorySchema), async (req, res) => {
+    const { name, sortOrder } = req.body;
+
+    try {
+      const id = randomUUID();
+      db.insert(categories).values({ id, name, sortOrder }).run();
+
+      const created = db.select().from(categories).where(eq(categories.id, id)).get();
+      res.status(201).json(created);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to create category' });
+    }
+  });
+
+  app.put('/api/categories/:id', authenticate, requireRole(['MANAGER', 'ADMIN']), validateBody(categorySchema), async (req, res) => {
+    const id = String(req.params.id);
+    const { name, sortOrder } = req.body;
+
+    try {
+      const existing = db.select().from(categories).where(eq(categories.id, id)).get();
+      if (!existing) {
+        return res.status(404).json({ error: 'Category not found' });
+      }
+
+      db.update(categories).set({ name, sortOrder }).where(eq(categories.id, id)).run();
+
+      const updated = db.select().from(categories).where(eq(categories.id, id)).get();
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to update category' });
+    }
+  });
+
   app.get('/api/products', async (req, res) => {
     const { categoryId } = req.query;
 
@@ -176,6 +248,92 @@ function createApp() {
       res.json(query.all());
     } catch (error) {
       res.status(500).json({ error: 'Failed to fetch products' });
+    }
+  });
+
+  app.post('/api/products', authenticate, requireRole(['MANAGER', 'ADMIN']), validateBody(productSchema), async (req, res) => {
+    const { categoryId, name, basePrice, sku, imageUrl, isAvailable } = req.body;
+
+    try {
+      const categoryExists = db.select().from(categories).where(eq(categories.id, categoryId)).get();
+      if (!categoryExists) {
+        return res.status(400).json({ error: 'Selected category does not exist' });
+      }
+
+      const id = randomUUID();
+      db.insert(products).values({
+        id,
+        categoryId,
+        name,
+        basePrice,
+        sku: sku || null,
+        imageUrl: imageUrl || null,
+        isAvailable,
+      }).run();
+
+      const created = db.select().from(products).where(eq(products.id, id)).get();
+      res.status(201).json(created);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to create product' });
+    }
+  });
+
+  app.put('/api/products/:id', authenticate, requireRole(['MANAGER', 'ADMIN']), validateBody(productSchema), async (req, res) => {
+    const id = String(req.params.id);
+    const { categoryId, name, basePrice, sku, imageUrl, isAvailable } = req.body;
+
+    try {
+      const existing = db.select().from(products).where(eq(products.id, id)).get();
+      if (!existing) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
+
+      const categoryExists = db.select().from(categories).where(eq(categories.id, categoryId)).get();
+      if (!categoryExists) {
+        return res.status(400).json({ error: 'Selected category does not exist' });
+      }
+
+      db.update(products).set({
+        categoryId,
+        name,
+        basePrice,
+        sku: sku || null,
+        imageUrl: imageUrl || null,
+        isAvailable,
+      }).where(eq(products.id, id)).run();
+
+      const updated = db.select().from(products).where(eq(products.id, id)).get();
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to update product' });
+    }
+  });
+
+  app.delete('/api/products/:id', authenticate, requireRole(['MANAGER', 'ADMIN']), async (req, res) => {
+    const id = String(req.params.id);
+
+    try {
+      const existing = db.select().from(products).where(eq(products.id, id)).get();
+      if (!existing) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
+
+      const historicalOrderItems = db.select().from(orderItems).where(eq(orderItems.productId, id)).all();
+      if (historicalOrderItems.length > 0) {
+        return res.status(409).json({
+          error: `"${existing.name}" has ${historicalOrderItems.length} historical order line(s) and cannot be deleted.`,
+        });
+      }
+
+      db.transaction(() => {
+        db.delete(recipes).where(eq(recipes.productId, id)).run();
+        db.delete(productModifiers).where(eq(productModifiers.productId, id)).run();
+        db.delete(products).where(eq(products.id, id)).run();
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to delete product' });
     }
   });
 

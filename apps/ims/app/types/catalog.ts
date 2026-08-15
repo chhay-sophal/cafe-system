@@ -15,6 +15,24 @@ export interface Product {
   createdAt: string | null;
 }
 
+export interface CategoryPayload {
+  name: string;
+  sortOrder?: number;
+}
+
+export interface ProductPayload {
+  categoryId: string;
+  name: string;
+  basePrice: number;
+  sku?: string;
+  imageUrl?: string;
+  isAvailable: boolean;
+}
+
+export interface ImageUploadResult {
+  url: string;
+}
+
 export interface ModifierOption {
   id: string;
   groupId: string;

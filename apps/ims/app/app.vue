@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import type { Product } from "~/types/catalog";
 import type { InventoryItem } from "~/types/inventory";
 import type { StaffUser } from "~/types/user";
 
 const auth = useAuth();
 const store = useInventoryStore();
 
-const activeView = ref<"inventory" | "recipes" | "analytics" | "staff">("inventory");
+const activeView = ref<"inventory" | "menu" | "recipes" | "analytics" | "staff">("inventory");
 const isAdjustOpen = ref(false);
 const selectedItem = ref<InventoryItem | null>(null);
 const isItemModalOpen = ref(false);
@@ -15,6 +16,12 @@ const isDeleteOpen = ref(false);
 const deletingItem = ref<InventoryItem | null>(null);
 const isUserModalOpen = ref(false);
 const editingUser = ref<StaffUser | null>(null);
+
+const isProductModalOpen = ref(false);
+const editingProduct = ref<Product | null>(null);
+const isProductDeleteOpen = ref(false);
+const deletingProduct = ref<Product | null>(null);
+const isCategoryModalOpen = ref(false);
 
 const isAdmin = computed(() => auth.session.value?.user.role === "ADMIN");
 
@@ -48,6 +55,21 @@ function openEditUserModal(user: StaffUser) {
   isUserModalOpen.value = true;
 }
 
+function openCreateProductModal() {
+  editingProduct.value = null;
+  isProductModalOpen.value = true;
+}
+
+function openEditProductModal(product: Product) {
+  editingProduct.value = product;
+  isProductModalOpen.value = true;
+}
+
+function openProductDeleteDialog(product: Product) {
+  deletingProduct.value = product;
+  isProductDeleteOpen.value = true;
+}
+
 onMounted(() => {
   if (auth.session.value) {
     store.fetchInventory();
@@ -79,6 +101,14 @@ watch(
             @click="activeView = 'inventory'"
           >
             Stock
+          </button>
+          <button
+            type="button"
+            class="rounded-lg px-3 py-1.5 text-sm font-semibold"
+            :class="activeView === 'menu' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'"
+            @click="activeView = 'menu'"
+          >
+            Menu
           </button>
           <button
             type="button"
@@ -127,6 +157,13 @@ watch(
         @edit="openEditModal"
         @delete="openDeleteDialog"
       />
+      <ProductTable
+        v-else-if="activeView === 'menu'"
+        @create="openCreateProductModal"
+        @edit="openEditProductModal"
+        @delete="openProductDeleteDialog"
+        @manage-categories="isCategoryModalOpen = true"
+      />
       <RecipeEditor v-else-if="activeView === 'recipes'" />
       <UserTable v-else-if="activeView === 'staff' && isAdmin" @create="openCreateUserModal" @edit="openEditUserModal" />
       <AnalyticsDashboard v-else />
@@ -136,5 +173,8 @@ watch(
     <InventoryItemModal v-model:open="isItemModalOpen" :item="editingItem" />
     <DeleteConfirmationDialog v-model:open="isDeleteOpen" :item="deletingItem" />
     <UserFormModal v-if="isAdmin" v-model:open="isUserModalOpen" :user="editingUser" />
+    <ProductFormModal v-model:open="isProductModalOpen" :product="editingProduct" />
+    <ProductDeleteConfirmModal v-model:open="isProductDeleteOpen" :product="deletingProduct" />
+    <CategoryManagementModal v-model:open="isCategoryModalOpen" />
   </div>
 </template>

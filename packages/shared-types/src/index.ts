@@ -57,6 +57,20 @@ export const userUpdateSchema = z.object({
   pin: z.string().regex(/^\d{4}$/, 'PIN must be exactly 4 digits').optional(),
 });
 
+export const categorySchema = z.object({
+  name: z.string().trim().min(1, 'Name is required'),
+  sortOrder: z.number().int().optional().default(0),
+});
+
+export const productSchema = z.object({
+  categoryId: z.string().min(1, 'Category is required'),
+  name: z.string().trim().min(1, 'Name is required'),
+  basePrice: z.number().nonnegative(),
+  sku: z.string().trim().optional(),
+  imageUrl: z.string().trim().optional(),
+  isAvailable: z.boolean().optional().default(true),
+});
+
 export const recipeUpdateSchema = z.object({
   productId: z.string().min(1).optional(),
   modifierId: z.string().min(1).optional(),

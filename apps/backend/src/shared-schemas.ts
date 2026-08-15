@@ -1,9 +1,11 @@
 export {
+  categorySchema,
   inventoryAdjustmentSchema,
   inventoryItemSchema,
   managerApprovalSchema,
   orderSchema,
   pinLoginSchema,
+  productSchema,
   recipeUpdateSchema,
   userCreateSchema,
   userUpdateSchema,

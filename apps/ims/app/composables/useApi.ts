@@ -1,5 +1,7 @@
 import type { AuthSession } from "~/types/auth";
-import type { Category, ModifierGroup, Product } from "~/types/catalog";
+import type {
+  Category, CategoryPayload, ImageUploadResult, ModifierGroup, Product, ProductPayload,
+} from "~/types/catalog";
 import type { InventoryItem, InventoryItemPayload, StockAdjustmentPayload } from "~/types/inventory";
 import type { RecipeIngredientRecord, RecipeSummary, RecipeTarget, RecipeUpdatePayload } from "~/types/recipe";
 import type { DailySummaryReport } from "~/types/reports";
@@ -71,6 +73,22 @@ export function useApi() {
     return response.json() as Promise<T>;
   }
 
+  async function postForm<T>(path: string, formData: FormData, token: string): Promise<T> {
+    // No Content-Type header here - the browser sets multipart/form-data
+    // with the correct boundary itself; setting it manually breaks parsing.
+    const response = await fetch(`${baseUrl}${path}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new HttpError(await parseErrorMessage(response), response.status);
+    }
+
+    return response.json() as Promise<T>;
+  }
+
   function fetchInventory(): Promise<InventoryItem[]> {
     return getJson<InventoryItem[]>("/api/inventory");
   }
@@ -105,6 +123,32 @@ export function useApi() {
 
   function fetchModifiers(): Promise<ModifierGroup[]> {
     return getJson<ModifierGroup[]>("/api/modifiers");
+  }
+
+  function createCategory(payload: CategoryPayload, token: string): Promise<Category> {
+    return sendJson<Category>("POST", "/api/categories", payload, token);
+  }
+
+  function updateCategory(id: string, payload: CategoryPayload, token: string): Promise<Category> {
+    return sendJson<Category>("PUT", `/api/categories/${id}`, payload, token);
+  }
+
+  function createProduct(payload: ProductPayload, token: string): Promise<Product> {
+    return sendJson<Product>("POST", "/api/products", payload, token);
+  }
+
+  function updateProduct(id: string, payload: ProductPayload, token: string): Promise<Product> {
+    return sendJson<Product>("PUT", `/api/products/${id}`, payload, token);
+  }
+
+  function deleteProduct(id: string, token: string): Promise<{ success: boolean }> {
+    return deleteJson<{ success: boolean }>(`/api/products/${id}`, token);
+  }
+
+  function uploadProductImage(file: File, token: string): Promise<ImageUploadResult> {
+    const formData = new FormData();
+    formData.append("image", file);
+    return postForm<ImageUploadResult>("/api/upload", formData, token);
   }
 
   function fetchRecipe(target: RecipeTarget): Promise<RecipeIngredientRecord[]> {
@@ -158,5 +202,11 @@ export function useApi() {
     fetchUsers,
     createUser,
     updateUser,
+    createCategory,
+    updateCategory,
+    createProduct,
+    updateProduct,
+    deleteProduct,
+    uploadProductImage,
   };
 }
