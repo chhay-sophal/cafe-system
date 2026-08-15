@@ -6,6 +6,7 @@ import type { RecipeIngredientDraft, RecipeTarget, RecipeTargetKind, RecipeUpdat
 
 const auth = useAuth();
 const recipeStore = useRecipeStore();
+const catalogStore = useCatalogStore();
 const inventoryStore = useInventoryStore();
 
 const targetKind = ref<RecipeTargetKind>("product");
@@ -26,12 +27,12 @@ const inventoryItems = computed<InventoryItem[]>(() => inventoryStore.items);
 
 const productsByCategory = computed(() => {
   const grouped = new Map<string, Product[]>();
-  for (const product of recipeStore.products) {
+  for (const product of catalogStore.products) {
     const list = grouped.get(product.categoryId) ?? [];
     list.push(product);
     grouped.set(product.categoryId, list);
   }
-  return recipeStore.categories
+  return catalogStore.categories
     .map((category) => ({ category, products: grouped.get(category.id) ?? [] }))
     .filter((group) => group.products.length > 0);
 });
@@ -41,6 +42,9 @@ const modifierOptionChoices = computed(() =>
     group.options.map((option) => ({ id: option.id, label: `${group.name}: ${option.name}` })),
   ),
 );
+
+const catalogErrorMessage = computed(() => catalogStore.error ?? recipeStore.catalogError);
+const isCatalogLoading = computed(() => catalogStore.isLoading || recipeStore.isLoadingCatalog);
 
 const currentTarget = computed<RecipeTarget | null>(() => {
   if (targetKind.value === "product" && selectedProductId.value) {
@@ -54,7 +58,7 @@ const currentTarget = computed<RecipeTarget | null>(() => {
 
 const currentTargetLabel = computed(() => {
   if (currentTarget.value?.kind === "product") {
-    return recipeStore.products.find((p) => p.id === currentTarget.value?.id)?.name ?? "";
+    return catalogStore.products.find((p) => p.id === currentTarget.value?.id)?.name ?? "";
   }
   if (currentTarget.value?.kind === "modifier") {
     return modifierOptionChoices.value.find((o) => o.id === currentTarget.value?.id)?.label ?? "";
@@ -184,6 +188,10 @@ async function handleSave() {
 }
 
 onMounted(async () => {
+  if (!catalogStore.hasLoadedOnce) {
+    await catalogStore.fetchCatalog();
+  }
+
   if (!recipeStore.hasLoadedCatalog) {
     await recipeStore.fetchCatalog();
   }
@@ -199,11 +207,11 @@ onMounted(async () => {
     <section class="mb-8">
       <h2 class="mb-3 text-sm font-semibold text-slate-700">Menu Items</h2>
 
-      <p v-if="recipeStore.catalogError" class="rounded-lg bg-red-50 p-4 text-sm font-medium text-red-700">
-        {{ recipeStore.catalogError }}
+      <p v-if="catalogErrorMessage" class="rounded-lg bg-red-50 p-4 text-sm font-medium text-red-700">
+        {{ catalogErrorMessage }}
       </p>
 
-      <p v-else-if="recipeStore.isLoadingCatalog" class="p-6 text-center text-sm text-slate-500">
+      <p v-else-if="isCatalogLoading" class="p-6 text-center text-sm text-slate-500">
         Loading menu items...
       </p>
 
@@ -217,7 +225,7 @@ onMounted(async () => {
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100 bg-white">
-            <tr v-for="product in recipeStore.products" :key="product.id">
+            <tr v-for="product in catalogStore.products" :key="product.id">
               <td class="px-4 py-3 text-slate-700">{{ product.name }}</td>
               <td class="px-4 py-3">
                 <span
@@ -286,7 +294,7 @@ onMounted(async () => {
       </button>
     </div>
 
-    <template v-if="!recipeStore.catalogError && !recipeStore.isLoadingCatalog">
+    <template v-if="!catalogErrorMessage && !isCatalogLoading">
       <div class="mb-6 max-w-md">
         <label class="block text-sm font-medium text-slate-700">
           {{ targetKind === "product" ? "Menu Item" : "Modifier Choice" }}

@@ -1,11 +1,9 @@
 import { defineStore } from "pinia";
-import type { Category, ModifierGroup, Product } from "~/types/catalog";
+import type { ModifierGroup } from "~/types/catalog";
 import type { RecipeIngredientRecord, RecipeTarget, RecipeUpdatePayload } from "~/types/recipe";
 
 export const useRecipeStore = defineStore("recipes", {
   state: () => ({
-    categories: [] as Category[],
-    products: [] as Product[],
     modifierGroups: [] as ModifierGroup[],
     productRecipeCounts: {} as Record<string, number>,
     modifierRecipeCounts: {} as Record<string, number>,
@@ -21,20 +19,23 @@ export const useRecipeStore = defineStore("recipes", {
 
   actions: {
     async fetchCatalog() {
-      const { fetchCategories, fetchProducts, fetchModifiers, fetchRecipeSummary } = useApi();
+      // Categories/products live in useCatalogStore - it's the single source
+      // of truth shared with the Menu tab, so a product created/edited/deleted
+      // there is reflected here immediately via the same reactive state,
+      // with no separate copy to go stale until a refresh.
+      const catalogStore = useCatalogStore();
+      const { fetchModifiers, fetchRecipeSummary } = useApi();
+
       this.isLoadingCatalog = true;
       this.catalogError = null;
 
       try {
-        const [categories, products, modifierGroups, summary] = await Promise.all([
-          fetchCategories(),
-          fetchProducts(),
+        const [modifierGroups, summary] = await Promise.all([
           fetchModifiers(),
           fetchRecipeSummary(),
-        ]);
+          catalogStore.hasLoadedOnce ? Promise.resolve(undefined) : catalogStore.fetchCatalog(),
+        ] as const);
 
-        this.categories = categories;
-        this.products = products;
         this.modifierGroups = modifierGroups;
         this.productRecipeCounts = Object.fromEntries(summary.products.map((entry) => [entry.id, entry.ingredientCount]));
         this.modifierRecipeCounts = Object.fromEntries(summary.modifiers.map((entry) => [entry.id, entry.ingredientCount]));
