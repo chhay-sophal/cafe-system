@@ -15,6 +15,9 @@ import type { InventoryItem } from "~/types/inventory";
 
 const emit = defineEmits<{
   adjust: [item: InventoryItem];
+  create: [];
+  edit: [item: InventoryItem];
+  delete: [item: InventoryItem];
 }>();
 
 const store = useInventoryStore();
@@ -80,6 +83,14 @@ function formatUpdatedAt(value: string | null): string {
       <span v-if="store.lowStockCount > 0" class="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
         {{ store.lowStockCount }} low stock
       </span>
+
+      <button
+        type="button"
+        class="ml-auto rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+        @click="emit('create')"
+      >
+        + New Item
+      </button>
     </div>
 
     <p v-if="error" class="rounded-lg bg-red-50 p-4 text-sm font-medium text-red-700">{{ error }}</p>
@@ -137,13 +148,29 @@ function formatUpdatedAt(value: string | null): string {
             <td class="px-4 py-3 text-xs text-slate-400">{{ formatUpdatedAt(row.original.updatedAt) }}</td>
 
             <td class="px-4 py-3 text-right">
-              <button
-                type="button"
-                class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                @click="emit('adjust', row.original)"
-              >
-                Adjust
-              </button>
+              <div class="flex justify-end gap-2">
+                <button
+                  type="button"
+                  class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                  @click="emit('adjust', row.original)"
+                >
+                  Adjust
+                </button>
+                <button
+                  type="button"
+                  class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                  @click="emit('edit', row.original)"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
+                  @click="emit('delete', row.original)"
+                >
+                  Delete
+                </button>
+              </div>
             </td>
           </tr>
         </tbody>

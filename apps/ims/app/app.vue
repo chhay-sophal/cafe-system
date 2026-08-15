@@ -8,10 +8,29 @@ const store = useInventoryStore();
 const activeView = ref<"inventory" | "recipes" | "analytics">("inventory");
 const isAdjustOpen = ref(false);
 const selectedItem = ref<InventoryItem | null>(null);
+const isItemModalOpen = ref(false);
+const editingItem = ref<InventoryItem | null>(null);
+const isDeleteOpen = ref(false);
+const deletingItem = ref<InventoryItem | null>(null);
 
 function openAdjustModal(item: InventoryItem) {
   selectedItem.value = item;
   isAdjustOpen.value = true;
+}
+
+function openCreateModal() {
+  editingItem.value = null;
+  isItemModalOpen.value = true;
+}
+
+function openEditModal(item: InventoryItem) {
+  editingItem.value = item;
+  isItemModalOpen.value = true;
+}
+
+function openDeleteDialog(item: InventoryItem) {
+  deletingItem.value = item;
+  isDeleteOpen.value = true;
 }
 
 onMounted(() => {
@@ -77,11 +96,19 @@ watch(
     </header>
 
     <main class="mx-auto max-w-6xl p-6">
-      <StockTable v-if="activeView === 'inventory'" @adjust="openAdjustModal" />
+      <StockTable
+        v-if="activeView === 'inventory'"
+        @adjust="openAdjustModal"
+        @create="openCreateModal"
+        @edit="openEditModal"
+        @delete="openDeleteDialog"
+      />
       <RecipeEditor v-else-if="activeView === 'recipes'" />
       <AnalyticsDashboard v-else />
     </main>
 
     <StockAdjustmentModal v-model:open="isAdjustOpen" :item="selectedItem" />
+    <InventoryItemModal v-model:open="isItemModalOpen" :item="editingItem" />
+    <DeleteConfirmationDialog v-model:open="isDeleteOpen" :item="deletingItem" />
   </div>
 </template>

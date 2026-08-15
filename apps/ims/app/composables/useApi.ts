@@ -1,6 +1,6 @@
 import type { AuthSession } from "~/types/auth";
 import type { Category, ModifierGroup, Product } from "~/types/catalog";
-import type { InventoryItem, StockAdjustmentPayload } from "~/types/inventory";
+import type { InventoryItem, InventoryItemPayload, StockAdjustmentPayload } from "~/types/inventory";
 import type { RecipeIngredientRecord, RecipeTarget, RecipeUpdatePayload } from "~/types/recipe";
 import type { DailySummaryReport } from "~/types/reports";
 
@@ -57,6 +57,19 @@ export function useApi() {
     return response.json() as Promise<T>;
   }
 
+  async function deleteJson<T>(path: string, token: string): Promise<T> {
+    const response = await fetch(`${baseUrl}${path}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) {
+      throw new HttpError(await parseErrorMessage(response), response.status);
+    }
+
+    return response.json() as Promise<T>;
+  }
+
   function fetchInventory(): Promise<InventoryItem[]> {
     return getJson<InventoryItem[]>("/api/inventory");
   }
@@ -67,6 +80,18 @@ export function useApi() {
 
   function adjustInventory(payload: StockAdjustmentPayload, token: string): Promise<{ success: boolean }> {
     return sendJson<{ success: boolean }>("POST", "/api/inventory/adjust", payload, token);
+  }
+
+  function createInventoryItem(payload: InventoryItemPayload, token: string): Promise<InventoryItem> {
+    return sendJson<InventoryItem>("POST", "/api/inventory", payload, token);
+  }
+
+  function updateInventoryItem(id: string, payload: InventoryItemPayload, token: string): Promise<InventoryItem> {
+    return sendJson<InventoryItem>("PUT", `/api/inventory/${id}`, payload, token);
+  }
+
+  function deleteInventoryItem(id: string, token: string): Promise<{ success: boolean }> {
+    return deleteJson<{ success: boolean }>(`/api/inventory/${id}`, token);
   }
 
   function fetchCategories(): Promise<Category[]> {
@@ -98,6 +123,9 @@ export function useApi() {
     fetchInventory,
     login,
     adjustInventory,
+    createInventoryItem,
+    updateInventoryItem,
+    deleteInventoryItem,
     fetchCategories,
     fetchProducts,
     fetchModifiers,

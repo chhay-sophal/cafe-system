@@ -14,6 +14,7 @@ import { authenticate, hashPin, requireRole, signToken, verifyPin } from './midd
 import { validateBody } from './middleware/validate.js';
 import {
   inventoryAdjustmentSchema,
+  inventoryItemSchema,
   managerApprovalSchema,
   orderSchema,
   pinLoginSchema,
@@ -265,6 +266,65 @@ function createApp() {
       res.json(result);
     } catch (error) {
       res.status(500).json({ error: 'Failed to fetch inventory stock' });
+    }
+  });
+
+  app.post('/api/inventory', authenticate, requireRole(['MANAGER', 'ADMIN']), validateBody(inventoryItemSchema), async (req, res) => {
+    const { name, unit, reorderThreshold, costPerUnit } = req.body;
+
+    try {
+      const id = randomUUID();
+      db.insert(inventoryItems).values({ id, name, unit, reorderThreshold, costPerUnit, stockQuantity: 0 }).run();
+
+      const created = db.select().from(inventoryItems).where(eq(inventoryItems.id, id)).get()!;
+      res.status(201).json({ ...created, isLowStock: created.stockQuantity <= created.reorderThreshold });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to create inventory item' });
+    }
+  });
+
+  app.put('/api/inventory/:id', authenticate, requireRole(['MANAGER', 'ADMIN']), validateBody(inventoryItemSchema), async (req, res) => {
+    const id = String(req.params.id);
+    const { name, unit, reorderThreshold, costPerUnit } = req.body;
+
+    try {
+      const existing = db.select().from(inventoryItems).where(eq(inventoryItems.id, id)).get();
+      if (!existing) {
+        return res.status(404).json({ error: 'Inventory item not found' });
+      }
+
+      db.update(inventoryItems)
+        .set({ name, unit, reorderThreshold, costPerUnit, updatedAt: sql`CURRENT_TIMESTAMP` })
+        .where(eq(inventoryItems.id, id))
+        .run();
+
+      const updated = db.select().from(inventoryItems).where(eq(inventoryItems.id, id)).get()!;
+      res.json({ ...updated, isLowStock: updated.stockQuantity <= updated.reorderThreshold });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to update inventory item' });
+    }
+  });
+
+  app.delete('/api/inventory/:id', authenticate, requireRole(['MANAGER', 'ADMIN']), async (req, res) => {
+    const id = String(req.params.id);
+
+    try {
+      const existing = db.select().from(inventoryItems).where(eq(inventoryItems.id, id)).get();
+      if (!existing) {
+        return res.status(404).json({ error: 'Inventory item not found' });
+      }
+
+      const linkedRecipes = db.select().from(recipes).where(eq(recipes.inventoryItemId, id)).all();
+      if (linkedRecipes.length > 0) {
+        return res.status(409).json({
+          error: `"${existing.name}" is used in ${linkedRecipes.length} recipe(s). Remove the recipe link(s) before deleting this item.`,
+        });
+      }
+
+      db.delete(inventoryItems).where(eq(inventoryItems.id, id)).run();
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to delete inventory item' });
     }
   });
 

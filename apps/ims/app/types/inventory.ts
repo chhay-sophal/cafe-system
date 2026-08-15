@@ -9,6 +9,13 @@ export interface InventoryItem {
   isLowStock: boolean;
 }
 
+export interface InventoryItemPayload {
+  name: string;
+  unit: string;
+  reorderThreshold: number;
+  costPerUnit: number;
+}
+
 export type AdjustmentType = "RESTOCK" | "WASTAGE" | "AUDIT_CORRECTION";
 
 export interface StockAdjustmentPayload {

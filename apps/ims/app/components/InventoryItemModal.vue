@@ -1,0 +1,169 @@
+<script setup lang="ts">
+import { computed, ref, watch } from "vue";
+import type { InventoryItem } from "~/types/inventory";
+
+const props = defineProps<{
+  item: InventoryItem | null;
+}>();
+
+const open = defineModel<boolean>("open", { default: false });
+
+const auth = useAuth();
+const store = useInventoryStore();
+
+const UNITS = ["grams", "ml", "pieces"];
+
+const name = ref("");
+const unit = ref("grams");
+const reorderThreshold = ref<number | null>(null);
+const costPerUnit = ref<number | null>(null);
+const isSubmitting = ref(false);
+const errorMessage = ref<string | null>(null);
+
+const isEditMode = computed(() => props.item !== null);
+
+const nameError = computed(() => (name.value.trim().length === 0 ? "Name is required" : null));
+const reorderError = computed(() =>
+  reorderThreshold.value === null || reorderThreshold.value < 0 ? "Enter a reorder threshold of 0 or more" : null,
+);
+const costError = computed(() =>
+  costPerUnit.value === null || costPerUnit.value < 0 ? "Enter a cost of 0 or more" : null,
+);
+
+const canSubmit = computed(() => !nameError.value && !reorderError.value && !costError.value && !isSubmitting.value);
+
+watch(open, (isOpen) => {
+  if (!isOpen) {
+    return;
+  }
+
+  errorMessage.value = null;
+
+  if (props.item) {
+    name.value = props.item.name;
+    unit.value = props.item.unit;
+    reorderThreshold.value = props.item.reorderThreshold;
+    costPerUnit.value = props.item.costPerUnit;
+  } else {
+    name.value = "";
+    unit.value = "grams";
+    reorderThreshold.value = null;
+    costPerUnit.value = null;
+  }
+});
+
+function close() {
+  open.value = false;
+}
+
+async function submit() {
+  if (!canSubmit.value) {
+    return;
+  }
+
+  const token = auth.session.value?.token;
+  if (!token) {
+    errorMessage.value = "Your session has expired. Please sign in again.";
+    return;
+  }
+
+  isSubmitting.value = true;
+  errorMessage.value = null;
+
+  const payload = {
+    name: name.value.trim(),
+    unit: unit.value,
+    reorderThreshold: reorderThreshold.value as number,
+    costPerUnit: costPerUnit.value as number,
+  };
+
+  try {
+    if (props.item) {
+      await store.updateItem(props.item.id, payload, token);
+    } else {
+      await store.createItem(payload, token);
+    }
+    open.value = false;
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : "Failed to save item.";
+  } finally {
+    isSubmitting.value = false;
+  }
+}
+</script>
+
+<template>
+  <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+      <div class="flex items-start justify-between">
+        <h2 class="text-lg font-bold text-slate-900">{{ isEditMode ? "Edit Item" : "New Inventory Item" }}</h2>
+        <button type="button" class="text-2xl leading-none text-slate-400 hover:text-slate-600" @click="close">
+          &times;
+        </button>
+      </div>
+
+      <div class="mt-4">
+        <label class="block text-sm font-medium text-slate-700">Name</label>
+        <input
+          v-model="name"
+          type="text"
+          placeholder="e.g. Oat Milk"
+          class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+        />
+      </div>
+
+      <div class="mt-4">
+        <label class="block text-sm font-medium text-slate-700">Unit</label>
+        <select
+          v-model="unit"
+          class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+        >
+          <option v-for="option in UNITS" :key="option" :value="option">{{ option }}</option>
+        </select>
+      </div>
+
+      <div class="mt-4 grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-sm font-medium text-slate-700">Reorder Threshold</label>
+          <input
+            v-model.number="reorderThreshold"
+            type="number"
+            step="any"
+            min="0"
+            class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+          />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700">Cost Per Unit</label>
+          <input
+            v-model.number="costPerUnit"
+            type="number"
+            step="any"
+            min="0"
+            class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+          />
+        </div>
+      </div>
+
+      <p v-if="errorMessage" class="mt-4 text-sm font-medium text-red-600">{{ errorMessage }}</p>
+
+      <div class="mt-6 flex justify-end gap-3">
+        <button
+          type="button"
+          class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          @click="close"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          :disabled="!canSubmit"
+          class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+          @click="submit"
+        >
+          {{ isSubmitting ? "Saving..." : isEditMode ? "Save Changes" : "Create Item" }}
+        </button>
+      </div>
+    </div>
+  </div>
+</template>

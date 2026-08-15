@@ -34,6 +34,13 @@ export const inventoryAdjustmentSchema = z.object({
   notes: z.string().trim().optional(),
 });
 
+export const inventoryItemSchema = z.object({
+  name: z.string().trim().min(1, 'Name is required'),
+  unit: z.enum(['grams', 'ml', 'pieces']),
+  reorderThreshold: z.number().nonnegative(),
+  costPerUnit: z.number().nonnegative(),
+});
+
 export const recipeUpdateSchema = z.object({
   productId: z.string().min(1).optional(),
   modifierId: z.string().min(1).optional(),

@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import type { InventoryItem, StockAdjustmentPayload } from "~/types/inventory";
+import type { InventoryItem, InventoryItemPayload, StockAdjustmentPayload } from "~/types/inventory";
 
 export const useInventoryStore = defineStore("inventory", {
   state: () => ({
@@ -33,6 +33,24 @@ export const useInventoryStore = defineStore("inventory", {
       await adjustInventory(payload, token);
       // Re-fetch rather than mutate locally so the table reflects the
       // server's authoritative stock/low-stock state, not a client guess.
+      await this.fetchInventory();
+    },
+
+    async createItem(payload: InventoryItemPayload, token: string) {
+      const { createInventoryItem } = useApi();
+      await createInventoryItem(payload, token);
+      await this.fetchInventory();
+    },
+
+    async updateItem(id: string, payload: InventoryItemPayload, token: string) {
+      const { updateInventoryItem } = useApi();
+      await updateInventoryItem(id, payload, token);
+      await this.fetchInventory();
+    },
+
+    async deleteItem(id: string, token: string) {
+      const { deleteInventoryItem } = useApi();
+      await deleteInventoryItem(id, token);
       await this.fetchInventory();
     },
   },

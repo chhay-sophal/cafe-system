@@ -1,5 +1,6 @@
 export {
   inventoryAdjustmentSchema,
+  inventoryItemSchema,
   managerApprovalSchema,
   orderSchema,
   pinLoginSchema,
