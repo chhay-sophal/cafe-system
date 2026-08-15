@@ -27,3 +27,13 @@ export interface RecipeUpdatePayload {
   modifierId?: string;
   ingredients: Array<{ inventoryItemId: string; quantityRequired: number }>;
 }
+
+export interface RecipeSummaryEntry {
+  id: string;
+  ingredientCount: number;
+}
+
+export interface RecipeSummary {
+  products: RecipeSummaryEntry[];
+  modifiers: RecipeSummaryEntry[];
+}

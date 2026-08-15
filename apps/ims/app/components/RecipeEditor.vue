@@ -1,18 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
-import type { Category, ModifierGroup, Product } from "~/types/catalog";
+import { computed, onMounted, ref } from "vue";
 import type { InventoryItem } from "~/types/inventory";
+import type { Product } from "~/types/catalog";
 import type { RecipeIngredientDraft, RecipeTarget, RecipeTargetKind, RecipeUpdatePayload } from "~/types/recipe";
 
 const auth = useAuth();
-const { fetchCategories, fetchProducts, fetchModifiers, fetchRecipe, saveRecipe } = useApi();
+const recipeStore = useRecipeStore();
 const inventoryStore = useInventoryStore();
-
-const categories = ref<Category[]>([]);
-const products = ref<Product[]>([]);
-const modifierGroups = ref<ModifierGroup[]>([]);
-const isLoadingCatalog = ref(true);
-const catalogError = ref<string | null>(null);
 
 const targetKind = ref<RecipeTargetKind>("product");
 const selectedProductId = ref("");
@@ -25,22 +19,25 @@ const saveError = ref<string | null>(null);
 const saveSuccess = ref(false);
 const isSaving = ref(false);
 
+const isDeleteOpen = ref(false);
+const deletingProduct = ref<Product | null>(null);
+
 const inventoryItems = computed<InventoryItem[]>(() => inventoryStore.items);
 
 const productsByCategory = computed(() => {
   const grouped = new Map<string, Product[]>();
-  for (const product of products.value) {
+  for (const product of recipeStore.products) {
     const list = grouped.get(product.categoryId) ?? [];
     list.push(product);
     grouped.set(product.categoryId, list);
   }
-  return categories.value
+  return recipeStore.categories
     .map((category) => ({ category, products: grouped.get(category.id) ?? [] }))
     .filter((group) => group.products.length > 0);
 });
 
 const modifierOptionChoices = computed(() =>
-  modifierGroups.value.flatMap((group) =>
+  recipeStore.modifierGroups.flatMap((group) =>
     group.options.map((option) => ({ id: option.id, label: `${group.name}: ${option.name}` })),
   ),
 );
@@ -57,7 +54,7 @@ const currentTarget = computed<RecipeTarget | null>(() => {
 
 const currentTargetLabel = computed(() => {
   if (currentTarget.value?.kind === "product") {
-    return products.value.find((p) => p.id === currentTarget.value?.id)?.name ?? "";
+    return recipeStore.products.find((p) => p.id === currentTarget.value?.id)?.name ?? "";
   }
   if (currentTarget.value?.kind === "modifier") {
     return modifierOptionChoices.value.find((o) => o.id === currentTarget.value?.id)?.label ?? "";
@@ -101,7 +98,7 @@ async function loadRecipeForTarget() {
   loadError.value = null;
 
   try {
-    const records = await fetchRecipe(target);
+    const records = await recipeStore.fetchRecipe(target);
     rows.value = records.map((record) => ({
       rowKey: record.id,
       inventoryItemId: record.inventoryItemId,
@@ -112,6 +109,38 @@ async function loadRecipeForTarget() {
     rows.value = [];
   } finally {
     isLoadingRecipe.value = false;
+  }
+}
+
+function switchTargetKind(kind: RecipeTargetKind) {
+  targetKind.value = kind;
+  selectedProductId.value = "";
+  selectedModifierId.value = "";
+  rows.value = [];
+  saveSuccess.value = false;
+  saveError.value = null;
+}
+
+function selectTarget() {
+  saveSuccess.value = false;
+  saveError.value = null;
+  loadRecipeForTarget();
+}
+
+function startEditingProduct(productId: string) {
+  targetKind.value = "product";
+  selectedProductId.value = productId;
+  selectTarget();
+}
+
+function openDeleteModal(product: Product) {
+  deletingProduct.value = product;
+  isDeleteOpen.value = true;
+}
+
+function handleRecipeDeleted(productId: string) {
+  if (currentTarget.value?.kind === "product" && currentTarget.value.id === productId) {
+    rows.value = [];
   }
 }
 
@@ -144,7 +173,7 @@ async function handleSave() {
   }
 
   try {
-    await saveRecipe(payload, token);
+    await recipeStore.saveRecipe(payload, token);
     await loadRecipeForTarget();
     saveSuccess.value = true;
   } catch (error) {
@@ -154,51 +183,96 @@ async function handleSave() {
   }
 }
 
-watch(targetKind, () => {
-  selectedProductId.value = "";
-  selectedModifierId.value = "";
-  rows.value = [];
-});
-
-watch(currentTarget, () => {
-  saveSuccess.value = false;
-  saveError.value = null;
-  loadRecipeForTarget();
-});
-
 onMounted(async () => {
-  isLoadingCatalog.value = true;
-  catalogError.value = null;
+  if (!recipeStore.hasLoadedCatalog) {
+    await recipeStore.fetchCatalog();
+  }
 
-  try {
-    const [categoryList, productList, modifierList] = await Promise.all([
-      fetchCategories(),
-      fetchProducts(),
-      fetchModifiers(),
-    ]);
-    categories.value = categoryList;
-    products.value = productList;
-    modifierGroups.value = modifierList;
-
-    if (inventoryItems.value.length === 0) {
-      await inventoryStore.fetchInventory();
-    }
-  } catch (error) {
-    catalogError.value = error instanceof Error ? error.message : "Failed to load catalog.";
-  } finally {
-    isLoadingCatalog.value = false;
+  if (inventoryItems.value.length === 0) {
+    await inventoryStore.fetchInventory();
   }
 });
 </script>
 
 <template>
   <div>
+    <section class="mb-8">
+      <h2 class="mb-3 text-sm font-semibold text-slate-700">Menu Items</h2>
+
+      <p v-if="recipeStore.catalogError" class="rounded-lg bg-red-50 p-4 text-sm font-medium text-red-700">
+        {{ recipeStore.catalogError }}
+      </p>
+
+      <p v-else-if="recipeStore.isLoadingCatalog" class="p-6 text-center text-sm text-slate-500">
+        Loading menu items...
+      </p>
+
+      <div v-else class="overflow-x-auto rounded-lg border border-slate-200">
+        <table class="min-w-full divide-y divide-slate-200 text-sm">
+          <thead class="bg-slate-50">
+            <tr>
+              <th class="px-4 py-3 text-left font-semibold text-slate-600">Item</th>
+              <th class="px-4 py-3 text-left font-semibold text-slate-600">Recipe Status</th>
+              <th class="px-4 py-3" />
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 bg-white">
+            <tr v-for="product in recipeStore.products" :key="product.id">
+              <td class="px-4 py-3 text-slate-700">{{ product.name }}</td>
+              <td class="px-4 py-3">
+                <span
+                  v-if="recipeStore.hasProductRecipe(product.id)"
+                  class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700"
+                >
+                  {{ recipeStore.productRecipeCounts[product.id] }} ingredient(s)
+                </span>
+                <span
+                  v-else
+                  class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700"
+                >
+                  No Recipe Configured
+                </span>
+              </td>
+              <td class="px-4 py-3 text-right">
+                <div class="flex justify-end gap-2">
+                  <button
+                    v-if="!recipeStore.hasProductRecipe(product.id)"
+                    type="button"
+                    class="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700"
+                    @click="startEditingProduct(product.id)"
+                  >
+                    Create Recipe
+                  </button>
+                  <template v-else>
+                    <button
+                      type="button"
+                      class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                      @click="startEditingProduct(product.id)"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
+                      @click="openDeleteModal(product)"
+                    >
+                      Delete
+                    </button>
+                  </template>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <div class="mb-4 flex gap-2">
       <button
         type="button"
         class="rounded-lg px-4 py-2 text-sm font-semibold"
         :class="targetKind === 'product' ? 'bg-slate-900 text-white' : 'border border-slate-300 text-slate-700 hover:bg-slate-100'"
-        @click="targetKind = 'product'"
+        @click="switchTargetKind('product')"
       >
         Menu Item
       </button>
@@ -206,19 +280,13 @@ onMounted(async () => {
         type="button"
         class="rounded-lg px-4 py-2 text-sm font-semibold"
         :class="targetKind === 'modifier' ? 'bg-slate-900 text-white' : 'border border-slate-300 text-slate-700 hover:bg-slate-100'"
-        @click="targetKind = 'modifier'"
+        @click="switchTargetKind('modifier')"
       >
         Modifier Choice
       </button>
     </div>
 
-    <p v-if="catalogError" class="rounded-lg bg-red-50 p-4 text-sm font-medium text-red-700">{{ catalogError }}</p>
-
-    <template v-else-if="isLoadingCatalog">
-      <p class="p-6 text-center text-sm text-slate-500">Loading catalog...</p>
-    </template>
-
-    <template v-else>
+    <template v-if="!recipeStore.catalogError && !recipeStore.isLoadingCatalog">
       <div class="mb-6 max-w-md">
         <label class="block text-sm font-medium text-slate-700">
           {{ targetKind === "product" ? "Menu Item" : "Modifier Choice" }}
@@ -228,6 +296,7 @@ onMounted(async () => {
           v-if="targetKind === 'product'"
           v-model="selectedProductId"
           class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+          @change="selectTarget"
         >
           <option value="">Select a menu item...</option>
           <optgroup v-for="group in productsByCategory" :key="group.category.id" :label="group.category.name">
@@ -241,6 +310,7 @@ onMounted(async () => {
           v-else
           v-model="selectedModifierId"
           class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+          @change="selectTarget"
         >
           <option value="">Select a modifier choice...</option>
           <option v-for="choice in modifierOptionChoices" :key="choice.id" :value="choice.id">
@@ -336,5 +406,7 @@ onMounted(async () => {
         </template>
       </template>
     </template>
+
+    <RecipeDeleteModal v-model:open="isDeleteOpen" :product="deletingProduct" @deleted="handleRecipeDeleted" />
   </div>
 </template>

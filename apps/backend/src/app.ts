@@ -3,7 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { randomUUID } from 'crypto';
-import { eq, sql, gte, lte, and, inArray } from 'drizzle-orm';
+import { eq, sql, gte, lte, and, inArray, isNotNull } from 'drizzle-orm';
 import { db } from './db/index.js';
 import {
   users, categories, products, modifierGroups, modifiers, productModifiers,
@@ -359,6 +359,40 @@ function createApp() {
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: 'Failed to update stock adjustment' });
+    }
+  });
+
+  app.get('/api/recipes/summary', async (_req, res) => {
+    try {
+      const productCounts = db.select({
+        id: recipes.productId,
+        ingredientCount: sql<number>`count(*)`,
+      }).from(recipes).where(isNotNull(recipes.productId)).groupBy(recipes.productId).all();
+
+      const modifierCounts = db.select({
+        id: recipes.modifierId,
+        ingredientCount: sql<number>`count(*)`,
+      }).from(recipes).where(isNotNull(recipes.modifierId)).groupBy(recipes.modifierId).all();
+
+      res.json({ products: productCounts, modifiers: modifierCounts });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch recipe summary' });
+    }
+  });
+
+  app.delete('/api/recipes/:productId', authenticate, requireRole(['MANAGER', 'ADMIN']), async (req, res) => {
+    const productId = String(req.params.productId);
+
+    try {
+      const existing = db.select().from(products).where(eq(products.id, productId)).get();
+      if (!existing) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
+
+      db.delete(recipes).where(eq(recipes.productId, productId)).run();
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to delete recipe' });
     }
   });
 

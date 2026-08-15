@@ -1,7 +1,7 @@
 import type { AuthSession } from "~/types/auth";
 import type { Category, ModifierGroup, Product } from "~/types/catalog";
 import type { InventoryItem, InventoryItemPayload, StockAdjustmentPayload } from "~/types/inventory";
-import type { RecipeIngredientRecord, RecipeTarget, RecipeUpdatePayload } from "~/types/recipe";
+import type { RecipeIngredientRecord, RecipeSummary, RecipeTarget, RecipeUpdatePayload } from "~/types/recipe";
 import type { DailySummaryReport } from "~/types/reports";
 
 export class HttpError extends Error {
@@ -115,6 +115,14 @@ export function useApi() {
     return sendJson<{ success: boolean }>("PUT", "/api/recipes", payload, token);
   }
 
+  function fetchRecipeSummary(): Promise<RecipeSummary> {
+    return getJson<RecipeSummary>("/api/recipes/summary");
+  }
+
+  function deleteRecipe(productId: string, token: string): Promise<{ success: boolean }> {
+    return deleteJson<{ success: boolean }>(`/api/recipes/${productId}`, token);
+  }
+
   function fetchDailySummary(startDate: string, endDate: string): Promise<DailySummaryReport> {
     return getJson<DailySummaryReport>(`/api/reports/daily-summary?startDate=${startDate}&endDate=${endDate}`);
   }
@@ -131,6 +139,8 @@ export function useApi() {
     fetchModifiers,
     fetchRecipe,
     saveRecipe,
+    fetchRecipeSummary,
+    deleteRecipe,
     fetchDailySummary,
   };
 }
