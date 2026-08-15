@@ -20,6 +20,7 @@ async function seed() {
   console.log('Seeding Users...');
   const cashierId = randomUUID();
   const managerId = randomUUID();
+  const adminId = randomUUID();
 
   await db.insert(users).values([
     {
@@ -34,6 +35,13 @@ async function seed() {
       name: 'Bob Manager',
       pinHash: '9999',
       role: 'MANAGER',
+      isActive: true,
+    },
+    {
+      id: adminId,
+      name: 'Charlie Admin',
+      pinHash: '0000',
+      role: 'ADMIN',
       isActive: true,
     },
   ]);

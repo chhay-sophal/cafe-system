@@ -5,4 +5,6 @@ export {
   orderSchema,
   pinLoginSchema,
   recipeUpdateSchema,
+  userCreateSchema,
+  userUpdateSchema,
 } from '../../../packages/shared-types/src/index.js';

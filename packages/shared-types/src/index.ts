@@ -41,6 +41,22 @@ export const inventoryItemSchema = z.object({
   costPerUnit: z.number().nonnegative(),
 });
 
+export const userRoleSchema = z.enum(['CASHIER', 'BARISTA', 'MANAGER', 'ADMIN']);
+
+export const userCreateSchema = z.object({
+  name: z.string().trim().min(1, 'Name is required'),
+  pin: z.string().regex(/^\d{4}$/, 'PIN must be exactly 4 digits'),
+  role: userRoleSchema,
+  isActive: z.boolean().optional().default(true),
+});
+
+export const userUpdateSchema = z.object({
+  name: z.string().trim().min(1, 'Name is required'),
+  role: userRoleSchema,
+  isActive: z.boolean(),
+  pin: z.string().regex(/^\d{4}$/, 'PIN must be exactly 4 digits').optional(),
+});
+
 export const recipeUpdateSchema = z.object({
   productId: z.string().min(1).optional(),
   modifierId: z.string().min(1).optional(),

@@ -19,7 +19,17 @@ import {
   orderSchema,
   pinLoginSchema,
   recipeUpdateSchema,
+  userCreateSchema,
+  userUpdateSchema,
 } from './shared-schemas.js';
+
+const USER_PUBLIC_COLUMNS = {
+  id: users.id,
+  name: users.name,
+  role: users.role,
+  isActive: users.isActive,
+  createdAt: users.createdAt,
+};
 
 function createApp() {
   const app = express();
@@ -91,6 +101,59 @@ function createApp() {
     const { action = 'general-approval', reason = 'Approved locally' } = req.body;
 
     res.json({ success: true, approvedBy: req.user?.name, action, reason });
+  });
+
+  app.get('/api/users', authenticate, requireRole(['ADMIN']), async (_req, res) => {
+    try {
+      const result = db.select(USER_PUBLIC_COLUMNS).from(users).all();
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch users' });
+    }
+  });
+
+  app.post('/api/users', authenticate, requireRole(['ADMIN']), validateBody(userCreateSchema), async (req, res) => {
+    const { name, pin, role, isActive } = req.body;
+
+    try {
+      const id = randomUUID();
+      const pinHash = await hashPin(pin);
+      db.insert(users).values({ id, name, pinHash, role, isActive }).run();
+
+      const created = db.select(USER_PUBLIC_COLUMNS).from(users).where(eq(users.id, id)).get();
+      res.status(201).json(created);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to create user' });
+    }
+  });
+
+  app.put('/api/users/:id', authenticate, requireRole(['ADMIN']), validateBody(userUpdateSchema), async (req, res) => {
+    const id = String(req.params.id);
+    const { name, role, isActive, pin } = req.body;
+    const actingUserId = req.user?.id;
+
+    try {
+      const existing = db.select().from(users).where(eq(users.id, id)).get();
+      if (!existing) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      if (actingUserId === id && !isActive) {
+        return res.status(400).json({ error: 'You cannot deactivate your own account' });
+      }
+
+      const updates: { name: string; role: typeof role; isActive: boolean; pinHash?: string } = { name, role, isActive };
+      if (pin) {
+        updates.pinHash = await hashPin(pin);
+      }
+
+      db.update(users).set(updates).where(eq(users.id, id)).run();
+
+      const updated = db.select(USER_PUBLIC_COLUMNS).from(users).where(eq(users.id, id)).get();
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to update user' });
+    }
   });
 
   app.get('/api/categories', async (_req, res) => {

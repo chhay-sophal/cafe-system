@@ -3,6 +3,7 @@ import type { Category, ModifierGroup, Product } from "~/types/catalog";
 import type { InventoryItem, InventoryItemPayload, StockAdjustmentPayload } from "~/types/inventory";
 import type { RecipeIngredientRecord, RecipeSummary, RecipeTarget, RecipeUpdatePayload } from "~/types/recipe";
 import type { DailySummaryReport } from "~/types/reports";
+import type { StaffUser, UserCreatePayload, UserUpdatePayload } from "~/types/user";
 
 export class HttpError extends Error {
   status: number;
@@ -127,6 +128,18 @@ export function useApi() {
     return getJson<DailySummaryReport>(`/api/reports/daily-summary?startDate=${startDate}&endDate=${endDate}`);
   }
 
+  function fetchUsers(token: string): Promise<StaffUser[]> {
+    return getJson<StaffUser[]>("/api/users", token);
+  }
+
+  function createUser(payload: UserCreatePayload, token: string): Promise<StaffUser> {
+    return sendJson<StaffUser>("POST", "/api/users", payload, token);
+  }
+
+  function updateUser(id: string, payload: UserUpdatePayload, token: string): Promise<StaffUser> {
+    return sendJson<StaffUser>("PUT", `/api/users/${id}`, payload, token);
+  }
+
   return {
     fetchInventory,
     login,
@@ -142,5 +155,8 @@ export function useApi() {
     fetchRecipeSummary,
     deleteRecipe,
     fetchDailySummary,
+    fetchUsers,
+    createUser,
+    updateUser,
   };
 }
