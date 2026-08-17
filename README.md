@@ -33,7 +33,7 @@ The backend is the single source of truth; POS and IMS are independent frontends
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) 18+
-- [pnpm](https://pnpm.io/) 9.x (`corepack enable` will pick up the pinned version automatically)
+- [pnpm](https://pnpm.io/) 11.x (`corepack enable` will pick up the pinned version automatically)
 - Rust toolchain (only needed to build/run the POS desktop shell — see the [Tauri prerequisites guide](https://v2.tauri.app/start/prerequisites/))
 
 ### Install
