@@ -14,6 +14,12 @@ export default defineNuxtConfig({
     // The backend API already occupies :3000 in local dev.
     port: 3001
   },
+  // Pinned so `pnpm build` always emits a standalone Node server at
+  // .output/server/index.mjs, regardless of the host platform's
+  // auto-detected preset.
+  nitro: {
+    preset: 'node-server'
+  },
   runtimeConfig: {
     public: {
       apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:3000'

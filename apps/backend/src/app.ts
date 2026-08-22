@@ -3,7 +3,7 @@ import cors from 'cors';
 import fs from 'fs';
 import multer from 'multer';
 import path from 'path';
-import { fileURLToPath, pathToFileURL } from 'url';
+import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
 import { eq, sql, gte, lte, and, inArray, isNotNull } from 'drizzle-orm';
 import { db } from './db/index.js';
@@ -727,13 +727,4 @@ function createApp() {
   return app;
 }
 
-const app = createApp();
-
-if (typeof process !== 'undefined' && process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const PORT = Number(process.env.PORT ?? 3000);
-  app.listen(PORT, () => {
-    console.log(`☕ Cafe POS Backend API running at http://localhost:${PORT}`);
-  });
-}
-
-export { app, createApp };
+export { createApp };
