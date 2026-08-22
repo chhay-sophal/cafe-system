@@ -1,5 +1,9 @@
 {
   "name": "cafe-system",
   "private": true,
-  "packageManager": "pnpm@11.22.0"
+  "packageManager": "pnpm@11.22.0",
+  "scripts": {
+    "typecheck": "pnpm --filter backend --filter ims --filter pos run typecheck",
+    "build": "pnpm -r --if-present run build"
+  }
 }
