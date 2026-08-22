@@ -17,6 +17,7 @@ node_modules/
 apps/backend/.drizzle/
 apps/backend/.cache/
 apps/backend/data/
+apps/backend/backups/
 apps/backend/*.sqlite
 apps/backend/*.sqlite3
 apps/backend/.env.local
