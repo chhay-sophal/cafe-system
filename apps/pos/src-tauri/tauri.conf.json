@@ -2,7 +2,7 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "pos",
   "version": "0.1.0",
-  "identifier": "com.apphal.pos",
+  "identifier": "com.cafesystem.pos",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -12,9 +12,10 @@
   "app": {
     "windows": [
       {
-        "title": "pos",
-        "width": 800,
-        "height": 600
+        "title": "Cafe POS",
+        "fullscreen": true,
+        "resizable": false,
+        "center": true
       }
     ],
     "security": {
