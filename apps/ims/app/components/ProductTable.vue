@@ -13,10 +13,10 @@ const auth = useAuth();
 const store = useCatalogStore();
 
 const togglingIds = ref<Set<string>>(new Set());
-const failedImageIds = ref<Set<string>>(new Set());
+const failedImageUrls = ref<Set<string>>(new Set());
 
-function markImageFailed(productId: string) {
-  failedImageIds.value = new Set(failedImageIds.value).add(productId);
+function markImageFailed(url: string) {
+  failedImageUrls.value = new Set(failedImageUrls.value).add(url);
 }
 
 onMounted(() => {
@@ -117,11 +117,11 @@ async function toggleAvailability(product: Product) {
           <tr v-for="product in store.products" :key="product.id">
             <td class="px-4 py-3">
               <img
-                v-if="resolveImageUrl(product.imageUrl) && !failedImageIds.has(product.id)"
+                v-if="resolveImageUrl(product.imageUrl) && !failedImageUrls.has(resolveImageUrl(product.imageUrl)!)"
                 :src="resolveImageUrl(product.imageUrl)!"
                 :alt="product.name"
                 class="h-10 w-10 rounded-lg object-cover"
-                @error="markImageFailed(product.id)"
+                @error="markImageFailed(resolveImageUrl(product.imageUrl)!)"
               />
               <div
                 v-else
