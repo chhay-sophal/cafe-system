@@ -19,6 +19,7 @@ async function seed() {
   // ============================================================================
   console.log('Seeding Users...');
   const cashierId = randomUUID();
+  const baristaId = randomUUID();
   const managerId = randomUUID();
   const adminId = randomUUID();
 
@@ -28,6 +29,13 @@ async function seed() {
       name: 'Alice Cashier',
       pinHash: '1234', // Simple 4-digit PIN
       role: 'CASHIER',
+      isActive: true,
+    },
+    {
+      id: baristaId,
+      name: 'Carla Barista',
+      pinHash: '2222',
+      role: 'BARISTA',
       isActive: true,
     },
     {
