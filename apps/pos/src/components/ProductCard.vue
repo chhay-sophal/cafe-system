@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { resolveImageUrl } from "../lib/image";
 import type { Product } from "../types/catalog";
 
 const props = defineProps<{
@@ -11,7 +12,8 @@ const emit = defineEmits<{
 }>();
 
 const imageFailed = ref(false);
-const showImage = computed(() => Boolean(props.product.imageUrl) && !imageFailed.value);
+const resolvedImageUrl = computed(() => resolveImageUrl(props.product.imageUrl));
+const showImage = computed(() => Boolean(resolvedImageUrl.value) && !imageFailed.value);
 
 const formattedPrice = computed(() =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(props.product.basePrice),
@@ -37,7 +39,7 @@ function handleTap() {
     <div class="product-card__image-wrap">
       <img
         v-if="showImage"
-        :src="product.imageUrl!"
+        :src="resolvedImageUrl!"
         :alt="product.name"
         class="product-card__image"
         loading="lazy"
