@@ -1,52 +1,110 @@
-# Dependencies
+####################################
+# Node & Package Managers
+####################################
 node_modules/
 **/node_modules/
 .pnpm-store/
 **/.pnpm-store/
+.pnpm-debug.log*
 
-# Build outputs
-/dist/
-/build/
-/coverage/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+####################################
+# Build Outputs (general)
+####################################
+dist/
+build/
+coverage/
 **/dist/
 **/build/
 **/coverage/
 *.tsbuildinfo
 
-# Backend / Drizzle / local data
-apps/backend/.drizzle/
-apps/backend/.cache/
-apps/backend/data/
-apps/backend/backups/
-apps/backend/*.sqlite
-apps/backend/*.sqlite3
-apps/backend/.env.local
+####################################
+# Turborepo
+####################################
+.turbo/
+**/.turbo/
 
-# Environment files
+####################################
+# Environment & Secrets
+####################################
 .env
+.env.local
+.env.*.local
 .env.*
 !.env.example
 
-# Logs
-npm-debug.log*
-pnpm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-*.log
+####################################
+# Backend (Express + Drizzle + SQLite)
+####################################
+apps/backend/.drizzle/
+apps/backend/.cache/
 
-# Tauri / Rust
+# Local SQLite database files
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+apps/backend/data/store_data.db
+apps/backend/data/store_data.db-journal
+apps/backend/data/store_data.db-shm
+apps/backend/data/store_data.db-wal
+
+# Automated database backups
+backups/
+apps/backend/backups/
+
+# Uploaded media — keep the directory structure, ignore its contents
+apps/backend/uploads/*
+!apps/backend/uploads/.gitkeep
+!apps/backend/uploads/**/.gitkeep
+
+####################################
+# Nuxt 3 / Vue (apps/ims)
+####################################
+apps/ims/.nuxt/
+apps/ims/.output/
+apps/ims/.nitro/
+apps/ims/.cache/
+apps/ims/.data/
+**/.nuxt/
+**/.output/
+
+####################################
+# Tauri v2 & Rust (apps/pos)
+####################################
 apps/pos/src-tauri/target/
 apps/pos/src-tauri/gen/
 apps/pos/src-tauri/wix/
+apps/pos/src-tauri/Cargo.lock
 
-# OS files
+# Native installers / bundle outputs
+*.exe
+*.msi
+*.app
+*.dmg
+*.deb
+*.AppImage
+
+####################################
+# OS Files
+####################################
 .DS_Store
 Thumbs.db
 
-# Editor files
-.vscode/
+####################################
+# Editor Files
+####################################
+.vscode/*
+!.vscode/settings.json
 .idea/
 
-# Temporary files
+####################################
+# Temporary Files
+####################################
 tmp/
 temp/
