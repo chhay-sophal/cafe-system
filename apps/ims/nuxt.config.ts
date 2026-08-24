@@ -6,6 +6,15 @@ export default defineNuxtConfig({
     '@nuxtjs/tailwindcss'
   ],
   devtools: { enabled: true },
+  app: {
+    head: {
+      link: [
+        { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+        { rel: 'apple-touch-icon', href: '/icons/icon-192.png' },
+        { rel: 'manifest', href: '/manifest.webmanifest' },
+      ]
+    }
+  },
   // Internal dashboard tool backed entirely by the separate backend API - no
   // server-rendered data of its own, and auth state lives in localStorage,
   // so plain client-side rendering avoids hydration mismatches for both.
