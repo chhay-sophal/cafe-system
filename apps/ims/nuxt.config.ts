@@ -20,8 +20,9 @@ export default defineNuxtConfig({
   // so plain client-side rendering avoids hydration mismatches for both.
   ssr: false,
   devServer: {
-    // The backend API already occupies :3000 in local dev.
-    port: 3001
+    // The backend API already occupies :3000 in local dev. Matches the
+    // IMS_PORT default in ecosystem.config.js so dev and prod agree.
+    port: 8080
   },
   // Pinned so `pnpm build` always emits a standalone Node server at
   // .output/server/index.mjs, regardless of the host platform's

@@ -80,7 +80,7 @@ Each app runs independently — start the backend first, then whichever client(s
 # API — http://localhost:3000
 pnpm --filter @cafe-system/backend dev
 
-# IMS manager dashboard — http://localhost:3001
+# IMS manager dashboard — http://localhost:8080
 pnpm --filter ims dev
 
 # POS terminal (web preview)
