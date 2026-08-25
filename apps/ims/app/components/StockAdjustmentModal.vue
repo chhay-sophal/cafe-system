@@ -8,14 +8,15 @@ const props = defineProps<{
 
 const open = defineModel<boolean>("open", { default: false });
 
+const { t } = useI18n();
 const auth = useAuth();
 const store = useInventoryStore();
 
-const ADJUSTMENT_TYPES: Array<{ value: AdjustmentType; label: string }> = [
-  { value: "RESTOCK", label: "Restock" },
-  { value: "WASTAGE", label: "Wastage" },
-  { value: "AUDIT_CORRECTION", label: "Audit Correction" },
-];
+const ADJUSTMENT_TYPES = computed<Array<{ value: AdjustmentType; label: string }>>(() => [
+  { value: "RESTOCK", label: t("stockAdjustment.types.RESTOCK") },
+  { value: "WASTAGE", label: t("stockAdjustment.types.WASTAGE") },
+  { value: "AUDIT_CORRECTION", label: t("stockAdjustment.types.AUDIT_CORRECTION") },
+]);
 
 const type = ref<AdjustmentType>("RESTOCK");
 const quantity = ref<number | null>(null);
@@ -24,9 +25,9 @@ const isSubmitting = ref(false);
 const errorMessage = ref<string | null>(null);
 
 const quantityLabel = computed(() => {
-  if (type.value === "RESTOCK") return "Quantity Received";
-  if (type.value === "WASTAGE") return "Quantity Wasted";
-  return "Adjustment Amount (use - for a reduction)";
+  if (type.value === "RESTOCK") return t("stockAdjustment.quantityReceived");
+  if (type.value === "WASTAGE") return t("stockAdjustment.quantityWasted");
+  return t("stockAdjustment.adjustmentAmount");
 });
 
 // Restock/wastage always move stock in one direction; only an audit
@@ -67,7 +68,7 @@ async function submit() {
 
   const token = auth.session.value?.token;
   if (!token) {
-    errorMessage.value = "Your session has expired. Please sign in again.";
+    errorMessage.value = t("common.sessionExpired");
     return;
   }
 
@@ -86,7 +87,7 @@ async function submit() {
     );
     open.value = false;
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : "Failed to submit adjustment.";
+    errorMessage.value = error instanceof Error ? error.message : t("stockAdjustment.submitError");
   } finally {
     isSubmitting.value = false;
   }
@@ -98,7 +99,7 @@ async function submit() {
     <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
       <div class="flex items-start justify-between">
         <div>
-          <h2 class="text-lg font-bold text-slate-900">Adjust Stock</h2>
+          <h2 class="text-lg font-bold text-slate-900">{{ $t("stockAdjustment.heading") }}</h2>
           <p class="text-sm text-slate-500">{{ item.name }}</p>
         </div>
         <button type="button" class="text-2xl leading-none text-slate-400 hover:text-slate-600" @click="close">
@@ -107,11 +108,14 @@ async function submit() {
       </div>
 
       <p class="mt-4 text-sm text-slate-600">
-        Current stock: <span class="font-semibold text-slate-900">{{ item.stockQuantity }} {{ item.unit }}</span>
+        <i18n-t keypath="stockAdjustment.currentStock" tag="span">
+          <template #quantity><span class="font-semibold text-slate-900">{{ item.stockQuantity }}</span></template>
+          <template #unit><span class="font-semibold text-slate-900">{{ item.unit }}</span></template>
+        </i18n-t>
       </p>
 
       <div class="mt-4">
-        <label class="block text-sm font-medium text-slate-700">Adjustment Type</label>
+        <label class="block text-sm font-medium text-slate-700">{{ $t("stockAdjustment.adjustmentType") }}</label>
         <select
           v-model="type"
           class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
@@ -129,17 +133,17 @@ async function submit() {
           type="number"
           step="any"
           class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
-          :placeholder="`Amount in ${item.unit}`"
+          :placeholder="$t('stockAdjustment.amountPlaceholder', { unit: item.unit })"
         />
       </div>
 
       <div class="mt-4">
-        <label class="block text-sm font-medium text-slate-700">Notes (optional)</label>
+        <label class="block text-sm font-medium text-slate-700">{{ $t("stockAdjustment.notes") }}</label>
         <textarea
           v-model="notes"
           rows="2"
           class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
-          placeholder="e.g. Delivery from supplier, spoilage during prep..."
+          :placeholder="$t('stockAdjustment.notesPlaceholder')"
         />
       </div>
 
@@ -151,7 +155,7 @@ async function submit() {
           class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
           @click="close"
         >
-          Cancel
+          {{ $t("common.cancel") }}
         </button>
         <button
           type="button"
@@ -159,7 +163,7 @@ async function submit() {
           class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
           @click="submit"
         >
-          {{ isSubmitting ? "Saving..." : "Save Adjustment" }}
+          {{ isSubmitting ? $t("common.saving") : $t("stockAdjustment.saveButton") }}
         </button>
       </div>
     </div>

@@ -8,6 +8,7 @@ const props = defineProps<{
 
 const open = defineModel<boolean>("open", { default: false });
 
+const { t } = useI18n();
 const auth = useAuth();
 const store = useUserStore();
 
@@ -23,7 +24,7 @@ const errorMessage = ref<string | null>(null);
 
 const isEditMode = computed(() => props.user !== null);
 
-const nameError = computed(() => (name.value.trim().length === 0 ? "Name is required" : null));
+const nameError = computed(() => (name.value.trim().length === 0 ? t("common.nameRequired") : null));
 
 const pinError = computed(() => {
   // A blank PIN is only valid when editing an existing account - it means
@@ -31,7 +32,7 @@ const pinError = computed(() => {
   if (isEditMode.value && pin.value.trim().length === 0) {
     return null;
   }
-  return PIN_PATTERN.test(pin.value) ? null : "PIN must be exactly 4 digits";
+  return PIN_PATTERN.test(pin.value) ? null : t("staff.pinError");
 });
 
 const canSubmit = computed(() => !nameError.value && !pinError.value && !isSubmitting.value);
@@ -67,7 +68,7 @@ async function submit() {
 
   const token = auth.session.value?.token;
   if (!token) {
-    errorMessage.value = "Your session has expired. Please sign in again.";
+    errorMessage.value = t("common.sessionExpired");
     return;
   }
 
@@ -99,7 +100,7 @@ async function submit() {
     }
     open.value = false;
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : "Failed to save staff account.";
+    errorMessage.value = error instanceof Error ? error.message : t("staff.saveError");
   } finally {
     isSubmitting.value = false;
   }
@@ -109,45 +110,45 @@ async function submit() {
 <template>
   <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
     <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-      <h2 class="text-lg font-bold text-slate-900">{{ isEditMode ? "Edit Staff Member" : "New Staff Member" }}</h2>
+      <h2 class="text-lg font-bold text-slate-900">{{ isEditMode ? $t("staff.editHeading") : $t("staff.newHeading") }}</h2>
 
       <div class="mt-4">
-        <label class="block text-sm font-medium text-slate-700">Name</label>
+        <label class="block text-sm font-medium text-slate-700">{{ $t("common.name") }}</label>
         <input
           v-model="name"
           type="text"
-          placeholder="e.g. Jamie Rivera"
+          :placeholder="$t('staff.namePlaceholder')"
           class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
         />
       </div>
 
       <div class="mt-4">
         <label class="block text-sm font-medium text-slate-700">
-          PIN {{ isEditMode ? "(leave blank to keep current PIN)" : "" }}
+          {{ $t("staff.pinLabel") }} {{ isEditMode ? $t("staff.pinKeepCurrent") : "" }}
         </label>
         <input
           v-model="pin"
           type="password"
           inputmode="numeric"
           maxlength="4"
-          placeholder="4 digits"
+          :placeholder="$t('staff.pinPlaceholder')"
           class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm tracking-widest focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
         />
         <p v-if="pin.length > 0 && pinError" class="mt-1 text-xs font-medium text-red-600">{{ pinError }}</p>
       </div>
 
       <div class="mt-4">
-        <label class="block text-sm font-medium text-slate-700">Role</label>
+        <label class="block text-sm font-medium text-slate-700">{{ $t("staff.role") }}</label>
         <select
           v-model="role"
           class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
         >
-          <option v-for="option in ROLES" :key="option" :value="option">{{ option }}</option>
+          <option v-for="option in ROLES" :key="option" :value="option">{{ $t(`staff.roles.${option}`) }}</option>
         </select>
       </div>
 
       <div class="mt-4 flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2.5">
-        <span class="text-sm font-medium text-slate-700">Active</span>
+        <span class="text-sm font-medium text-slate-700">{{ $t("staff.active") }}</span>
         <button
           type="button"
           role="switch"
@@ -173,7 +174,7 @@ async function submit() {
           class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
           @click="close"
         >
-          Cancel
+          {{ $t("common.cancel") }}
         </button>
         <button
           type="button"
@@ -181,7 +182,7 @@ async function submit() {
           class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
           @click="submit"
         >
-          {{ isSubmitting ? "Saving..." : isEditMode ? "Save Changes" : "Create Staff Member" }}
+          {{ isSubmitting ? $t("common.saving") : isEditMode ? $t("common.saveChanges") : $t("staff.createButton") }}
         </button>
       </div>
     </div>

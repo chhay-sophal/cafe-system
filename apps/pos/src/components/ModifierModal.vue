@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive } from "vue";
+import { useI18n } from "vue-i18n";
 import type { CartModifier, ModifierGroup, ModifierOption } from "../types/cart";
 import type { Product } from "../types/catalog";
 
@@ -12,6 +13,8 @@ const emit = defineEmits<{
   confirm: [modifiers: CartModifier[]];
   cancel: [];
 }>();
+
+const { t } = useI18n({ useScope: "global" });
 
 const selections = reactive<Record<string, string[]>>(
   Object.fromEntries(props.groups.map((group) => [group.id, []])),
@@ -103,10 +106,10 @@ onUnmounted(() => {
 
 <template>
   <div class="modifier-modal-backdrop" @click.self="handleCancel">
-    <div class="modifier-modal" role="dialog" aria-modal="true" :aria-label="`Customize ${product.name}`">
+    <div class="modifier-modal" role="dialog" aria-modal="true" :aria-label="t('modifier.customizeAria', { name: product.name })">
       <header class="modifier-modal__header">
         <h2 class="modifier-modal__title">{{ product.name }}</h2>
-        <button type="button" class="modifier-modal__close" aria-label="Close" @click="handleCancel">
+        <button type="button" class="modifier-modal__close" :aria-label="t('common.close')" @click="handleCancel">
           &times;
         </button>
       </header>
@@ -116,9 +119,9 @@ onUnmounted(() => {
           <div class="modifier-group__header">
             <span class="modifier-group__name">{{ group.name }}</span>
             <span v-if="(group.minSelection ?? 0) > 0" class="modifier-group__required">
-              Required &middot; choose {{ group.minSelection }}
+              {{ t("modifier.requiredChoose", { count: group.minSelection }) }}
             </span>
-            <span v-else class="modifier-group__optional">Optional</span>
+            <span v-else class="modifier-group__optional">{{ t("modifier.optional") }}</span>
           </div>
 
           <div class="modifier-group__options">
@@ -142,13 +145,13 @@ onUnmounted(() => {
 
       <footer class="modifier-modal__footer">
         <p v-if="unsatisfiedGroups.length > 0" class="modifier-modal__hint">
-          Select an option for: {{ unsatisfiedGroups.map((g) => g.name).join(", ") }}
+          {{ t("modifier.selectPrompt", { list: unsatisfiedGroups.map((g) => g.name).join(", ") }) }}
         </p>
         <div class="modifier-modal__actions">
           <span class="modifier-modal__running-price">{{ currencyFormatter.format(runningUnitPrice) }}</span>
-          <button type="button" class="modifier-modal__cancel" @click="handleCancel">Cancel</button>
+          <button type="button" class="modifier-modal__cancel" @click="handleCancel">{{ t("common.cancel") }}</button>
           <button type="button" class="modifier-modal__confirm" :disabled="!canConfirm" @click="handleConfirm">
-            Add to Order
+            {{ t("modifier.addToOrder") }}
           </button>
         </div>
       </footer>

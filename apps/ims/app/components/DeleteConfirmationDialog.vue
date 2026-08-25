@@ -8,6 +8,7 @@ const props = defineProps<{
 
 const open = defineModel<boolean>("open", { default: false });
 
+const { t } = useI18n();
 const auth = useAuth();
 const store = useInventoryStore();
 
@@ -31,7 +32,7 @@ async function confirmDelete() {
 
   const token = auth.session.value?.token;
   if (!token) {
-    errorMessage.value = "Your session has expired. Please sign in again.";
+    errorMessage.value = t("common.sessionExpired");
     return;
   }
 
@@ -45,7 +46,7 @@ async function confirmDelete() {
     // A recipe-bound item is rejected by the backend with an explicit
     // message - surface it here rather than closing, so the manager sees
     // exactly why the delete was refused before deciding what to do next.
-    errorMessage.value = error instanceof Error ? error.message : "Failed to delete item.";
+    errorMessage.value = error instanceof Error ? error.message : t("inventoryItem.deleteError");
   } finally {
     isDeleting.value = false;
   }
@@ -55,9 +56,11 @@ async function confirmDelete() {
 <template>
   <div v-if="open && item" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
     <div class="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
-      <h2 class="text-lg font-bold text-slate-900">Delete Inventory Item</h2>
+      <h2 class="text-lg font-bold text-slate-900">{{ $t("inventoryItem.deleteHeading") }}</h2>
       <p class="mt-2 text-sm text-slate-600">
-        Are you sure you want to delete <span class="font-semibold">{{ item.name }}</span>? This cannot be undone.
+        <i18n-t keypath="inventoryItem.deleteConfirm" tag="span">
+          <template #name><span class="font-semibold">{{ item.name }}</span></template>
+        </i18n-t>
       </p>
 
       <p v-if="errorMessage" class="mt-4 rounded-lg bg-red-50 p-3 text-sm font-medium text-red-700">
@@ -70,7 +73,7 @@ async function confirmDelete() {
           class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
           @click="close"
         >
-          Cancel
+          {{ $t("common.cancel") }}
         </button>
         <button
           type="button"
@@ -78,7 +81,7 @@ async function confirmDelete() {
           class="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
           @click="confirmDelete"
         >
-          {{ isDeleting ? "Deleting..." : "Delete" }}
+          {{ isDeleting ? $t("common.deleting") : $t("common.delete") }}
         </button>
       </div>
     </div>

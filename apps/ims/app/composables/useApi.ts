@@ -17,14 +17,18 @@ export class HttpError extends Error {
   }
 }
 
-async function parseErrorMessage(response: Response): Promise<string> {
+async function parseErrorMessage(response: Response, t: (key: string, params: Record<string, unknown>) => string): Promise<string> {
   const body = await response.json().catch(() => null);
-  return body?.error ?? `Request failed with status ${response.status}`;
+  return body?.error ?? t("common.requestFailed", { status: response.status });
 }
 
 export function useApi() {
   const config = useRuntimeConfig();
   const baseUrl = config.public.apiBase;
+  // useApi() itself runs inside store actions and other callbacks invoked
+  // well after setup, where useI18n()'s inject() call would throw - the
+  // global composer on the Nuxt app has no such restriction.
+  const { t } = useNuxtApp().$i18n;
 
   async function getJson<T>(path: string, token?: string): Promise<T> {
     const headers: Record<string, string> = {};
@@ -35,7 +39,7 @@ export function useApi() {
     const response = await fetch(`${baseUrl}${path}`, { headers });
 
     if (!response.ok) {
-      throw new HttpError(await parseErrorMessage(response), response.status);
+      throw new HttpError(await parseErrorMessage(response, t), response.status);
     }
 
     return response.json() as Promise<T>;
@@ -54,7 +58,7 @@ export function useApi() {
     });
 
     if (!response.ok) {
-      throw new HttpError(await parseErrorMessage(response), response.status);
+      throw new HttpError(await parseErrorMessage(response, t), response.status);
     }
 
     return response.json() as Promise<T>;
@@ -67,7 +71,7 @@ export function useApi() {
     });
 
     if (!response.ok) {
-      throw new HttpError(await parseErrorMessage(response), response.status);
+      throw new HttpError(await parseErrorMessage(response, t), response.status);
     }
 
     return response.json() as Promise<T>;
@@ -83,7 +87,7 @@ export function useApi() {
     });
 
     if (!response.ok) {
-      throw new HttpError(await parseErrorMessage(response), response.status);
+      throw new HttpError(await parseErrorMessage(response, t), response.status);
     }
 
     return response.json() as Promise<T>;

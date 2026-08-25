@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { useAuth } from "../composables/useAuth";
+import { setLocale } from "../i18n";
 
+const { t, locale } = useI18n({ useScope: "global" });
 const auth = useAuth();
 
 const pin = ref("");
@@ -39,7 +42,7 @@ async function submit() {
   try {
     await auth.login(pin.value);
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : "Login failed.";
+    errorMessage.value = error instanceof Error ? error.message : t("login.genericError");
     pin.value = "";
   } finally {
     isSubmitting.value = false;
@@ -50,12 +53,22 @@ async function submit() {
 <template>
   <div class="login-screen">
     <div class="login-card">
-      <h1 class="login-card__title">Cafe POS</h1>
-      <p class="login-card__subtitle">Enter your PIN to start a shift</p>
+      <div class="login-card__locale-row">
+        <select
+          :value="locale"
+          class="login-card__locale"
+          @change="setLocale(($event.target as HTMLSelectElement).value as 'en-US' | 'km-KH')"
+        >
+          <option value="en-US">English</option>
+          <option value="km-KH">ខ្មែរ</option>
+        </select>
+      </div>
+      <h1 class="login-card__title">{{ t("app.title") }}</h1>
+      <p class="login-card__subtitle">{{ t("login.subtitle") }}</p>
 
       <div class="login-card__pin-display" aria-live="polite">
         <span v-if="pin.length > 0">{{ maskedPin }}</span>
-        <span v-else class="login-card__pin-placeholder">Enter PIN</span>
+        <span v-else class="login-card__pin-placeholder">{{ t("login.enterPin") }}</span>
       </div>
 
       <p v-if="errorMessage" class="login-card__error">{{ errorMessage }}</p>
@@ -72,7 +85,7 @@ async function submit() {
           {{ digit }}
         </button>
         <button type="button" class="login-keypad__key login-keypad__key--muted" :disabled="isSubmitting" @click="pressClear">
-          Clear
+          {{ t("common.clear") }}
         </button>
         <button type="button" class="login-keypad__key" :disabled="isSubmitting" @click="pressDigit('0')">0</button>
         <button type="button" class="login-keypad__key login-keypad__key--muted" :disabled="isSubmitting" @click="pressBackspace">
@@ -86,7 +99,7 @@ async function submit() {
         :disabled="pin.length === 0 || isSubmitting"
         @click="submit"
       >
-        {{ isSubmitting ? "Logging in..." : "Log In" }}
+        {{ isSubmitting ? t("login.loggingIn") : t("login.logIn") }}
       </button>
     </div>
   </div>
@@ -109,6 +122,21 @@ async function submit() {
   background: #ffffff;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
   text-align: center;
+}
+
+.login-card__locale-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.5rem;
+}
+
+.login-card__locale {
+  border: 2px solid #dcdcdc;
+  background: #ffffff;
+  color: #1a1a1a;
+  border-radius: 8px;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.85rem;
 }
 
 .login-card__title {
@@ -215,6 +243,12 @@ async function submit() {
   }
 
   .login-card__title {
+    color: #f2f2f2;
+  }
+
+  .login-card__locale {
+    background: #2a2a2a;
+    border-color: #444444;
     color: #f2f2f2;
   }
 

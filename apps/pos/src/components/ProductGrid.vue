@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import type { Product } from "../types/catalog";
 import ProductCard from "./ProductCard.vue";
 
@@ -11,6 +12,8 @@ defineProps<{
 const emit = defineEmits<{
   select: [product: Product];
 }>();
+
+const { t } = useI18n({ useScope: "global" });
 </script>
 
 <template>
@@ -19,10 +22,10 @@ const emit = defineEmits<{
       {{ errorMessage }}
     </p>
 
-    <p v-else-if="isLoading" class="product-grid__state">Loading menu...</p>
+    <p v-else-if="isLoading" class="product-grid__state">{{ t("product.loading") }}</p>
 
     <p v-else-if="products.length === 0" class="product-grid__state">
-      No items in this category.
+      {{ t("product.empty") }}
     </p>
 
     <div v-else class="product-grid">

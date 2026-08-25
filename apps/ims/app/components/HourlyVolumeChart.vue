@@ -5,6 +5,7 @@ import { Bar } from "vue-chartjs";
 
 ChartJS.register(...registerables);
 
+const { t } = useI18n();
 const store = useReportsStore();
 
 const showTable = ref(false);
@@ -24,7 +25,7 @@ const chartData = computed(() => ({
   labels: hourlyVolume.value.map((entry) => formatHourLabel(entry.hour)),
   datasets: [
     {
-      label: "Orders",
+      label: t("hourlyVolume.orders"),
       data: hourlyVolume.value.map((entry) => entry.orderCount),
       backgroundColor: "#2a78d6",
       borderRadius: { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 },
@@ -54,8 +55,8 @@ const chartOptions = {
       callbacks: {
         label(context: TooltipItem<"bar">) {
           const entry = hourlyVolume.value[context.dataIndex];
-          const orderCount = context.parsed.y;
-          return ` ${orderCount} ${orderCount === 1 ? "order" : "orders"} – ${currencyFormatter.format(entry?.revenue ?? 0)}`;
+          const orderCount = context.parsed.y ?? 0;
+          return ` ${t("hourlyVolume.orderCount", orderCount)} – ${currencyFormatter.format(entry?.revenue ?? 0)}`;
         },
       },
     },
@@ -66,28 +67,28 @@ const chartOptions = {
 <template>
   <div class="rounded-lg border border-slate-200 bg-white p-4">
     <div class="mb-3 flex items-center justify-between">
-      <h3 class="text-sm font-semibold text-slate-700">Hourly Volume</h3>
+      <h3 class="text-sm font-semibold text-slate-700">{{ $t("hourlyVolume.heading") }}</h3>
       <button
         v-if="hasData"
         type="button"
         class="text-xs font-semibold text-slate-500 hover:text-slate-700"
         @click="showTable = !showTable"
       >
-        {{ showTable ? "View chart" : "View table" }}
+        {{ showTable ? $t("common.viewChart") : $t("common.viewTable") }}
       </button>
     </div>
 
     <p v-if="!hasData" class="flex h-64 items-center justify-center text-center text-sm text-slate-400">
-      No orders recorded for this period.
+      {{ $t("hourlyVolume.noData") }}
     </p>
 
     <div v-else-if="showTable" class="max-h-64 overflow-y-auto">
       <table class="w-full text-sm">
         <thead>
           <tr class="border-b border-slate-200 text-left text-slate-500">
-            <th class="py-2 font-medium">Hour</th>
-            <th class="py-2 text-right font-medium">Orders</th>
-            <th class="py-2 text-right font-medium">Revenue</th>
+            <th class="py-2 font-medium">{{ $t("hourlyVolume.hour") }}</th>
+            <th class="py-2 text-right font-medium">{{ $t("hourlyVolume.orders") }}</th>
+            <th class="py-2 text-right font-medium">{{ $t("hourlyVolume.revenue") }}</th>
           </tr>
         </thead>
         <tbody>

@@ -1,0 +1,233 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving...",
+    "saveChanges": "Save Changes",
+    "edit": "Edit",
+    "delete": "Delete",
+    "deleting": "Deleting...",
+    "name": "Name",
+    "nameRequired": "Name is required",
+    "sessionExpired": "Your session has expired. Please sign in again.",
+    "requestFailed": "Request failed with status {status}",
+    "viewChart": "View chart",
+    "viewTable": "View table",
+    "selectEllipsis": "Select...",
+    "dash": "-"
+  },
+  "app": {
+    "title": "Inventory Manager",
+    "logout": "Log out",
+    "nav": {
+      "stock": "Stock",
+      "menu": "Menu",
+      "recipes": "Recipes",
+      "analytics": "Analytics",
+      "staff": "Staff"
+    }
+  },
+  "login": {
+    "subtitle": "Sign in with your manager PIN",
+    "pinLabel": "PIN",
+    "signIn": "Sign In",
+    "signingIn": "Signing in...",
+    "genericError": "Login failed.",
+    "noManagerAccess": "This PIN does not have manager access to inventory."
+  },
+  "analytics": {
+    "heading": "Sales Analytics",
+    "loadingReport": "Loading report..."
+  },
+  "summaryCards": {
+    "grossRevenue": "Gross revenue",
+    "netRevenue": "Net revenue",
+    "orders": "Orders",
+    "averageOrderValue": "Average order value"
+  },
+  "dateRange": {
+    "today": "Today",
+    "last7Days": "Last 7 days",
+    "last30Days": "Last 30 days",
+    "monthToDate": "Month to date",
+    "customRange": "Custom range",
+    "apply": "Apply"
+  },
+  "hourlyVolume": {
+    "heading": "Hourly Volume",
+    "noData": "No orders recorded for this period.",
+    "hour": "Hour",
+    "orders": "Orders",
+    "revenue": "Revenue",
+    "orderCount": "{count} order | {count} orders"
+  },
+  "paymentBreakdown": {
+    "heading": "Payment Breakdown",
+    "noData": "No payments recorded for this period.",
+    "method": "Method",
+    "amount": "Amount",
+    "share": "Share",
+    "methods": {
+      "CASH": "Cash",
+      "CARD": "Card",
+      "QR_CODE": "Mobile Pay"
+    }
+  },
+  "categories": {
+    "manage": "Manage Categories",
+    "none": "No categories yet.",
+    "addHeading": "Add Category",
+    "namePlaceholder": "e.g. Bakery",
+    "orderPlaceholder": "Order",
+    "add": "Add Category",
+    "adding": "Adding...",
+    "createError": "Failed to create category.",
+    "updateError": "Failed to update category."
+  },
+  "inventoryItem": {
+    "deleteHeading": "Delete Inventory Item",
+    "deleteConfirm": "Are you sure you want to delete {name}? This cannot be undone.",
+    "deleteError": "Failed to delete item.",
+    "editHeading": "Edit Item",
+    "newHeading": "New Inventory Item",
+    "namePlaceholder": "e.g. Oat Milk",
+    "unit": "Unit",
+    "reorderThreshold": "Reorder Threshold",
+    "reorderError": "Enter a reorder threshold of 0 or more",
+    "costPerUnit": "Cost Per Unit",
+    "costError": "Enter a cost of 0 or more",
+    "saveError": "Failed to save item.",
+    "createButton": "Create Item"
+  },
+  "product": {
+    "deleteHeading": "Delete Product",
+    "deleteConfirm": "Are you sure you want to delete {name}? This also removes any recipe/ingredient mappings and modifier links for this item. This cannot be undone.",
+    "deleteError": "Failed to delete product.",
+    "editHeading": "Edit Product",
+    "newHeading": "New Product",
+    "previewAlt": "Product preview",
+    "imageLabel": "Product Image",
+    "namePlaceholder": "e.g. Iced Matcha Latte",
+    "category": "Category",
+    "basePrice": "Base Price",
+    "availableOnMenu": "Available on menu",
+    "categoryRequired": "Category is required",
+    "priceError": "Enter a price of 0 or more",
+    "uploadError": "Failed to upload image.",
+    "saveError": "Failed to save product.",
+    "uploadingImage": "Uploading image...",
+    "createButton": "Create Product"
+  },
+  "productTable": {
+    "heading": "Menu Items",
+    "newButton": "+ New Product",
+    "loading": "Loading menu...",
+    "empty": "No menu items yet.",
+    "image": "Image",
+    "item": "Item",
+    "category": "Category",
+    "basePrice": "Base Price",
+    "available": "Available"
+  },
+  "recipe": {
+    "deleteHeading": "Delete Recipe",
+    "deleteConfirm": "Remove the recipe for {name}? This deletes all {count} ingredient link(s). The product itself stays on the menu - you can add a new recipe for it at any time.",
+    "deleteError": "Failed to delete recipe.",
+    "menuItemsHeading": "Menu Items",
+    "recipeStatus": "Recipe Status",
+    "ingredientCount": "{count} ingredient(s)",
+    "notConfigured": "No Recipe Configured",
+    "createRecipe": "Create Recipe",
+    "menuItemTab": "Menu Item",
+    "modifierChoiceTab": "Modifier Choice",
+    "targetNoun": {
+      "product": "menu item",
+      "modifier": "modifier choice"
+    },
+    "selectMenuItem": "Select a menu item...",
+    "selectModifierChoice": "Select a modifier choice...",
+    "selectPrompt": "Select a {target} above to edit its ingredient recipe.",
+    "loadingRecipe": "Loading recipe...",
+    "loadError": "Failed to load recipe.",
+    "ingredientsFor": "Ingredients for \"{label}\"",
+    "noIngredients": "No ingredients mapped yet. Add one below.",
+    "selectIngredientOption": "Select an ingredient...",
+    "selectIngredientRequired": "Select an ingredient",
+    "quantityPlaceholder": "Quantity",
+    "quantityError": "Enter a quantity greater than zero",
+    "remove": "Remove",
+    "addIngredient": "+ Add Ingredient",
+    "saveRecipe": "Save Recipe",
+    "saveError": "Failed to save recipe.",
+    "saveSuccess": "Recipe saved.",
+    "loadingMenuItems": "Loading menu items..."
+  },
+  "stockAdjustment": {
+    "types": {
+      "RESTOCK": "Restock",
+      "WASTAGE": "Wastage",
+      "AUDIT_CORRECTION": "Audit Correction"
+    },
+    "quantityReceived": "Quantity Received",
+    "quantityWasted": "Quantity Wasted",
+    "adjustmentAmount": "Adjustment Amount (use - for a reduction)",
+    "heading": "Adjust Stock",
+    "currentStock": "Current stock: {quantity} {unit}",
+    "adjustmentType": "Adjustment Type",
+    "amountPlaceholder": "Amount in {unit}",
+    "notes": "Notes (optional)",
+    "notesPlaceholder": "e.g. Delivery from supplier, spoilage during prep...",
+    "saveButton": "Save Adjustment",
+    "submitError": "Failed to submit adjustment."
+  },
+  "stockTable": {
+    "searchPlaceholder": "Search items...",
+    "allUnits": "All units",
+    "lowStockBadge": "{count} low stock",
+    "newButton": "+ New Item",
+    "loading": "Loading inventory...",
+    "empty": "No inventory items match your filters.",
+    "lowStock": "Low Stock",
+    "ok": "OK",
+    "adjust": "Adjust",
+    "columns": {
+      "item": "Item",
+      "stock": "Stock",
+      "unit": "Unit",
+      "reorderAt": "Reorder At",
+      "status": "Status",
+      "updated": "Updated"
+    }
+  },
+  "staff": {
+    "editHeading": "Edit Staff Member",
+    "newHeading": "New Staff Member",
+    "namePlaceholder": "e.g. Jamie Rivera",
+    "pinLabel": "PIN",
+    "pinKeepCurrent": "(leave blank to keep current PIN)",
+    "pinPlaceholder": "4 digits",
+    "pinError": "PIN must be exactly 4 digits",
+    "role": "Role",
+    "active": "Active",
+    "saveError": "Failed to save staff account.",
+    "createButton": "Create Staff Member",
+    "roles": {
+      "CASHIER": "Cashier",
+      "BARISTA": "Barista",
+      "MANAGER": "Manager",
+      "ADMIN": "Admin"
+    },
+    "table": {
+      "heading": "Staff Accounts",
+      "newButton": "+ New Staff Member",
+      "loading": "Loading staff...",
+      "empty": "No staff accounts yet.",
+      "name": "Name",
+      "role": "Role",
+      "status": "Status",
+      "created": "Created",
+      "active": "Active",
+      "deactivated": "Deactivated"
+    }
+  }
+}

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { HttpError, submitOrder } from "../lib/api";
 import { useNetworkStatus } from "../composables/useNetworkStatus";
 import { useOfflineQueue } from "../composables/useOfflineQueue";
@@ -22,11 +23,13 @@ const emit = defineEmits<{
 
 type Phase = "payment" | "submitting" | "success" | "error";
 
-const PAYMENT_METHODS: Array<{ value: PaymentMethod; label: string }> = [
-  { value: "CASH", label: "Cash" },
-  { value: "CARD", label: "Credit Card" },
-  { value: "QR_CODE", label: "Mobile Pay" },
-];
+const { t } = useI18n({ useScope: "global" });
+
+const PAYMENT_METHODS = computed<Array<{ value: PaymentMethod; label: string }>>(() => [
+  { value: "CASH", label: t("checkout.methods.CASH") },
+  { value: "CARD", label: t("checkout.methods.CARD") },
+  { value: "QR_CODE", label: t("checkout.methods.QR_CODE") },
+]);
 
 const FAST_CASH_AMOUNTS = [10, 20, 50];
 
@@ -51,9 +54,9 @@ const canComplete = computed(() => !isInsufficient.value);
 
 const successLabel = computed(() => {
   if (isQueuedOffline.value) {
-    return "Order Queued";
+    return t("checkout.orderQueued");
   }
-  return isCash.value ? "Change Due" : "Payment Complete";
+  return isCash.value ? t("checkout.changeDueLabel") : t("checkout.paymentComplete");
 });
 
 // Offline orders have no server-confirmed change/total yet, so fall back to
@@ -116,7 +119,7 @@ async function queueOffline(payload: OrderPayload) {
   } catch (error) {
     // Even local persistence can fail (e.g. IndexedDB unavailable/full) - the
     // cashier still needs to know the sale did not go through anywhere.
-    errorMessage.value = error instanceof Error ? error.message : "Failed to save order locally.";
+    errorMessage.value = error instanceof Error ? error.message : t("checkout.saveLocalError");
     phase.value = "error";
   }
 }
@@ -172,14 +175,14 @@ function handleDone() {
 
 <template>
   <div class="checkout-backdrop">
-    <div class="checkout-modal" role="dialog" aria-modal="true" aria-label="Checkout">
+    <div class="checkout-modal" role="dialog" aria-modal="true" :aria-label="t('checkout.dialogAriaLabel')">
       <header class="checkout-modal__header">
-        <h2>Checkout</h2>
+        <h2>{{ t("checkout.heading") }}</h2>
         <button
           v-if="phase === 'payment' || phase === 'error'"
           type="button"
           class="checkout-modal__close"
-          aria-label="Close"
+          :aria-label="t('common.close')"
           @click="handleCancel"
         >
           &times;
@@ -188,7 +191,7 @@ function handleDone() {
 
       <div v-if="phase === 'payment'" class="checkout-modal__body">
         <div class="checkout-total">
-          <span>Total Due</span>
+          <span>{{ t("checkout.totalDue") }}</span>
           <span class="checkout-total__amount">{{ format(totalAmount) }}</span>
         </div>
 
@@ -207,7 +210,7 @@ function handleDone() {
 
         <template v-if="isCash">
           <div class="tendered-display">
-            <span class="tendered-display__label">Amount Tendered</span>
+            <span class="tendered-display__label">{{ t("checkout.amountTendered") }}</span>
             <div class="tendered-display__input-wrap">
               <span>$</span>
               <input
@@ -231,40 +234,40 @@ function handleDone() {
               +${{ amount }}
             </button>
             <button type="button" class="fast-cash__button fast-cash__button--exact" @click="setExactChange">
-              Exact Change
+              {{ t("checkout.exactChange") }}
             </button>
           </div>
 
-          <button type="button" class="tendered-clear" @click="clearTendered">Clear</button>
+          <button type="button" class="tendered-clear" @click="clearTendered">{{ t("common.clear") }}</button>
 
           <div class="change-banner" :class="{ 'change-banner--warning': isInsufficient }">
-            <span v-if="isInsufficient">{{ format(amountShort) }} more needed</span>
-            <span v-else>Change Due: {{ format(changeDue) }}</span>
+            <span v-if="isInsufficient">{{ t("checkout.amountShort", { amount: format(amountShort) }) }}</span>
+            <span v-else>{{ t("checkout.changeDue", { amount: format(changeDue) }) }}</span>
           </div>
         </template>
 
         <button type="button" class="checkout-modal__complete" :disabled="!canComplete" @click="handleComplete">
-          Complete Payment
+          {{ t("checkout.completePayment") }}
         </button>
       </div>
 
       <div v-else-if="phase === 'submitting'" class="checkout-modal__body checkout-modal__body--centered">
-        <p class="checkout-modal__status">Processing payment...</p>
+        <p class="checkout-modal__status">{{ t("checkout.processing") }}</p>
       </div>
 
       <div v-else-if="phase === 'success'" class="checkout-modal__body checkout-modal__body--centered">
         <p class="checkout-success__label">{{ successLabel }}</p>
         <p class="checkout-success__amount">{{ format(successAmount) }}</p>
-        <p v-if="isQueuedOffline" class="checkout-success__order">Saved offline - will sync automatically</p>
-        <p v-else class="checkout-success__order">Order #{{ orderResult?.orderNumber }}</p>
-        <button type="button" class="checkout-modal__complete" @click="handleDone">Done</button>
+        <p v-if="isQueuedOffline" class="checkout-success__order">{{ t("checkout.savedOffline") }}</p>
+        <p v-else class="checkout-success__order">{{ t("checkout.orderNumber", { number: orderResult?.orderNumber }) }}</p>
+        <button type="button" class="checkout-modal__complete" @click="handleDone">{{ t("common.done") }}</button>
       </div>
 
       <div v-else class="checkout-modal__body checkout-modal__body--centered">
         <p class="checkout-modal__error">{{ errorMessage }}</p>
         <div class="checkout-error__actions">
-          <button type="button" class="checkout-modal__cancel" @click="handleCancel">Cancel</button>
-          <button type="button" class="checkout-modal__complete" @click="handleRetry">Try Again</button>
+          <button type="button" class="checkout-modal__cancel" @click="handleCancel">{{ t("common.cancel") }}</button>
+          <button type="button" class="checkout-modal__complete" @click="handleRetry">{{ t("common.tryAgain") }}</button>
         </div>
       </div>
     </div>

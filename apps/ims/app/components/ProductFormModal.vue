@@ -8,6 +8,7 @@ const props = defineProps<{
 
 const open = defineModel<boolean>("open", { default: false });
 
+const { t } = useI18n();
 const auth = useAuth();
 const store = useCatalogStore();
 const { uploadProductImage } = useApi();
@@ -27,11 +28,11 @@ const fileInput = ref<HTMLInputElement | null>(null);
 
 const isEditMode = computed(() => props.product !== null);
 
-const nameError = computed(() => (name.value.trim().length === 0 ? "Name is required" : null));
-const categoryError = computed(() => (categoryId.value.length === 0 ? "Category is required" : null));
+const nameError = computed(() => (name.value.trim().length === 0 ? t("common.nameRequired") : null));
+const categoryError = computed(() => (categoryId.value.length === 0 ? t("product.categoryRequired") : null));
 const priceError = computed(() =>
   basePrice.value === null || Number.isNaN(basePrice.value) || basePrice.value < 0
-    ? "Enter a price of 0 or more"
+    ? t("product.priceError")
     : null,
 );
 
@@ -100,7 +101,7 @@ async function submit() {
 
   const token = auth.session.value?.token;
   if (!token) {
-    errorMessage.value = "Your session has expired. Please sign in again.";
+    errorMessage.value = t("common.sessionExpired");
     return;
   }
 
@@ -115,7 +116,7 @@ async function submit() {
       const result = await uploadProductImage(selectedFile.value, token);
       imageUrl = result.url;
     } catch (error) {
-      errorMessage.value = error instanceof Error ? error.message : "Failed to upload image.";
+      errorMessage.value = error instanceof Error ? error.message : t("product.uploadError");
       isUploadingImage.value = false;
       isSubmitting.value = false;
       return;
@@ -139,7 +140,7 @@ async function submit() {
     }
     open.value = false;
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : "Failed to save product.";
+    errorMessage.value = error instanceof Error ? error.message : t("product.saveError");
   } finally {
     isSubmitting.value = false;
   }
@@ -149,13 +150,13 @@ async function submit() {
 <template>
   <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
     <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-      <h2 class="text-lg font-bold text-slate-900">{{ isEditMode ? "Edit Product" : "New Product" }}</h2>
+      <h2 class="text-lg font-bold text-slate-900">{{ isEditMode ? $t("product.editHeading") : $t("product.newHeading") }}</h2>
 
       <div class="mt-4 flex items-center gap-4">
         <img
           v-if="thumbnailUrl && !imageLoadFailed"
           :src="thumbnailUrl"
-          alt="Product preview"
+          :alt="$t('product.previewAlt')"
           class="h-16 w-16 rounded-lg object-cover"
           @error="imageLoadFailed = true"
         />
@@ -163,7 +164,7 @@ async function submit() {
           {{ name.slice(0, 1) || "?" }}
         </div>
         <div>
-          <label class="block text-sm font-medium text-slate-700">Product Image</label>
+          <label class="block text-sm font-medium text-slate-700">{{ $t("product.imageLabel") }}</label>
           <input
             ref="fileInput"
             type="file"
@@ -175,30 +176,30 @@ async function submit() {
       </div>
 
       <div class="mt-4">
-        <label class="block text-sm font-medium text-slate-700">Name</label>
+        <label class="block text-sm font-medium text-slate-700">{{ $t("common.name") }}</label>
         <input
           v-model="name"
           type="text"
-          placeholder="e.g. Iced Matcha Latte"
+          :placeholder="$t('product.namePlaceholder')"
           class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
         />
       </div>
 
       <div class="mt-4 grid grid-cols-2 gap-3">
         <div>
-          <label class="block text-sm font-medium text-slate-700">Category</label>
+          <label class="block text-sm font-medium text-slate-700">{{ $t("product.category") }}</label>
           <select
             v-model="categoryId"
             class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
           >
-            <option value="">Select...</option>
+            <option value="">{{ $t("common.selectEllipsis") }}</option>
             <option v-for="category in store.categories" :key="category.id" :value="category.id">
               {{ category.name }}
             </option>
           </select>
         </div>
         <div>
-          <label class="block text-sm font-medium text-slate-700">Base Price</label>
+          <label class="block text-sm font-medium text-slate-700">{{ $t("product.basePrice") }}</label>
           <input
             v-model.number="basePrice"
             type="number"
@@ -211,7 +212,7 @@ async function submit() {
       </div>
 
       <div class="mt-4 flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2.5">
-        <span class="text-sm font-medium text-slate-700">Available on menu</span>
+        <span class="text-sm font-medium text-slate-700">{{ $t("product.availableOnMenu") }}</span>
         <button
           type="button"
           role="switch"
@@ -237,7 +238,7 @@ async function submit() {
           class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
           @click="close"
         >
-          Cancel
+          {{ $t("common.cancel") }}
         </button>
         <button
           type="button"
@@ -245,7 +246,7 @@ async function submit() {
           class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
           @click="submit"
         >
-          {{ isUploadingImage ? "Uploading image..." : isSubmitting ? "Saving..." : isEditMode ? "Save Changes" : "Create Product" }}
+          {{ isUploadingImage ? $t("product.uploadingImage") : isSubmitting ? $t("common.saving") : isEditMode ? $t("common.saveChanges") : $t("product.createButton") }}
         </button>
       </div>
     </div>

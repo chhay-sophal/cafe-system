@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import { useNetworkStatus } from "../composables/useNetworkStatus";
 import { useOfflineQueue } from "../composables/useOfflineQueue";
 
+const { t } = useI18n({ useScope: "global" });
 const network = useNetworkStatus();
 const queue = useOfflineQueue();
 </script>
@@ -13,10 +15,10 @@ const queue = useOfflineQueue();
     :class="{ 'network-bar--offline': !network.isOnline.value }"
   >
     <span class="network-bar__dot" />
-    <span v-if="!network.isOnline.value">You're offline. Orders will save locally and sync automatically.</span>
-    <span v-else>Back online - syncing pending orders...</span>
+    <span v-if="!network.isOnline.value">{{ t("network.offlineMessage") }}</span>
+    <span v-else>{{ t("network.backOnline") }}</span>
     <span v-if="queue.pendingCount.value > 0" class="network-bar__badge">
-      {{ queue.pendingCount.value }} pending
+      {{ t("app.pendingBadge", { count: queue.pendingCount.value }) }}
     </span>
   </div>
 </template>

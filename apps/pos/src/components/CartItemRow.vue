@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import type { CartLineItem } from "../types/cart";
 
 const props = defineProps<{
@@ -11,6 +12,8 @@ const emit = defineEmits<{
   decrement: [];
   remove: [];
 }>();
+
+const { t } = useI18n({ useScope: "global" });
 
 const SWIPE_OPEN_OFFSET = -88;
 
@@ -57,7 +60,7 @@ function onPointerUp() {
 
 <template>
   <div class="cart-row-wrap">
-    <button type="button" class="cart-row__swipe-remove" @click="emit('remove')">Remove</button>
+    <button type="button" class="cart-row__swipe-remove" @click="emit('remove')">{{ t("cart.remove") }}</button>
 
     <div
       class="cart-row"
@@ -70,7 +73,7 @@ function onPointerUp() {
       <div class="cart-row__top">
         <span class="cart-row__name">{{ item.productName }}</span>
         <span class="cart-row__line-total">{{ format(lineTotal) }}</span>
-        <button type="button" class="cart-row__close" aria-label="Remove item" @click="emit('remove')">
+        <button type="button" class="cart-row__close" :aria-label="t('cart.removeAria')" @click="emit('remove')">
           &times;
         </button>
       </div>
@@ -84,11 +87,11 @@ function onPointerUp() {
 
       <div class="cart-row__bottom">
         <div class="cart-row__stepper">
-          <button type="button" aria-label="Decrease quantity" @click="emit('decrement')">-</button>
+          <button type="button" :aria-label="t('cart.decreaseAria')" @click="emit('decrement')">-</button>
           <span class="cart-row__quantity">{{ item.quantity }}</span>
-          <button type="button" aria-label="Increase quantity" @click="emit('increment')">+</button>
+          <button type="button" :aria-label="t('cart.increaseAria')" @click="emit('increment')">+</button>
         </div>
-        <span class="cart-row__unit-price">{{ format(unitPrice) }} each</span>
+        <span class="cart-row__unit-price">{{ t("cart.unitPriceEach", { price: format(unitPrice) }) }}</span>
       </div>
     </div>
   </div>

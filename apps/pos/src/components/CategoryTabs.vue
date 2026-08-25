@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import type { Category } from "../types/catalog";
 
 defineProps<{
@@ -9,17 +10,19 @@ defineProps<{
 const emit = defineEmits<{
   select: [categoryId: string | null];
 }>();
+
+const { t } = useI18n({ useScope: "global" });
 </script>
 
 <template>
-  <nav class="category-tabs" aria-label="Product categories">
+  <nav class="category-tabs" :aria-label="t('categories.ariaLabel')">
     <button
       type="button"
       class="category-tab"
       :class="{ 'category-tab--active': selectedCategoryId === null }"
       @click="emit('select', null)"
     >
-      All Items
+      {{ t("categories.allItems") }}
     </button>
     <button
       v-for="category in categories"

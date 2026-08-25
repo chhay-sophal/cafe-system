@@ -4,6 +4,7 @@ import type { InventoryItem } from "~/types/inventory";
 import type { Product } from "~/types/catalog";
 import type { RecipeIngredientDraft, RecipeTarget, RecipeTargetKind, RecipeUpdatePayload } from "~/types/recipe";
 
+const { t } = useI18n();
 const auth = useAuth();
 const recipeStore = useRecipeStore();
 const catalogStore = useCatalogStore();
@@ -72,10 +73,10 @@ function unitForRow(row: RecipeIngredientDraft): string {
 
 function rowError(row: RecipeIngredientDraft): string | null {
   if (!row.inventoryItemId) {
-    return "Select an ingredient";
+    return t("recipe.selectIngredientRequired");
   }
   if (row.quantityRequired === null || Number.isNaN(row.quantityRequired) || row.quantityRequired <= 0) {
-    return "Enter a quantity greater than zero";
+    return t("recipe.quantityError");
   }
   return null;
 }
@@ -109,7 +110,7 @@ async function loadRecipeForTarget() {
       quantityRequired: record.quantityRequired,
     }));
   } catch (error) {
-    loadError.value = error instanceof Error ? error.message : "Failed to load recipe.";
+    loadError.value = error instanceof Error ? error.message : t("recipe.loadError");
     rows.value = [];
   } finally {
     isLoadingRecipe.value = false;
@@ -155,7 +156,7 @@ async function handleSave() {
 
   const token = auth.session.value?.token;
   if (!token) {
-    saveError.value = "Your session has expired. Please sign in again.";
+    saveError.value = t("common.sessionExpired");
     return;
   }
 
@@ -181,7 +182,7 @@ async function handleSave() {
     await loadRecipeForTarget();
     saveSuccess.value = true;
   } catch (error) {
-    saveError.value = error instanceof Error ? error.message : "Failed to save recipe.";
+    saveError.value = error instanceof Error ? error.message : t("recipe.saveError");
   } finally {
     isSaving.value = false;
   }
@@ -205,22 +206,22 @@ onMounted(async () => {
 <template>
   <div>
     <section class="mb-8">
-      <h2 class="mb-3 text-sm font-semibold text-slate-700">Menu Items</h2>
+      <h2 class="mb-3 text-sm font-semibold text-slate-700">{{ $t("recipe.menuItemsHeading") }}</h2>
 
       <p v-if="catalogErrorMessage" class="rounded-lg bg-red-50 p-4 text-sm font-medium text-red-700">
         {{ catalogErrorMessage }}
       </p>
 
       <p v-else-if="isCatalogLoading" class="p-6 text-center text-sm text-slate-500">
-        Loading menu items...
+        {{ $t("recipe.loadingMenuItems") }}
       </p>
 
       <div v-else class="overflow-x-auto rounded-lg border border-slate-200">
         <table class="min-w-full divide-y divide-slate-200 text-sm">
           <thead class="bg-slate-50">
             <tr>
-              <th class="px-4 py-3 text-left font-semibold text-slate-600">Item</th>
-              <th class="px-4 py-3 text-left font-semibold text-slate-600">Recipe Status</th>
+              <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("productTable.item") }}</th>
+              <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("recipe.recipeStatus") }}</th>
               <th class="px-4 py-3" />
             </tr>
           </thead>
@@ -232,13 +233,13 @@ onMounted(async () => {
                   v-if="recipeStore.hasProductRecipe(product.id)"
                   class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700"
                 >
-                  {{ recipeStore.productRecipeCounts[product.id] }} ingredient(s)
+                  {{ $t("recipe.ingredientCount", { count: recipeStore.productRecipeCounts[product.id] }) }}
                 </span>
                 <span
                   v-else
                   class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700"
                 >
-                  No Recipe Configured
+                  {{ $t("recipe.notConfigured") }}
                 </span>
               </td>
               <td class="px-4 py-3 text-right">
@@ -249,7 +250,7 @@ onMounted(async () => {
                     class="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700"
                     @click="startEditingProduct(product.id)"
                   >
-                    Create Recipe
+                    {{ $t("recipe.createRecipe") }}
                   </button>
                   <template v-else>
                     <button
@@ -257,14 +258,14 @@ onMounted(async () => {
                       class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
                       @click="startEditingProduct(product.id)"
                     >
-                      Edit
+                      {{ $t("common.edit") }}
                     </button>
                     <button
                       type="button"
                       class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
                       @click="openDeleteModal(product)"
                     >
-                      Delete
+                      {{ $t("common.delete") }}
                     </button>
                   </template>
                 </div>
@@ -282,7 +283,7 @@ onMounted(async () => {
         :class="targetKind === 'product' ? 'bg-slate-900 text-white' : 'border border-slate-300 text-slate-700 hover:bg-slate-100'"
         @click="switchTargetKind('product')"
       >
-        Menu Item
+        {{ $t("recipe.menuItemTab") }}
       </button>
       <button
         type="button"
@@ -290,14 +291,14 @@ onMounted(async () => {
         :class="targetKind === 'modifier' ? 'bg-slate-900 text-white' : 'border border-slate-300 text-slate-700 hover:bg-slate-100'"
         @click="switchTargetKind('modifier')"
       >
-        Modifier Choice
+        {{ $t("recipe.modifierChoiceTab") }}
       </button>
     </div>
 
     <template v-if="!catalogErrorMessage && !isCatalogLoading">
       <div class="mb-6 max-w-md">
         <label class="block text-sm font-medium text-slate-700">
-          {{ targetKind === "product" ? "Menu Item" : "Modifier Choice" }}
+          {{ targetKind === "product" ? $t("recipe.menuItemTab") : $t("recipe.modifierChoiceTab") }}
         </label>
 
         <select
@@ -306,7 +307,7 @@ onMounted(async () => {
           class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
           @change="selectTarget"
         >
-          <option value="">Select a menu item...</option>
+          <option value="">{{ $t("recipe.selectMenuItem") }}</option>
           <optgroup v-for="group in productsByCategory" :key="group.category.id" :label="group.category.name">
             <option v-for="product in group.products" :key="product.id" :value="product.id">
               {{ product.name }}
@@ -320,7 +321,7 @@ onMounted(async () => {
           class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
           @change="selectTarget"
         >
-          <option value="">Select a modifier choice...</option>
+          <option value="">{{ $t("recipe.selectModifierChoice") }}</option>
           <option v-for="choice in modifierOptionChoices" :key="choice.id" :value="choice.id">
             {{ choice.label }}
           </option>
@@ -328,23 +329,22 @@ onMounted(async () => {
       </div>
 
       <p v-if="!currentTarget" class="text-sm text-slate-500">
-        Select a {{ targetKind === "product" ? "menu item" : "modifier choice" }} above to edit its ingredient
-        recipe.
+        {{ $t("recipe.selectPrompt", { target: targetKind === "product" ? $t("recipe.targetNoun.product") : $t("recipe.targetNoun.modifier") }) }}
       </p>
 
       <template v-else>
         <p v-if="loadError" class="rounded-lg bg-red-50 p-4 text-sm font-medium text-red-700">{{ loadError }}</p>
 
         <template v-else-if="isLoadingRecipe">
-          <p class="p-6 text-center text-sm text-slate-500">Loading recipe...</p>
+          <p class="p-6 text-center text-sm text-slate-500">{{ $t("recipe.loadingRecipe") }}</p>
         </template>
 
         <template v-else>
-          <h2 class="mb-3 text-sm font-semibold text-slate-700">Ingredients for "{{ currentTargetLabel }}"</h2>
+          <h2 class="mb-3 text-sm font-semibold text-slate-700">{{ $t("recipe.ingredientsFor", { label: currentTargetLabel }) }}</h2>
 
           <div class="space-y-3">
             <p v-if="rows.length === 0" class="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-500">
-              No ingredients mapped yet. Add one below.
+              {{ $t("recipe.noIngredients") }}
             </p>
 
             <div
@@ -357,7 +357,7 @@ onMounted(async () => {
                   v-model="row.inventoryItemId"
                   class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
                 >
-                  <option value="">Select an ingredient...</option>
+                  <option value="">{{ $t("recipe.selectIngredientOption") }}</option>
                   <option v-for="item in inventoryItems" :key="item.id" :value="item.id">{{ item.name }}</option>
                 </select>
               </div>
@@ -367,7 +367,7 @@ onMounted(async () => {
                   v-model.number="row.quantityRequired"
                   type="number"
                   step="any"
-                  placeholder="Quantity"
+                  :placeholder="$t('recipe.quantityPlaceholder')"
                   class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
                 />
               </div>
@@ -383,7 +383,7 @@ onMounted(async () => {
                 class="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100"
                 @click="removeRow(row.rowKey)"
               >
-                Remove
+                {{ $t("recipe.remove") }}
               </button>
 
               <p v-if="rowError(row)" class="w-full text-xs font-medium text-red-600">{{ rowError(row) }}</p>
@@ -395,7 +395,7 @@ onMounted(async () => {
             class="mt-4 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
             @click="addRow"
           >
-            + Add Ingredient
+            {{ $t("recipe.addIngredient") }}
           </button>
 
           <div class="mt-6 flex items-center gap-4">
@@ -405,11 +405,11 @@ onMounted(async () => {
               class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
               @click="handleSave"
             >
-              {{ isSaving ? "Saving..." : "Save Recipe" }}
+              {{ isSaving ? $t("common.saving") : $t("recipe.saveRecipe") }}
             </button>
 
             <p v-if="saveError" class="text-sm font-medium text-red-600">{{ saveError }}</p>
-            <p v-else-if="saveSuccess" class="text-sm font-medium text-emerald-600">Recipe saved.</p>
+            <p v-else-if="saveSuccess" class="text-sm font-medium text-emerald-600">{{ $t("recipe.saveSuccess") }}</p>
           </div>
         </template>
       </template>

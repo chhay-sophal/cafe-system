@@ -1,3 +1,4 @@
+import { t } from "../i18n";
 import type { AuthSession } from "../types/auth";
 import type { Category, Product } from "../types/catalog";
 import type { ModifierGroup } from "../types/cart";
@@ -23,7 +24,7 @@ export class HttpError extends Error {
 
 async function parseErrorMessage(response: Response): Promise<string> {
   const body = await response.json().catch(() => null);
-  return body?.error ?? `Request failed with status ${response.status}`;
+  return body?.error ?? t("common.requestFailed", { status: response.status });
 }
 
 async function fetchWithTimeout(input: string, init: RequestInit): Promise<Response> {
