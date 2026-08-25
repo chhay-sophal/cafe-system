@@ -172,6 +172,18 @@ Updating POS: download the newer installer from Releases and run it — it upgra
 
 The backend already takes a daily automated backup at 3 AM to `apps/backend/backups/` (see [`src/db/backup.ts`](apps/backend/src/db/backup.ts)) — but that still lives on the same disk, so periodically copy `apps/backend/backups/` and `apps/backend/uploads/` somewhere off-machine (USB drive, cloud sync) to survive hardware failure.
 
+### Decommissioning a machine
+
+```bash
+# Windows (PowerShell)
+.\scripts\uninstall.ps1
+
+# macOS
+./scripts/uninstall.sh
+```
+
+Stops the pm2 services, unregisters boot-persistence, and removes the IMS desktop shortcut. It deliberately leaves the database, uploads, and backups untouched — that's real sales/inventory history. Pass `-PurgeData` (Windows) / `--purge-data` (macOS) to also delete them; it asks for a typed `yes` confirmation first since that step is irreversible. POS isn't handled here — uninstall it the normal way for this OS (Windows' "Add or remove programs", or dragging it to the Trash on macOS).
+
 <a id="multi-machine-note"></a>
 > **Splitting POS onto separate register machines?** Point each register's POS build at the backend's LAN IP (not `localhost`) via `VITE_API_BASE_URL`, and rebuild the POS installer with that value baked in — the prebuilt Releases installer assumes backend and POS share a machine.
 
