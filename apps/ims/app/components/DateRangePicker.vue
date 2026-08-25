@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 
+const { t } = useI18n();
 const store = useReportsStore();
 
 const isOpen = ref(false);
@@ -9,12 +10,12 @@ const customEnd = ref(store.endDate);
 
 type PresetKey = "today" | "last7" | "last30" | "mtd";
 
-const presets: Array<{ key: PresetKey; label: string }> = [
-  { key: "today", label: "Today" },
-  { key: "last7", label: "Last 7 days" },
-  { key: "last30", label: "Last 30 days" },
-  { key: "mtd", label: "Month to date" },
-];
+const presets = computed<Array<{ key: PresetKey; label: string }>>(() => [
+  { key: "today", label: t("dateRange.today") },
+  { key: "last7", label: t("dateRange.last7Days") },
+  { key: "last30", label: t("dateRange.last30Days") },
+  { key: "mtd", label: t("dateRange.monthToDate") },
+]);
 
 const activePreset = computed<PresetKey | null>(() => {
   const today = formatDateLocal(new Date());
@@ -35,7 +36,7 @@ const activePreset = computed<PresetKey | null>(() => {
 
 const rangeLabel = computed(() => {
   if (store.startDate === store.endDate) {
-    return activePreset.value === "today" ? "Today" : formatDateLabel(store.startDate);
+    return activePreset.value === "today" ? t("dateRange.today") : formatDateLabel(store.startDate);
   }
   return `${formatDateLabel(store.startDate)} – ${formatDateLabel(store.endDate)}`;
 });
@@ -106,7 +107,7 @@ function toggleOpen() {
       </div>
 
       <div class="border-t border-slate-200 p-3">
-        <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Custom range</p>
+        <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{{ $t("dateRange.customRange") }}</p>
         <div class="flex items-center gap-2">
           <input
             v-model="customStart"
@@ -125,7 +126,7 @@ function toggleOpen() {
           class="mt-3 w-full rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-slate-700"
           @click="applyCustomRange"
         >
-          Apply
+          {{ $t("dateRange.apply") }}
         </button>
       </div>
     </div>

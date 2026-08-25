@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import type { CartLineItem } from "../types/cart";
 import CartItemRow from "./CartItemRow.vue";
+
+const { t } = useI18n({ useScope: "global" });
 
 const props = defineProps<{
   items: CartLineItem[];
@@ -31,13 +34,13 @@ function handleDiscountInput(event: Event) {
 </script>
 
 <template>
-  <aside class="cart-sidebar" aria-label="Current order">
+  <aside class="cart-sidebar" :aria-label="t('cart.ariaLabel')">
     <header class="cart-sidebar__header">
-      <h2>Current Order</h2>
+      <h2>{{ t("cart.heading") }}</h2>
     </header>
 
     <div class="cart-sidebar__items">
-      <p v-if="items.length === 0" class="cart-sidebar__empty">Tap a product to add it to the order.</p>
+      <p v-if="items.length === 0" class="cart-sidebar__empty">{{ t("cart.empty") }}</p>
 
       <CartItemRow
         v-for="item in items"
@@ -51,15 +54,15 @@ function handleDiscountInput(event: Event) {
 
     <footer class="cart-sidebar__summary">
       <div class="cart-sidebar__row">
-        <span>Subtotal</span>
+        <span>{{ t("cart.subtotal") }}</span>
         <span>{{ format(props.subtotal) }}</span>
       </div>
       <div class="cart-sidebar__row">
-        <span>Tax</span>
+        <span>{{ t("cart.tax") }}</span>
         <span>{{ format(props.taxAmount) }}</span>
       </div>
       <div class="cart-sidebar__row cart-sidebar__row--discount">
-        <label for="discount-input">Discount</label>
+        <label for="discount-input">{{ t("cart.discount") }}</label>
         <div class="cart-sidebar__discount-input">
           <span>-$</span>
           <input
@@ -73,7 +76,7 @@ function handleDiscountInput(event: Event) {
         </div>
       </div>
       <div class="cart-sidebar__row cart-sidebar__row--total">
-        <span>Total</span>
+        <span>{{ t("cart.total") }}</span>
         <span>{{ format(props.totalAmount) }}</span>
       </div>
 
@@ -83,7 +86,7 @@ function handleDiscountInput(event: Event) {
         :disabled="items.length === 0"
         @click="emit('checkout')"
       >
-        Checkout
+        {{ t("cart.checkout") }}
       </button>
     </footer>
   </aside>

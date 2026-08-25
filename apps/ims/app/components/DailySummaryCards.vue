@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 
+const { t } = useI18n();
 const store = useReportsStore();
 
 const currencyFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
@@ -16,10 +17,10 @@ const averageOrderValue = computed(() => {
 });
 
 const cards = computed(() => [
-  { label: "Gross revenue", value: formatCurrency(store.report?.metrics.grossRevenue ?? 0) },
-  { label: "Net revenue", value: formatCurrency(store.report?.metrics.netRevenue ?? 0) },
-  { label: "Orders", value: String(store.report?.metrics.totalOrders ?? 0) },
-  { label: "Average order value", value: formatCurrency(averageOrderValue.value) },
+  { label: t("summaryCards.grossRevenue"), value: formatCurrency(store.report?.metrics.grossRevenue ?? 0) },
+  { label: t("summaryCards.netRevenue"), value: formatCurrency(store.report?.metrics.netRevenue ?? 0) },
+  { label: t("summaryCards.orders"), value: String(store.report?.metrics.totalOrders ?? 0) },
+  { label: t("summaryCards.averageOrderValue"), value: formatCurrency(averageOrderValue.value) },
 ]);
 </script>
 

@@ -30,11 +30,14 @@ export function useAuth() {
   const session = useState<AuthSession | null>("ims-auth-session", () => loadStoredSession());
 
   async function login(pin: string) {
+    // login() runs from a click handler, well after setup - useI18n()'s
+    // inject() call would throw there, so read the global composer instead.
+    const { t } = useNuxtApp().$i18n;
     const { login: apiLogin } = useApi();
     const result = await apiLogin(pin);
 
     if (!MANAGER_ROLES.has(result.user.role)) {
-      throw new Error("This PIN does not have manager access to inventory.");
+      throw new Error(t("login.noManagerAccess"));
     }
 
     session.value = result;

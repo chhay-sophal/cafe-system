@@ -3,6 +3,7 @@ import { ref, watch } from "vue";
 
 const open = defineModel<boolean>("open", { default: false });
 
+const { t } = useI18n();
 const auth = useAuth();
 const store = useCatalogStore();
 
@@ -38,7 +39,7 @@ async function createCategory() {
 
   const token = auth.session.value?.token;
   if (!token) {
-    createError.value = "Your session has expired. Please sign in again.";
+    createError.value = t("common.sessionExpired");
     return;
   }
 
@@ -50,7 +51,7 @@ async function createCategory() {
     newName.value = "";
     newSortOrder.value = null;
   } catch (error) {
-    createError.value = error instanceof Error ? error.message : "Failed to create category.";
+    createError.value = error instanceof Error ? error.message : t("categories.createError");
   } finally {
     isCreating.value = false;
   }
@@ -75,7 +76,7 @@ async function saveEdit() {
 
   const token = auth.session.value?.token;
   if (!token) {
-    editError.value = "Your session has expired. Please sign in again.";
+    editError.value = t("common.sessionExpired");
     return;
   }
 
@@ -86,7 +87,7 @@ async function saveEdit() {
     await store.updateCategory(editingId.value, { name: editName.value.trim(), sortOrder: editSortOrder.value ?? 0 }, token);
     editingId.value = null;
   } catch (error) {
-    editError.value = error instanceof Error ? error.message : "Failed to update category.";
+    editError.value = error instanceof Error ? error.message : t("categories.updateError");
   } finally {
     isSavingEdit.value = false;
   }
@@ -97,14 +98,14 @@ async function saveEdit() {
   <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
     <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
       <div class="flex items-start justify-between">
-        <h2 class="text-lg font-bold text-slate-900">Manage Categories</h2>
+        <h2 class="text-lg font-bold text-slate-900">{{ $t("categories.manage") }}</h2>
         <button type="button" class="text-2xl leading-none text-slate-400 hover:text-slate-600" @click="close">
           &times;
         </button>
       </div>
 
       <div class="mt-4 max-h-64 space-y-2 overflow-y-auto">
-        <div v-if="store.categories.length === 0" class="text-sm text-slate-400">No categories yet.</div>
+        <div v-if="store.categories.length === 0" class="text-sm text-slate-400">{{ $t("categories.none") }}</div>
 
         <div
           v-for="category in store.categories"
@@ -121,7 +122,7 @@ async function saveEdit() {
               <input
                 v-model.number="editSortOrder"
                 type="number"
-                placeholder="Order"
+                :placeholder="$t('categories.orderPlaceholder')"
                 class="w-20 rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
               />
             </div>
@@ -132,7 +133,7 @@ async function saveEdit() {
                 class="rounded-lg border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                 @click="cancelEdit"
               >
-                Cancel
+                {{ $t("common.cancel") }}
               </button>
               <button
                 type="button"
@@ -140,7 +141,7 @@ async function saveEdit() {
                 class="rounded-lg bg-slate-900 px-3 py-1 text-xs font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
                 @click="saveEdit"
               >
-                {{ isSavingEdit ? "Saving..." : "Save" }}
+                {{ isSavingEdit ? $t("common.saving") : $t("common.save") }}
               </button>
             </div>
           </template>
@@ -152,25 +153,25 @@ async function saveEdit() {
               class="rounded-lg border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
               @click="startEdit(category)"
             >
-              Edit
+              {{ $t("common.edit") }}
             </button>
           </div>
         </div>
       </div>
 
       <div class="mt-4 border-t border-slate-200 pt-4">
-        <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Add Category</p>
+        <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{{ $t("categories.addHeading") }}</p>
         <div class="flex gap-2">
           <input
             v-model="newName"
             type="text"
-            placeholder="e.g. Bakery"
+            :placeholder="$t('categories.namePlaceholder')"
             class="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
           />
           <input
             v-model.number="newSortOrder"
             type="number"
-            placeholder="Order"
+            :placeholder="$t('categories.orderPlaceholder')"
             class="w-20 rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
           />
         </div>
@@ -181,7 +182,7 @@ async function saveEdit() {
           class="mt-3 w-full rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
           @click="createCategory"
         >
-          {{ isCreating ? "Adding..." : "Add Category" }}
+          {{ isCreating ? $t("categories.adding") : $t("categories.add") }}
         </button>
       </div>
     </div>

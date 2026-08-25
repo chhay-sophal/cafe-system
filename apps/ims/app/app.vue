@@ -4,6 +4,7 @@ import type { Product } from "~/types/catalog";
 import type { InventoryItem } from "~/types/inventory";
 import type { StaffUser } from "~/types/user";
 
+const { locale, locales, setLocale } = useI18n();
 const auth = useAuth();
 const store = useInventoryStore();
 
@@ -92,7 +93,7 @@ watch(
   <div v-else class="min-h-screen bg-slate-100">
     <header class="flex items-center justify-between bg-white px-6 py-4 shadow-sm">
       <div class="flex items-center gap-6">
-        <h1 class="text-lg font-bold text-slate-900">Inventory Manager</h1>
+        <h1 class="text-lg font-bold text-slate-900">{{ $t("app.title") }}</h1>
         <nav class="flex gap-1">
           <button
             type="button"
@@ -100,7 +101,7 @@ watch(
             :class="activeView === 'inventory' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'"
             @click="activeView = 'inventory'"
           >
-            Stock
+            {{ $t("app.nav.stock") }}
           </button>
           <button
             type="button"
@@ -108,7 +109,7 @@ watch(
             :class="activeView === 'menu' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'"
             @click="activeView = 'menu'"
           >
-            Menu
+            {{ $t("app.nav.menu") }}
           </button>
           <button
             type="button"
@@ -116,7 +117,7 @@ watch(
             :class="activeView === 'recipes' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'"
             @click="activeView = 'recipes'"
           >
-            Recipes
+            {{ $t("app.nav.recipes") }}
           </button>
           <button
             type="button"
@@ -124,7 +125,7 @@ watch(
             :class="activeView === 'analytics' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'"
             @click="activeView = 'analytics'"
           >
-            Analytics
+            {{ $t("app.nav.analytics") }}
           </button>
           <button
             v-if="isAdmin"
@@ -133,18 +134,25 @@ watch(
             :class="activeView === 'staff' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'"
             @click="activeView = 'staff'"
           >
-            Staff
+            {{ $t("app.nav.staff") }}
           </button>
         </nav>
       </div>
       <div class="flex items-center gap-3 text-sm">
+        <select
+          :value="locale"
+          class="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-700 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+          @change="setLocale(($event.target as HTMLSelectElement).value as 'en-US' | 'km-KH')"
+        >
+          <option v-for="loc in locales" :key="loc.code" :value="loc.code">{{ loc.name }}</option>
+        </select>
         <span class="text-slate-500">{{ auth.session.value.user.name }}</span>
         <button
           type="button"
           class="rounded-lg border border-slate-300 px-3 py-1.5 font-semibold text-slate-700 hover:bg-slate-50"
           @click="auth.logout()"
         >
-          Log out
+          {{ $t("app.logout") }}
         </button>
       </div>
     </header>

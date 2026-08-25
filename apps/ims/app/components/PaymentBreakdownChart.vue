@@ -5,13 +5,8 @@ import { Pie } from "vue-chartjs";
 
 ChartJS.register(...registerables);
 
+const { t } = useI18n();
 const store = useReportsStore();
-
-const PAYMENT_LABELS: Record<string, string> = {
-  CASH: "Cash",
-  CARD: "Card",
-  QR_CODE: "Mobile Pay",
-};
 
 // Categorical slots 1-3 from the validated default palette (blue/green/magenta) -
 // see the dataviz skill's palette.md. Passes all-pairs CVD + normal-vision checks
@@ -28,7 +23,8 @@ const total = computed(() => breakdown.value.reduce((sum, entry) => sum + entry.
 const currencyFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
 function labelFor(method: string): string {
-  return PAYMENT_LABELS[method] ?? method;
+  const key = `paymentBreakdown.methods.${method}`;
+  return t(key) !== key ? t(key) : method;
 }
 
 function shareOf(amount: number): string {
@@ -71,27 +67,27 @@ const chartOptions = {
 <template>
   <div class="rounded-lg border border-slate-200 bg-white p-4">
     <div class="mb-3 flex items-center justify-between">
-      <h3 class="text-sm font-semibold text-slate-700">Payment Breakdown</h3>
+      <h3 class="text-sm font-semibold text-slate-700">{{ $t("paymentBreakdown.heading") }}</h3>
       <button
         v-if="hasData"
         type="button"
         class="text-xs font-semibold text-slate-500 hover:text-slate-700"
         @click="showTable = !showTable"
       >
-        {{ showTable ? "View chart" : "View table" }}
+        {{ showTable ? $t("common.viewChart") : $t("common.viewTable") }}
       </button>
     </div>
 
     <p v-if="!hasData" class="flex h-56 items-center justify-center text-center text-sm text-slate-400">
-      No payments recorded for this period.
+      {{ $t("paymentBreakdown.noData") }}
     </p>
 
     <table v-else-if="showTable" class="w-full text-sm">
       <thead>
         <tr class="border-b border-slate-200 text-left text-slate-500">
-          <th class="py-2 font-medium">Method</th>
-          <th class="py-2 text-right font-medium">Amount</th>
-          <th class="py-2 text-right font-medium">Share</th>
+          <th class="py-2 font-medium">{{ $t("paymentBreakdown.method") }}</th>
+          <th class="py-2 text-right font-medium">{{ $t("paymentBreakdown.amount") }}</th>
+          <th class="py-2 text-right font-medium">{{ $t("paymentBreakdown.share") }}</th>
         </tr>
       </thead>
       <tbody>

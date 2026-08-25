@@ -8,6 +8,7 @@ const props = defineProps<{
 
 const open = defineModel<boolean>("open", { default: false });
 
+const { t } = useI18n();
 const auth = useAuth();
 const store = useInventoryStore();
 
@@ -22,12 +23,12 @@ const errorMessage = ref<string | null>(null);
 
 const isEditMode = computed(() => props.item !== null);
 
-const nameError = computed(() => (name.value.trim().length === 0 ? "Name is required" : null));
+const nameError = computed(() => (name.value.trim().length === 0 ? t("common.nameRequired") : null));
 const reorderError = computed(() =>
-  reorderThreshold.value === null || reorderThreshold.value < 0 ? "Enter a reorder threshold of 0 or more" : null,
+  reorderThreshold.value === null || reorderThreshold.value < 0 ? t("inventoryItem.reorderError") : null,
 );
 const costError = computed(() =>
-  costPerUnit.value === null || costPerUnit.value < 0 ? "Enter a cost of 0 or more" : null,
+  costPerUnit.value === null || costPerUnit.value < 0 ? t("inventoryItem.costError") : null,
 );
 
 const canSubmit = computed(() => !nameError.value && !reorderError.value && !costError.value && !isSubmitting.value);
@@ -63,7 +64,7 @@ async function submit() {
 
   const token = auth.session.value?.token;
   if (!token) {
-    errorMessage.value = "Your session has expired. Please sign in again.";
+    errorMessage.value = t("common.sessionExpired");
     return;
   }
 
@@ -85,7 +86,7 @@ async function submit() {
     }
     open.value = false;
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : "Failed to save item.";
+    errorMessage.value = error instanceof Error ? error.message : t("inventoryItem.saveError");
   } finally {
     isSubmitting.value = false;
   }
@@ -96,24 +97,24 @@ async function submit() {
   <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
     <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
       <div class="flex items-start justify-between">
-        <h2 class="text-lg font-bold text-slate-900">{{ isEditMode ? "Edit Item" : "New Inventory Item" }}</h2>
+        <h2 class="text-lg font-bold text-slate-900">{{ isEditMode ? $t("inventoryItem.editHeading") : $t("inventoryItem.newHeading") }}</h2>
         <button type="button" class="text-2xl leading-none text-slate-400 hover:text-slate-600" @click="close">
           &times;
         </button>
       </div>
 
       <div class="mt-4">
-        <label class="block text-sm font-medium text-slate-700">Name</label>
+        <label class="block text-sm font-medium text-slate-700">{{ $t("common.name") }}</label>
         <input
           v-model="name"
           type="text"
-          placeholder="e.g. Oat Milk"
+          :placeholder="$t('inventoryItem.namePlaceholder')"
           class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
         />
       </div>
 
       <div class="mt-4">
-        <label class="block text-sm font-medium text-slate-700">Unit</label>
+        <label class="block text-sm font-medium text-slate-700">{{ $t("inventoryItem.unit") }}</label>
         <select
           v-model="unit"
           class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
@@ -124,7 +125,7 @@ async function submit() {
 
       <div class="mt-4 grid grid-cols-2 gap-3">
         <div>
-          <label class="block text-sm font-medium text-slate-700">Reorder Threshold</label>
+          <label class="block text-sm font-medium text-slate-700">{{ $t("inventoryItem.reorderThreshold") }}</label>
           <input
             v-model.number="reorderThreshold"
             type="number"
@@ -134,7 +135,7 @@ async function submit() {
           />
         </div>
         <div>
-          <label class="block text-sm font-medium text-slate-700">Cost Per Unit</label>
+          <label class="block text-sm font-medium text-slate-700">{{ $t("inventoryItem.costPerUnit") }}</label>
           <input
             v-model.number="costPerUnit"
             type="number"
@@ -153,7 +154,7 @@ async function submit() {
           class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
           @click="close"
         >
-          Cancel
+          {{ $t("common.cancel") }}
         </button>
         <button
           type="button"
@@ -161,7 +162,7 @@ async function submit() {
           class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
           @click="submit"
         >
-          {{ isSubmitting ? "Saving..." : isEditMode ? "Save Changes" : "Create Item" }}
+          {{ isSubmitting ? $t("common.saving") : isEditMode ? $t("common.saveChanges") : $t("inventoryItem.createButton") }}
         </button>
       </div>
     </div>

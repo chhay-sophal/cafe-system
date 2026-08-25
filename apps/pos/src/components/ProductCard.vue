@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { resolveImageUrl } from "../lib/image";
 import type { Product } from "../types/catalog";
+
+const { t } = useI18n({ useScope: "global" });
 
 const props = defineProps<{
   product: Product;
@@ -50,7 +53,7 @@ function handleTap() {
         {{ product.name.slice(0, 1) }}
       </div>
 
-      <div v-if="!product.isAvailable" class="product-card__badge">Sold Out</div>
+      <div v-if="!product.isAvailable" class="product-card__badge">{{ t("product.soldOut") }}</div>
     </div>
 
     <div class="product-card__body">

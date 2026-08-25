@@ -1,0 +1,82 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "done": "Done",
+    "clear": "Clear",
+    "tryAgain": "Try Again",
+    "close": "Close",
+    "requestFailed": "Request failed with status {status}"
+  },
+  "app": {
+    "title": "Cafe POS",
+    "logout": "Log out",
+    "pendingBadge": "{count} pending",
+    "online": "Online",
+    "offline": "Offline",
+    "loadError": "Failed to load menu."
+  },
+  "login": {
+    "subtitle": "Enter your PIN to start a shift",
+    "enterPin": "Enter PIN",
+    "loggingIn": "Logging in...",
+    "logIn": "Log In",
+    "genericError": "Login failed."
+  },
+  "cart": {
+    "ariaLabel": "Current order",
+    "heading": "Current Order",
+    "empty": "Tap a product to add it to the order.",
+    "subtotal": "Subtotal",
+    "tax": "Tax",
+    "discount": "Discount",
+    "total": "Total",
+    "checkout": "Checkout",
+    "unitPriceEach": "{price} each",
+    "removeAria": "Remove item",
+    "remove": "Remove",
+    "decreaseAria": "Decrease quantity",
+    "increaseAria": "Increase quantity"
+  },
+  "categories": {
+    "ariaLabel": "Product categories",
+    "allItems": "All Items"
+  },
+  "checkout": {
+    "dialogAriaLabel": "Checkout",
+    "heading": "Checkout",
+    "totalDue": "Total Due",
+    "amountTendered": "Amount Tendered",
+    "exactChange": "Exact Change",
+    "amountShort": "{amount} more needed",
+    "changeDue": "Change Due: {amount}",
+    "completePayment": "Complete Payment",
+    "processing": "Processing payment...",
+    "orderQueued": "Order Queued",
+    "changeDueLabel": "Change Due",
+    "paymentComplete": "Payment Complete",
+    "savedOffline": "Saved offline - will sync automatically",
+    "orderNumber": "Order #{number}",
+    "saveLocalError": "Failed to save order locally.",
+    "methods": {
+      "CASH": "Cash",
+      "CARD": "Credit Card",
+      "QR_CODE": "Mobile Pay"
+    }
+  },
+  "modifier": {
+    "customizeAria": "Customize {name}",
+    "requiredChoose": "Required · choose {count}",
+    "optional": "Optional",
+    "selectPrompt": "Select an option for: {list}",
+    "addToOrder": "Add to Order"
+  },
+  "network": {
+    "offlineMessage": "You're offline. Orders will save locally and sync automatically.",
+    "backOnline": "Back online - syncing pending orders..."
+  },
+  "product": {
+    "soldOut": "Sold Out",
+    "loading": "Loading menu...",
+    "empty": "No items in this category."
+  }
+}

@@ -20,6 +20,7 @@ const emit = defineEmits<{
   delete: [item: InventoryItem];
 }>();
 
+const { t } = useI18n();
 const store = useInventoryStore();
 const { items, isLoading, error } = storeToRefs(store);
 
@@ -34,10 +35,10 @@ const features = tableFeatures({
 });
 
 const columns = [
-  { accessorKey: "name", header: "Item" },
-  { accessorKey: "stockQuantity", header: "Stock" },
-  { accessorKey: "unit", header: "Unit", filterFn: "equalsString" as const },
-  { accessorKey: "reorderThreshold", header: "Reorder At" },
+  { accessorKey: "name", header: () => t("stockTable.columns.item") },
+  { accessorKey: "stockQuantity", header: () => t("stockTable.columns.stock") },
+  { accessorKey: "unit", header: () => t("stockTable.columns.unit"), filterFn: "equalsString" as const },
+  { accessorKey: "reorderThreshold", header: () => t("stockTable.columns.reorderAt") },
 ];
 
 const table = useTable({ features, columns, data: items });
@@ -66,7 +67,7 @@ function formatUpdatedAt(value: string | null): string {
       <input
         v-model="search"
         type="search"
-        placeholder="Search items..."
+        :placeholder="$t('stockTable.searchPlaceholder')"
         class="w-64 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
         @input="handleSearchInput"
       />
@@ -76,12 +77,12 @@ function formatUpdatedAt(value: string | null): string {
         class="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
         @change="handleUnitFilterChange"
       >
-        <option value="">All units</option>
+        <option value="">{{ $t("stockTable.allUnits") }}</option>
         <option v-for="unit in units" :key="unit" :value="unit">{{ unit }}</option>
       </select>
 
       <span v-if="store.lowStockCount > 0" class="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
-        {{ store.lowStockCount }} low stock
+        {{ $t("stockTable.lowStockBadge", { count: store.lowStockCount }) }}
       </span>
 
       <button
@@ -89,13 +90,13 @@ function formatUpdatedAt(value: string | null): string {
         class="ml-auto rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
         @click="emit('create')"
       >
-        + New Item
+        {{ $t("stockTable.newButton") }}
       </button>
     </div>
 
     <p v-if="error" class="rounded-lg bg-red-50 p-4 text-sm font-medium text-red-700">{{ error }}</p>
 
-    <p v-else-if="isLoading" class="p-6 text-center text-sm text-slate-500">Loading inventory...</p>
+    <p v-else-if="isLoading" class="p-6 text-center text-sm text-slate-500">{{ $t("stockTable.loading") }}</p>
 
     <div v-else class="overflow-x-auto rounded-lg border border-slate-200">
       <table class="min-w-full divide-y divide-slate-200 text-sm">
@@ -108,8 +109,8 @@ function formatUpdatedAt(value: string | null): string {
             >
               <FlexRender v-if="!header.isPlaceholder" :header="header" />
             </th>
-            <th class="px-4 py-3 text-left font-semibold text-slate-600">Status</th>
-            <th class="px-4 py-3 text-left font-semibold text-slate-600">Updated</th>
+            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("stockTable.columns.status") }}</th>
+            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("stockTable.columns.updated") }}</th>
             <th class="px-4 py-3" />
           </tr>
         </thead>
@@ -117,7 +118,7 @@ function formatUpdatedAt(value: string | null): string {
         <tbody class="divide-y divide-slate-100 bg-white">
           <tr v-if="table.getRowModel().rows.length === 0">
             <td :colspan="columns.length + 3" class="px-4 py-8 text-center text-slate-400">
-              No inventory items match your filters.
+              {{ $t("stockTable.empty") }}
             </td>
           </tr>
 
@@ -135,13 +136,13 @@ function formatUpdatedAt(value: string | null): string {
                 v-if="row.original.isLowStock"
                 class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700"
               >
-                Low Stock
+                {{ $t("stockTable.lowStock") }}
               </span>
               <span
                 v-else
                 class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700"
               >
-                OK
+                {{ $t("stockTable.ok") }}
               </span>
             </td>
 
@@ -154,21 +155,21 @@ function formatUpdatedAt(value: string | null): string {
                   class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
                   @click="emit('adjust', row.original)"
                 >
-                  Adjust
+                  {{ $t("stockTable.adjust") }}
                 </button>
                 <button
                   type="button"
                   class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
                   @click="emit('edit', row.original)"
                 >
-                  Edit
+                  {{ $t("common.edit") }}
                 </button>
                 <button
                   type="button"
                   class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
                   @click="emit('delete', row.original)"
                 >
-                  Delete
+                  {{ $t("common.delete") }}
                 </button>
               </div>
             </td>

@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
+import { setLocale } from "./i18n";
 import CartSidebar from "./components/CartSidebar.vue";
 import CategoryTabs from "./components/CategoryTabs.vue";
 import CheckoutModal from "./components/CheckoutModal.vue";
@@ -16,6 +18,8 @@ import type { Category, Product } from "./types/catalog";
 import type { CartModifier, ModifierGroup } from "./types/cart";
 
 const SYNC_RETRY_INTERVAL_MS = 15000;
+
+const { t, locale } = useI18n({ useScope: "global" });
 
 const categories = ref<Category[]>([]);
 const products = ref<Product[]>([]);
@@ -93,7 +97,7 @@ onMounted(async () => {
     categories.value = categoryList;
     products.value = productList;
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : "Failed to load menu.";
+    errorMessage.value = error instanceof Error ? error.message : t("app.loadError");
   } finally {
     isLoading.value = false;
   }
@@ -126,22 +130,30 @@ onUnmounted(() => {
 
   <main v-else class="pos-screen">
     <header class="pos-header">
-      <h1 class="pos-header__title">Cafe POS</h1>
+      <h1 class="pos-header__title">{{ t("app.title") }}</h1>
       <div class="pos-header__account">
         <span
           v-if="offlineQueue.pendingCount.value > 0"
           class="pos-header__pending-badge"
         >
-          {{ offlineQueue.pendingCount.value }} pending
+          {{ t("app.pendingBadge", { count: offlineQueue.pendingCount.value }) }}
         </span>
         <span
           class="pos-header__network"
           :class="{ 'pos-header__network--offline': !network.isOnline.value }"
         >
-          {{ network.isOnline.value ? "Online" : "Offline" }}
+          {{ network.isOnline.value ? t("app.online") : t("app.offline") }}
         </span>
+        <select
+          :value="locale"
+          class="pos-header__locale"
+          @change="setLocale(($event.target as HTMLSelectElement).value as 'en-US' | 'km-KH')"
+        >
+          <option value="en-US">English</option>
+          <option value="km-KH">ខ្មែរ</option>
+        </select>
         <span class="pos-header__cashier">{{ auth.session.value.user.name }}</span>
-        <button type="button" class="pos-header__logout" @click="auth.logout()">Log out</button>
+        <button type="button" class="pos-header__logout" @click="auth.logout()">{{ t("app.logout") }}</button>
       </div>
     </header>
 
@@ -231,6 +243,15 @@ onUnmounted(() => {
 
 .pos-header__cashier {
   color: #cccccc;
+}
+
+.pos-header__locale {
+  border: 2px solid #444444;
+  background: #1a1a1a;
+  color: #ffffff;
+  border-radius: 8px;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.85rem;
 }
 
 .pos-header__pending-badge {

@@ -3,8 +3,22 @@ export default defineNuxtConfig({
   compatibilityDate: '2026-08-09',
   modules: [
     '@pinia/nuxt',
-    '@nuxtjs/tailwindcss'
+    '@nuxtjs/tailwindcss',
+    '@nuxtjs/i18n'
   ],
+  i18n: {
+    locales: [
+      { code: 'en-US', language: 'en-US', name: 'English', file: 'en-US.json' },
+      { code: 'km-KH', language: 'km-KH', name: 'ខ្មែរ', file: 'km-KH.json' }
+    ],
+    defaultLocale: 'en-US',
+    langDir: 'locales',
+    strategy: 'no_prefix',
+    // Client-only SPA (see ssr: false below) - locale choice is a plain
+    // user preference, so a localStorage-backed switcher is enough; no
+    // need for URL prefixes or server-side Accept-Language detection.
+    detectBrowserLanguage: false
+  },
   devtools: { enabled: true },
   app: {
     head: {

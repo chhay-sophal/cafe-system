@@ -28,52 +28,52 @@ function formatCreatedAt(value: string | null): string {
 <template>
   <div>
     <div class="mb-4 flex items-center justify-between">
-      <h2 class="text-sm font-semibold text-slate-700">Staff Accounts</h2>
+      <h2 class="text-sm font-semibold text-slate-700">{{ $t("staff.table.heading") }}</h2>
       <button
         type="button"
         class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
         @click="emit('create')"
       >
-        + New Staff Member
+        {{ $t("staff.table.newButton") }}
       </button>
     </div>
 
     <p v-if="store.error" class="rounded-lg bg-red-50 p-4 text-sm font-medium text-red-700">{{ store.error }}</p>
 
-    <p v-else-if="store.isLoading" class="p-6 text-center text-sm text-slate-500">Loading staff...</p>
+    <p v-else-if="store.isLoading" class="p-6 text-center text-sm text-slate-500">{{ $t("staff.table.loading") }}</p>
 
     <div v-else class="overflow-x-auto rounded-lg border border-slate-200">
       <table class="min-w-full divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-50">
           <tr>
-            <th class="px-4 py-3 text-left font-semibold text-slate-600">Name</th>
-            <th class="px-4 py-3 text-left font-semibold text-slate-600">Role</th>
-            <th class="px-4 py-3 text-left font-semibold text-slate-600">Status</th>
-            <th class="px-4 py-3 text-left font-semibold text-slate-600">Created</th>
+            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("staff.table.name") }}</th>
+            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("staff.table.role") }}</th>
+            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("staff.table.status") }}</th>
+            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("staff.table.created") }}</th>
             <th class="px-4 py-3" />
           </tr>
         </thead>
 
         <tbody class="divide-y divide-slate-100 bg-white">
           <tr v-if="store.items.length === 0">
-            <td colspan="5" class="px-4 py-8 text-center text-slate-400">No staff accounts yet.</td>
+            <td colspan="5" class="px-4 py-8 text-center text-slate-400">{{ $t("staff.table.empty") }}</td>
           </tr>
 
           <tr v-for="user in store.items" :key="user.id" :class="!user.isActive ? 'bg-slate-50' : ''">
             <td class="px-4 py-3" :class="user.isActive ? 'text-slate-700' : 'text-slate-400'">{{ user.name }}</td>
-            <td class="px-4 py-3" :class="user.isActive ? 'text-slate-700' : 'text-slate-400'">{{ user.role }}</td>
+            <td class="px-4 py-3" :class="user.isActive ? 'text-slate-700' : 'text-slate-400'">{{ $t(`staff.roles.${user.role}`) }}</td>
             <td class="px-4 py-3">
               <span
                 v-if="user.isActive"
                 class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700"
               >
-                Active
+                {{ $t("staff.table.active") }}
               </span>
               <span
                 v-else
                 class="inline-flex items-center rounded-full bg-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600"
               >
-                Deactivated
+                {{ $t("staff.table.deactivated") }}
               </span>
             </td>
             <td class="px-4 py-3 text-xs text-slate-400">{{ formatCreatedAt(user.createdAt) }}</td>
@@ -83,7 +83,7 @@ function formatCreatedAt(value: string | null): string {
                 class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
                 @click="emit('edit', user)"
               >
-                Edit
+                {{ $t("common.edit") }}
               </button>
             </td>
           </tr>

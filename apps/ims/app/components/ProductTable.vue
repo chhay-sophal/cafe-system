@@ -71,21 +71,21 @@ async function toggleAvailability(product: Product) {
 <template>
   <div>
     <div class="mb-4 flex items-center justify-between">
-      <h2 class="text-sm font-semibold text-slate-700">Menu Items</h2>
+      <h2 class="text-sm font-semibold text-slate-700">{{ $t("productTable.heading") }}</h2>
       <div class="flex gap-2">
         <button
           type="button"
           class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
           @click="emit('manageCategories')"
         >
-          Manage Categories
+          {{ $t("categories.manage") }}
         </button>
         <button
           type="button"
           class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
           @click="emit('create')"
         >
-          + New Product
+          {{ $t("productTable.newButton") }}
         </button>
       </div>
     </div>
@@ -93,25 +93,25 @@ async function toggleAvailability(product: Product) {
     <p v-if="store.error" class="rounded-lg bg-red-50 p-4 text-sm font-medium text-red-700">{{ store.error }}</p>
 
     <p v-else-if="store.isLoading && !store.hasLoadedOnce" class="p-6 text-center text-sm text-slate-500">
-      Loading menu...
+      {{ $t("productTable.loading") }}
     </p>
 
     <div v-else class="overflow-x-auto rounded-lg border border-slate-200">
       <table class="min-w-full divide-y divide-slate-200 text-sm">
         <thead class="bg-slate-50">
           <tr>
-            <th class="px-4 py-3 text-left font-semibold text-slate-600">Image</th>
-            <th class="px-4 py-3 text-left font-semibold text-slate-600">Item</th>
-            <th class="px-4 py-3 text-left font-semibold text-slate-600">Category</th>
-            <th class="px-4 py-3 text-left font-semibold text-slate-600">Base Price</th>
-            <th class="px-4 py-3 text-left font-semibold text-slate-600">Available</th>
+            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("productTable.image") }}</th>
+            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("productTable.item") }}</th>
+            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("productTable.category") }}</th>
+            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("productTable.basePrice") }}</th>
+            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("productTable.available") }}</th>
             <th class="px-4 py-3" />
           </tr>
         </thead>
 
         <tbody class="divide-y divide-slate-100 bg-white">
           <tr v-if="store.products.length === 0">
-            <td colspan="6" class="px-4 py-8 text-center text-slate-400">No menu items yet.</td>
+            <td colspan="6" class="px-4 py-8 text-center text-slate-400">{{ $t("productTable.empty") }}</td>
           </tr>
 
           <tr v-for="product in store.products" :key="product.id">
@@ -131,7 +131,7 @@ async function toggleAvailability(product: Product) {
               </div>
             </td>
             <td class="px-4 py-3 text-slate-700">{{ product.name }}</td>
-            <td class="px-4 py-3 text-slate-700">{{ categoryNameById.get(product.categoryId) ?? "-" }}</td>
+            <td class="px-4 py-3 text-slate-700">{{ categoryNameById.get(product.categoryId) ?? $t("common.dash") }}</td>
             <td class="px-4 py-3 text-slate-700">{{ formatPrice(product.basePrice) }}</td>
             <td class="px-4 py-3">
               <button
@@ -156,14 +156,14 @@ async function toggleAvailability(product: Product) {
                   class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
                   @click="emit('edit', product)"
                 >
-                  Edit
+                  {{ $t("common.edit") }}
                 </button>
                 <button
                   type="button"
                   class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
                   @click="emit('delete', product)"
                 >
-                  Delete
+                  {{ $t("common.delete") }}
                 </button>
               </div>
             </td>
