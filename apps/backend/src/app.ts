@@ -32,6 +32,21 @@ import {
 const DEFAULT_EXCHANGE_RATE_RIEL_PER_USD = 4100;
 const DEFAULT_MAIN_CURRENCY = 'USD' as const;
 
+// Single physical cafe in Cambodia (Asia/Phnom_Penh, UTC+7, no DST) - a fixed
+// offset is enough, no need for per-user timezone detection. `orders.createdAt`
+// is stored via SQLite's CURRENT_TIMESTAMP (UTC), but "today"/date-range
+// filters mean the store's local calendar day, so every comparison against
+// createdAt needs to shift it into local time first via this SQL modifier.
+const STORE_UTC_OFFSET_SQL_MODIFIER = '+7 hours';
+const STORE_UTC_OFFSET_HOURS = 7;
+
+// The store's current local calendar date (YYYY-MM-DD), used as the default
+// "today" for date-range filters and the daily order-number counter.
+function storeTodayDateString(): string {
+  const shifted = new Date(Date.now() + STORE_UTC_OFFSET_HOURS * 60 * 60 * 1000);
+  return shifted.toISOString().slice(0, 10);
+}
+
 function getExchangeRate(): number {
   const row = db.select().from(storeSettings).where(eq(storeSettings.id, 'default')).get();
   return row?.exchangeRateRielPerUsd ?? DEFAULT_EXCHANGE_RATE_RIEL_PER_USD;
@@ -440,8 +455,11 @@ function createApp() {
     }
 
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const todayOrdersCount = db.select({ count: sql<number>`count(*)` }).from(orders).where(gte(orders.createdAt, today)).get()?.count || 0;
+      const today = storeTodayDateString();
+      const todayOrdersCount = db.select({ count: sql<number>`count(*)` })
+        .from(orders)
+        .where(gte(sql`datetime(${orders.createdAt}, ${STORE_UTC_OFFSET_SQL_MODIFIER})`, today))
+        .get()?.count || 0;
       const orderNumber = todayOrdersCount + 1;
       const orderId = randomUUID();
 
@@ -810,11 +828,15 @@ function createApp() {
   });
 
   app.get('/api/reports/daily-summary', async (req, res) => {
-    const startDate = (req.query.startDate as string) || new Date().toISOString().split('T')[0];
+    const startDate = (req.query.startDate as string) || storeTodayDateString();
     const endDate = (req.query.endDate as string) || startDate;
+    // startDate/endDate are store-local calendar days (see storeTodayDateString),
+    // but createdAt is stored in UTC - shift it to local time before comparing,
+    // otherwise the boundary is off by the store's UTC offset.
+    const localCreatedAt = sql`datetime(${orders.createdAt}, ${STORE_UTC_OFFSET_SQL_MODIFIER})`;
     const dateCondition = and(
-      gte(orders.createdAt, `${startDate} 00:00:00`),
-      lte(orders.createdAt, `${endDate} 23:59:59`),
+      gte(localCreatedAt, `${startDate} 00:00:00`),
+      lte(localCreatedAt, `${endDate} 23:59:59`),
       eq(orders.status, 'COMPLETED'),
     );
 
@@ -841,10 +863,10 @@ function createApp() {
       }).from(payments).innerJoin(orders, eq(payments.orderId, orders.id)).where(dateCondition).groupBy(payments.paymentMethod).all();
 
       const hourlyRows = db.select({
-        hour: sql<string>`strftime('%H', ${orders.createdAt})`,
+        hour: sql<string>`strftime('%H', ${orders.createdAt}, ${STORE_UTC_OFFSET_SQL_MODIFIER})`,
         orderCount: sql<number>`count(${orders.id})`,
         revenue: sql<number>`coalesce(sum(${orders.totalAmount}), 0)`,
-      }).from(orders).where(dateCondition).groupBy(sql`strftime('%H', ${orders.createdAt})`).all();
+      }).from(orders).where(dateCondition).groupBy(sql`strftime('%H', ${orders.createdAt}, ${STORE_UTC_OFFSET_SQL_MODIFIER})`).all();
 
       const hourlyByHour = new Map(hourlyRows.map((row) => [Number(row.hour), row]));
       const hourlyVolume = Array.from({ length: 24 }, (_, hour) => ({

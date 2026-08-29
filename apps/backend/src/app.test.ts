@@ -259,3 +259,38 @@ describe('order payments in mixed USD/Riel', () => {
     expect(response.body.error).toBe('Insufficient payment');
   });
 });
+
+describe('daily summary date range (store-local timezone)', () => {
+  beforeEach(async () => {
+    db.delete(payments).run();
+    db.delete(orderItemModifiers).run();
+    db.delete(orderItems).run();
+    db.delete(orders).run();
+    db.delete(stockAdjustments).run();
+    db.delete(users).run();
+  });
+
+  it('buckets an order by the store-local calendar day, not its UTC calendar day', async () => {
+    const pinHash = await hashPin('1234');
+    db.insert(users).values({ id: 'cashier-1', name: 'Cashier', pinHash, role: 'CASHIER', isActive: true }).run();
+
+    // 18:30 UTC on the 29th is 01:30 local (store is UTC+7) on the 30th - a
+    // report for local "the 30th" must include this order; a report for
+    // local "the 29th" must not.
+    db.insert(orders).values({
+      id: 'order-1',
+      userId: 'cashier-1',
+      orderNumber: 1,
+      subtotal: 5,
+      totalAmount: 5,
+      createdAt: '2026-08-29 18:30:00',
+    }).run();
+
+    const sameLocalDay = await request(app).get('/api/reports/daily-summary?startDate=2026-08-30&endDate=2026-08-30');
+    expect(sameLocalDay.body.metrics.totalOrders).toBe(1);
+    expect(sameLocalDay.body.hourlyVolume.find((h: { hour: number }) => h.hour === 1)?.orderCount).toBe(1);
+
+    const previousUtcDay = await request(app).get('/api/reports/daily-summary?startDate=2026-08-29&endDate=2026-08-29');
+    expect(previousUtcDay.body.metrics.totalOrders).toBe(0);
+  });
+});
