@@ -4,6 +4,7 @@ import { storeToRefs } from "pinia";
 import {
   FlexRender,
   columnFilteringFeature,
+  createColumnHelper,
   createFilteredRowModel,
   filterFn_equalsString,
   filterFn_includesString,
@@ -34,12 +35,14 @@ const features = tableFeatures({
   filterFns: { includesString: filterFn_includesString, equalsString: filterFn_equalsString },
 });
 
-const columns = [
-  { accessorKey: "name", header: () => t("stockTable.columns.item") },
-  { accessorKey: "stockQuantity", header: () => t("stockTable.columns.stock") },
-  { accessorKey: "unit", header: () => t("stockTable.columns.unit"), filterFn: "equalsString" as const },
-  { accessorKey: "reorderThreshold", header: () => t("stockTable.columns.reorderAt") },
-];
+const columnHelper = createColumnHelper<typeof features, InventoryItem>();
+
+const columns = columnHelper.columns([
+  columnHelper.accessor("name", { header: () => t("stockTable.columns.item") }),
+  columnHelper.accessor("stockQuantity", { header: () => t("stockTable.columns.stock") }),
+  columnHelper.accessor("unit", { header: () => t("stockTable.columns.unit"), filterFn: "equalsString" }),
+  columnHelper.accessor("reorderThreshold", { header: () => t("stockTable.columns.reorderAt") }),
+]);
 
 const table = useTable({ features, columns, data: items });
 
