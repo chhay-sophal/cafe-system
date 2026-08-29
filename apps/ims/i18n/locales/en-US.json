@@ -245,5 +245,28 @@
     "previewLabel": "1 USD ≈ {amount}",
     "saveError": "Failed to save exchange rate.",
     "saveSuccess": "Exchange rate updated."
+  },
+  "orders": {
+    "heading": "Orders",
+    "loading": "Loading orders...",
+    "empty": "No orders in this period.",
+    "columns": {
+      "orderNumber": "Order #",
+      "dateTime": "Date & Time",
+      "cashier": "Cashier",
+      "items": "Items",
+      "payment": "Payment",
+      "total": "Total"
+    },
+    "detail": {
+      "heading": "Order #{number}",
+      "loading": "Loading order...",
+      "subtotal": "Subtotal",
+      "tax": "Tax",
+      "discount": "Discount",
+      "total": "Total",
+      "tendered": "Tendered",
+      "change": "Change"
+    }
   }
 }
