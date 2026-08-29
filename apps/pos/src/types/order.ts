@@ -13,7 +13,8 @@ export interface OrderItemPayload {
 export interface OrderPayload {
   items: OrderItemPayload[];
   paymentMethod: PaymentMethod;
-  amountTendered?: number;
+  amountTenderedUsd?: number;
+  amountTenderedRiel?: number;
   taxAmount?: number;
   discountAmount?: number;
 }
@@ -24,5 +25,7 @@ export interface OrderResult {
   orderNumber: number;
   subtotal: number;
   totalAmount: number;
-  changeGiven: number;
+  changeGivenUsd: number;
+  changeGivenRiel: number;
+  exchangeRateRielPerUsd: number;
 }

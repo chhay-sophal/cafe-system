@@ -11,6 +11,7 @@ import NetworkStatusBar from "./components/NetworkStatusBar.vue";
 import ProductGrid from "./components/ProductGrid.vue";
 import { useAuth } from "./composables/useAuth";
 import { useCart } from "./composables/useCart";
+import { useExchangeRate } from "./composables/useExchangeRate";
 import { useNetworkStatus } from "./composables/useNetworkStatus";
 import { useOfflineQueue } from "./composables/useOfflineQueue";
 import { fetchCategories, fetchProductModifiers, fetchProducts } from "./lib/api";
@@ -34,6 +35,7 @@ const auth = useAuth();
 const cart = useCart();
 const network = useNetworkStatus();
 const offlineQueue = useOfflineQueue();
+const exchangeRate = useExchangeRate();
 
 const filteredProducts = computed(() => {
   if (selectedCategoryId.value === null) {
@@ -93,7 +95,11 @@ function handleOnline() {
 
 onMounted(async () => {
   try {
-    const [categoryList, productList] = await Promise.all([fetchCategories(), fetchProducts()]);
+    const [categoryList, productList] = await Promise.all([
+      fetchCategories(),
+      fetchProducts(),
+      exchangeRate.refreshExchangeRate(),
+    ]);
     categories.value = categoryList;
     products.value = productList;
   } catch (error) {
