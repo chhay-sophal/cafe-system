@@ -5,7 +5,7 @@ import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
-import { eq, sql, gte, lte, and, inArray, isNotNull } from 'drizzle-orm';
+import { eq, sql, gte, lte, and, inArray, isNotNull, desc } from 'drizzle-orm';
 import { db } from './db/index.js';
 import {
   users, categories, products, modifierGroups, modifiers, productModifiers,
@@ -583,6 +583,113 @@ function createApp() {
     } catch (error) {
       console.error('Order creation error:', error);
       res.status(500).json({ error: 'Failed to process sale' });
+    }
+  });
+
+  // Every IMS login is already MANAGER or ADMIN (see useAuth's login gate on
+  // the frontend), so plain `authenticate` - without a role check - matches
+  // how the rest of the Analytics tab is already gated.
+  app.get('/api/orders', authenticate, async (req, res) => {
+    const startDate = (req.query.startDate as string) || storeTodayDateString();
+    const endDate = (req.query.endDate as string) || startDate;
+    // Same store-local day boundary logic as the daily-summary report.
+    const localCreatedAt = sql`datetime(${orders.createdAt}, ${STORE_UTC_OFFSET_SQL_MODIFIER})`;
+    const dateCondition = and(
+      gte(localCreatedAt, `${startDate} 00:00:00`),
+      lte(localCreatedAt, `${endDate} 23:59:59`),
+    );
+
+    try {
+      const rows = db.select({
+        id: orders.id,
+        orderNumber: orders.orderNumber,
+        createdAt: localCreatedAt,
+        status: orders.status,
+        subtotal: orders.subtotal,
+        taxAmount: orders.taxAmount,
+        discountAmount: orders.discountAmount,
+        totalAmount: orders.totalAmount,
+        cashierName: users.name,
+        paymentMethod: payments.paymentMethod,
+        itemCount: sql<number>`(select count(*) from ${orderItems} where ${orderItems.orderId} = ${orders.id})`,
+      })
+        .from(orders)
+        .leftJoin(users, eq(orders.userId, users.id))
+        .leftJoin(payments, eq(payments.orderId, orders.id))
+        .where(dateCondition)
+        .orderBy(desc(orders.createdAt))
+        .all();
+
+      res.json(rows);
+    } catch (error) {
+      console.error('Fetch orders error:', error);
+      res.status(500).json({ error: 'Failed to fetch orders' });
+    }
+  });
+
+  app.get('/api/orders/:id', authenticate, async (req, res) => {
+    const id = String(req.params.id);
+    const localCreatedAt = sql`datetime(${orders.createdAt}, ${STORE_UTC_OFFSET_SQL_MODIFIER})`;
+
+    try {
+      const order = db.select({
+        id: orders.id,
+        orderNumber: orders.orderNumber,
+        createdAt: localCreatedAt,
+        status: orders.status,
+        subtotal: orders.subtotal,
+        taxAmount: orders.taxAmount,
+        discountAmount: orders.discountAmount,
+        totalAmount: orders.totalAmount,
+        cashierName: users.name,
+      })
+        .from(orders)
+        .leftJoin(users, eq(orders.userId, users.id))
+        .where(eq(orders.id, id))
+        .get();
+
+      if (!order) {
+        return res.status(404).json({ error: 'Order not found' });
+      }
+
+      const items = db.select({
+        id: orderItems.id,
+        productName: orderItems.productName,
+        quantity: orderItems.quantity,
+        unitPrice: orderItems.unitPrice,
+        totalPrice: orderItems.totalPrice,
+      }).from(orderItems).where(eq(orderItems.orderId, id)).all();
+
+      const itemModifiers = db.select({
+        orderItemId: orderItemModifiers.orderItemId,
+        modifierName: orderItemModifiers.modifierName,
+        priceExtra: orderItemModifiers.priceExtra,
+      })
+        .from(orderItemModifiers)
+        .innerJoin(orderItems, eq(orderItemModifiers.orderItemId, orderItems.id))
+        .where(eq(orderItems.orderId, id))
+        .all();
+
+      const itemsWithModifiers = items.map((item) => ({
+        ...item,
+        modifiers: itemModifiers
+          .filter((m) => m.orderItemId === item.id)
+          .map(({ modifierName, priceExtra }) => ({ modifierName, priceExtra })),
+      }));
+
+      const payment = db.select({
+        paymentMethod: payments.paymentMethod,
+        amountTenderedUsd: payments.amountTenderedUsd,
+        amountTenderedRiel: payments.amountTenderedRiel,
+        changeGivenUsd: payments.changeGivenUsd,
+        changeGivenRiel: payments.changeGivenRiel,
+        exchangeRateRielPerUsd: payments.exchangeRateRielPerUsd,
+      }).from(payments).where(eq(payments.orderId, id)).get();
+
+      res.json({ ...order, items: itemsWithModifiers, payment: payment ?? null });
+    } catch (error) {
+      console.error('Fetch order detail error:', error);
+      res.status(500).json({ error: 'Failed to fetch order detail' });
     }
   });
 

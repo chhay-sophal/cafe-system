@@ -4,7 +4,8 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import { createApp } from './app.js';
 import { db } from './db/index.js';
 import {
-  categories, orderItemModifiers, orderItems, orders, payments, products, stockAdjustments, storeSettings, users,
+  categories, modifierGroups, modifiers, orderItemModifiers, orderItems, orders, payments, products, stockAdjustments,
+  storeSettings, users,
 } from './db/schema.js';
 import { hashPin, signToken } from './middleware/auth.js';
 
@@ -292,5 +293,108 @@ describe('daily summary date range (store-local timezone)', () => {
 
     const previousUtcDay = await request(app).get('/api/reports/daily-summary?startDate=2026-08-29&endDate=2026-08-29');
     expect(previousUtcDay.body.metrics.totalOrders).toBe(0);
+  });
+});
+
+describe('order list and detail', () => {
+  beforeEach(async () => {
+    db.delete(payments).run();
+    db.delete(orderItemModifiers).run();
+    db.delete(orderItems).run();
+    db.delete(orders).run();
+    db.delete(stockAdjustments).run();
+    db.delete(users).run();
+  });
+
+  async function cashierToken() {
+    const pinHash = await hashPin('1234');
+    db.insert(users).values({ id: 'cashier-1', name: 'Cashier', pinHash, role: 'CASHIER', isActive: true }).run();
+    return signToken({ id: 'cashier-1', name: 'Cashier', role: 'CASHIER' });
+  }
+
+  function testProductId(): string {
+    const existing = db.select({ id: products.id }).from(products).limit(1).get();
+    if (existing) {
+      return existing.id;
+    }
+
+    const categoryId = randomUUID();
+    const productId = randomUUID();
+    db.insert(categories).values({ id: categoryId, name: 'Test Category' }).run();
+    db.insert(products).values({ id: productId, categoryId, name: 'Test Product', basePrice: 3.25 }).run();
+    return productId;
+  }
+
+  it('requires authentication for both endpoints', async () => {
+    const listResponse = await request(app).get('/api/orders');
+    expect(listResponse.status).toBe(401);
+
+    const detailResponse = await request(app).get('/api/orders/some-id');
+    expect(detailResponse.status).toBe(401);
+  });
+
+  it('lists orders within the date range and includes a detail view with items, modifiers, and payment', async () => {
+    const token = await cashierToken();
+
+    // orderItemModifiers.modifierId is a real FK - needs an actual modifier row.
+    const groupId = randomUUID();
+    const modifierId = randomUUID();
+    db.insert(modifierGroups).values({ id: groupId, name: 'Milk Choice' }).run();
+    db.insert(modifiers).values({ id: modifierId, groupId, name: 'Oat Milk', priceExtra: 0.5 }).run();
+
+    const createResponse = await request(app)
+      .post('/api/orders')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        items: [{
+          productId: testProductId(),
+          productName: 'Latte',
+          quantity: 2,
+          unitPrice: 4,
+          selectedModifiers: [{ id: modifierId, name: 'Oat Milk', priceExtra: 0.5 }],
+        }],
+        paymentMethod: 'CASH',
+        amountTenderedUsd: 10,
+        amountTenderedRiel: 0,
+      });
+    expect(createResponse.status).toBe(201);
+    const orderId = createResponse.body.orderId;
+
+    // No date params - defaults to the store's local "today", which the
+    // just-created order necessarily falls within regardless of the
+    // machine's own timezone or where UTC-vs-local midnight currently sits.
+    const listResponse = await request(app)
+      .get('/api/orders')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(listResponse.status).toBe(200);
+    expect(listResponse.body).toHaveLength(1);
+    expect(listResponse.body[0]).toMatchObject({
+      id: orderId,
+      cashierName: 'Cashier',
+      paymentMethod: 'CASH',
+      itemCount: 1,
+    });
+
+    const detailResponse = await request(app)
+      .get(`/api/orders/${orderId}`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(detailResponse.status).toBe(200);
+    expect(detailResponse.body.cashierName).toBe('Cashier');
+    expect(detailResponse.body.items).toHaveLength(1);
+    expect(detailResponse.body.items[0]).toMatchObject({ productName: 'Latte', quantity: 2 });
+    expect(detailResponse.body.items[0].modifiers).toEqual([{ modifierName: 'Oat Milk', priceExtra: 0.5 }]);
+    expect(detailResponse.body.payment).toMatchObject({ paymentMethod: 'CASH', amountTenderedUsd: 10 });
+  });
+
+  it('returns 404 for an unknown order id', async () => {
+    const token = await cashierToken();
+
+    const response = await request(app)
+      .get('/api/orders/does-not-exist')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(404);
   });
 });
