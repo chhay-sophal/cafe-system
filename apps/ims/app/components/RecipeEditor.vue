@@ -216,9 +216,9 @@ onMounted(async () => {
         {{ $t("recipe.loadingMenuItems") }}
       </p>
 
-      <div v-else class="overflow-x-auto rounded-lg border border-slate-200">
+      <div v-else class="max-h-[45vh] overflow-auto rounded-lg border border-slate-200">
         <table class="min-w-full divide-y divide-slate-200 text-sm">
-          <thead class="bg-slate-50">
+          <thead class="sticky top-0 z-10 bg-slate-50">
             <tr>
               <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("productTable.item") }}</th>
               <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("recipe.recipeStatus") }}</th>

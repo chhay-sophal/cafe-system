@@ -65,7 +65,7 @@ function formatUpdatedAt(value: string | null): string {
 </script>
 
 <template>
-  <div>
+  <div class="flex h-full min-h-0 flex-col">
     <div class="mb-4 flex flex-wrap items-center gap-3">
       <input
         v-model="search"
@@ -101,9 +101,9 @@ function formatUpdatedAt(value: string | null): string {
 
     <p v-else-if="isLoading" class="p-6 text-center text-sm text-slate-500">{{ $t("stockTable.loading") }}</p>
 
-    <div v-else class="overflow-x-auto rounded-lg border border-slate-200">
+    <div v-else class="min-h-0 flex-1 overflow-auto rounded-lg border border-slate-200">
       <table class="min-w-full divide-y divide-slate-200 text-sm">
-        <thead class="bg-slate-50">
+        <thead class="sticky top-0 z-10 bg-slate-50">
           <tr v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
             <th
               v-for="header in headerGroup.headers"

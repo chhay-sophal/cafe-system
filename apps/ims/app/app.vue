@@ -90,8 +90,8 @@ watch(
 <template>
   <LoginForm v-if="!auth.session.value" />
 
-  <div v-else class="min-h-screen bg-slate-100">
-    <header class="flex items-center justify-between bg-white px-6 py-4 shadow-sm">
+  <div v-else class="flex h-screen flex-col bg-slate-100">
+    <header class="flex shrink-0 items-center justify-between bg-white px-6 py-4 shadow-sm">
       <div class="flex items-center gap-6">
         <h1 class="text-lg font-bold text-slate-900">{{ $t("app.title") }}</h1>
         <nav class="flex gap-1">
@@ -157,7 +157,7 @@ watch(
       </div>
     </header>
 
-    <main class="mx-auto max-w-6xl p-6">
+    <main class="mx-auto flex w-full max-w-6xl flex-1 flex-col overflow-y-auto p-6">
       <StockTable
         v-if="activeView === 'inventory'"
         @adjust="openAdjustModal"
