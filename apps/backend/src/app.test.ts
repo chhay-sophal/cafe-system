@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import request from 'supertest';
 import { describe, expect, it, beforeEach } from 'vitest';
+import { eq } from 'drizzle-orm';
 import { createApp } from './app.js';
 import { db } from './db/index.js';
 import {
@@ -396,5 +397,130 @@ describe('order list and detail', () => {
       .set('Authorization', `Bearer ${token}`);
 
     expect(response.status).toBe(404);
+  });
+});
+
+describe('category deletion', () => {
+  beforeEach(async () => {
+    // Doesn't touch categories/products - the real seeded catalog stays
+    // intact (recipes/orderItems reference it), only test-created rows
+    // (given high sortOrder values below, out of the seeded range) are used.
+    db.delete(payments).run();
+    db.delete(orderItemModifiers).run();
+    db.delete(orderItems).run();
+    db.delete(orders).run();
+    db.delete(stockAdjustments).run();
+    db.delete(users).run();
+  });
+
+  async function managerToken() {
+    const pinHash = await hashPin('9999');
+    db.insert(users).values({ id: 'manager-1', name: 'Manager', pinHash, role: 'MANAGER', isActive: true }).run();
+    return signToken({ id: 'manager-1', name: 'Manager', role: 'MANAGER' });
+  }
+
+  it('rejects deletion when the category still has products assigned and no reassignment target is given', async () => {
+    const token = await managerToken();
+    const categoryId = randomUUID();
+    db.insert(categories).values({ id: categoryId, name: 'Test Drinks', sortOrder: 1000 }).run();
+    db.insert(products).values({ id: randomUUID(), categoryId, name: 'Test Latte', basePrice: 4 }).run();
+
+    const response = await request(app)
+      .delete(`/api/categories/${categoryId}`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(409);
+    expect(response.body.productCount).toBe(1);
+    expect(db.select().from(categories).where(eq(categories.id, categoryId)).get()).toBeDefined();
+
+    db.delete(products).where(eq(products.categoryId, categoryId)).run();
+    db.delete(categories).where(eq(categories.id, categoryId)).run();
+  });
+
+  it('reassigns products to the target category and deletes the source category', async () => {
+    const token = await managerToken();
+    const sourceId = randomUUID();
+    const targetId = randomUUID();
+    const productId = randomUUID();
+    db.insert(categories).values([
+      { id: sourceId, name: 'Test Source', sortOrder: 1000 },
+      { id: targetId, name: 'Test Target', sortOrder: 1001 },
+    ]).run();
+    db.insert(products).values({ id: productId, categoryId: sourceId, name: 'Test Latte', basePrice: 4 }).run();
+
+    const response = await request(app)
+      .delete(`/api/categories/${sourceId}?reassignToCategoryId=${targetId}`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.reassignedCount).toBe(1);
+    expect(db.select().from(categories).where(eq(categories.id, sourceId)).get()).toBeUndefined();
+    expect(db.select().from(products).where(eq(products.id, productId)).get()).toMatchObject({ categoryId: targetId });
+
+    db.delete(products).where(eq(products.id, productId)).run();
+    db.delete(categories).where(eq(categories.id, targetId)).run();
+  });
+
+  it('rejects reassigning products to the category being deleted', async () => {
+    const token = await managerToken();
+    const categoryId = randomUUID();
+    db.insert(categories).values({ id: categoryId, name: 'Test Drinks', sortOrder: 1000 }).run();
+    db.insert(products).values({ id: randomUUID(), categoryId, name: 'Test Latte', basePrice: 4 }).run();
+
+    const response = await request(app)
+      .delete(`/api/categories/${categoryId}?reassignToCategoryId=${categoryId}`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(400);
+
+    db.delete(products).where(eq(products.categoryId, categoryId)).run();
+    db.delete(categories).where(eq(categories.id, categoryId)).run();
+  });
+
+  it('rejects reassigning to a non-existent target category', async () => {
+    const token = await managerToken();
+    const categoryId = randomUUID();
+    db.insert(categories).values({ id: categoryId, name: 'Test Drinks', sortOrder: 1000 }).run();
+    db.insert(products).values({ id: randomUUID(), categoryId, name: 'Test Latte', basePrice: 4 }).run();
+
+    const response = await request(app)
+      .delete(`/api/categories/${categoryId}?reassignToCategoryId=does-not-exist`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(404);
+
+    db.delete(products).where(eq(products.categoryId, categoryId)).run();
+    db.delete(categories).where(eq(categories.id, categoryId)).run();
+  });
+
+  it('deletes an empty category and compacts the remaining sortOrder values', async () => {
+    const token = await managerToken();
+    // High sortOrder values, clear of the real seeded categories, so the
+    // recalculation's effect on these three is checkable by their *relative*
+    // spacing regardless of how many other categories precede them globally.
+    const [catA, catB, catC, catD] = [randomUUID(), randomUUID(), randomUUID(), randomUUID()];
+    db.insert(categories).values([
+      { id: catA, name: 'Test A', sortOrder: 1000 },
+      { id: catB, name: 'Test B', sortOrder: 1001 },
+      { id: catC, name: 'Test C', sortOrder: 1002 },
+      { id: catD, name: 'Test D', sortOrder: 1003 },
+    ]).run();
+
+    const response = await request(app)
+      .delete(`/api/categories/${catB}`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(200);
+
+    const a = db.select().from(categories).where(eq(categories.id, catA)).get();
+    const c = db.select().from(categories).where(eq(categories.id, catC)).get();
+    const d = db.select().from(categories).where(eq(categories.id, catD)).get();
+
+    expect(c!.sortOrder).toBe(a!.sortOrder! + 1);
+    expect(d!.sortOrder).toBe(a!.sortOrder! + 2);
+
+    db.delete(categories).where(eq(categories.id, catA)).run();
+    db.delete(categories).where(eq(categories.id, catC)).run();
+    db.delete(categories).where(eq(categories.id, catD)).run();
   });
 });

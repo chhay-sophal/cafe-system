@@ -307,6 +307,64 @@ function createApp() {
     }
   });
 
+  app.delete('/api/categories/:id', authenticate, requireRole(['MANAGER', 'ADMIN']), async (req, res) => {
+    const id = String(req.params.id);
+    const reassignToCategoryId = req.query.reassignToCategoryId ? String(req.query.reassignToCategoryId) : undefined;
+
+    try {
+      const existing = db.select().from(categories).where(eq(categories.id, id)).get();
+      if (!existing) {
+        return res.status(404).json({ error: 'Category not found' });
+      }
+
+      const productsInCategory = db.select().from(products).where(eq(products.categoryId, id)).all();
+
+      if (productsInCategory.length > 0) {
+        // No target given yet - tell the client how many products are
+        // affected so it can offer a "move these to..." picker instead of
+        // just blocking outright.
+        if (!reassignToCategoryId) {
+          return res.status(409).json({
+            error: `"${existing.name}" has ${productsInCategory.length} product(s) assigned to it. Choose a category to move them to before deleting.`,
+            productCount: productsInCategory.length,
+          });
+        }
+
+        if (reassignToCategoryId === id) {
+          return res.status(400).json({ error: 'Cannot reassign products to the category being deleted' });
+        }
+
+        const targetCategory = db.select().from(categories).where(eq(categories.id, reassignToCategoryId)).get();
+        if (!targetCategory) {
+          return res.status(404).json({ error: 'Target category not found' });
+        }
+      }
+
+      db.transaction(() => {
+        if (productsInCategory.length > 0 && reassignToCategoryId) {
+          db.update(products).set({ categoryId: reassignToCategoryId }).where(eq(products.categoryId, id)).run();
+        }
+
+        db.delete(categories).where(eq(categories.id, id)).run();
+
+        // Recalculate sortOrder for the remaining categories so there's no
+        // gap left by the deleted one - keeps their relative order, just
+        // compacted (e.g. 0,1,2,3 minus #1 becomes 0,1,2, not 0,2,3).
+        const remaining = db.select().from(categories).orderBy(categories.sortOrder).all();
+        remaining.forEach((category, index) => {
+          if (category.sortOrder !== index) {
+            db.update(categories).set({ sortOrder: index }).where(eq(categories.id, category.id)).run();
+          }
+        });
+      });
+
+      res.json({ success: true, reassignedCount: productsInCategory.length });
+    } catch (error) {
+      console.error('Delete category error:', error);
+      res.status(500).json({ error: 'Failed to delete category' });
+    }
+  });
+
   app.get('/api/products', async (req, res) => {
     const { categoryId } = req.query;
 
