@@ -20,6 +20,7 @@ export default defineNuxtConfig({
     detectBrowserLanguage: false
   },
   devtools: { enabled: true },
+  css: ['~/assets/css/main.css'],
   app: {
     head: {
       link: [
