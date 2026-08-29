@@ -8,6 +8,14 @@ const isOpen = ref(false);
 const customStart = ref(store.startDate);
 const customEnd = ref(store.endDate);
 
+// Matches the panel's `w-72` (18rem = 288px) - known up front so alignment
+// can be decided before the panel itself is in the DOM to measure.
+const MENU_WIDTH_PX = 288;
+const VIEWPORT_MARGIN_PX = 8;
+
+const triggerButton = ref<HTMLButtonElement | null>(null);
+const menuAlign = ref<"left" | "right">("left");
+
 type PresetKey = "today" | "last7" | "last30" | "mtd";
 
 const presets = computed<Array<{ key: PresetKey; label: string }>>(() => [
@@ -71,6 +79,15 @@ function toggleOpen() {
   if (!isOpen.value) {
     customStart.value = store.startDate;
     customEnd.value = store.endDate;
+
+    // Decide alignment from the trigger's actual position rather than a
+    // fixed side, so the panel stays fully on-screen regardless of where
+    // this component ends up in the page (e.g. near the right edge here).
+    const rect = triggerButton.value?.getBoundingClientRect();
+    if (rect) {
+      const fitsLeftAligned = rect.left + MENU_WIDTH_PX <= window.innerWidth - VIEWPORT_MARGIN_PX;
+      menuAlign.value = fitsLeftAligned ? "left" : "right";
+    }
   }
   isOpen.value = !isOpen.value;
 }
@@ -79,6 +96,7 @@ function toggleOpen() {
 <template>
   <div class="relative inline-block">
     <button
+      ref="triggerButton"
       type="button"
       class="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
       @click="toggleOpen"
@@ -91,7 +109,8 @@ function toggleOpen() {
 
     <div
       v-if="isOpen"
-      class="absolute left-0 z-20 mt-2 w-72 rounded-lg border border-slate-200 bg-white shadow-lg"
+      class="absolute z-20 mt-2 w-72 rounded-lg border border-slate-200 bg-white shadow-lg"
+      :class="menuAlign === 'right' ? 'right-0' : 'left-0'"
     >
       <div class="p-2">
         <button
