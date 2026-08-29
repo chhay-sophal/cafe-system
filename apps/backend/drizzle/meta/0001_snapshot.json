@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "02193313-c892-416b-b308-dc448f5791c0",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "b28a1ddc-1bd3-4e31-86f8-f2dfd8e96b61",
+  "prevId": "02193313-c892-416b-b308-dc448f5791c0",
   "tables": {
     "categories": {
       "name": "categories",
@@ -909,6 +909,14 @@
           "notNull": true,
           "autoincrement": false,
           "default": 4100
+        },
+        "main_currency": {
+          "name": "main_currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'USD'"
         },
         "updated_at": {
           "name": "updated_at",

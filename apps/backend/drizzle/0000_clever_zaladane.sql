@@ -70,8 +70,11 @@ CREATE TABLE `payments` (
 	`id` text PRIMARY KEY NOT NULL,
 	`order_id` text NOT NULL,
 	`payment_method` text NOT NULL,
-	`amount_tendered` real NOT NULL,
-	`change_given` real DEFAULT 0 NOT NULL,
+	`amount_tendered_usd` real DEFAULT 0 NOT NULL,
+	`amount_tendered_riel` real DEFAULT 0 NOT NULL,
+	`change_given_usd` real DEFAULT 0 NOT NULL,
+	`change_given_riel` real DEFAULT 0 NOT NULL,
+	`exchange_rate_riel_per_usd` real NOT NULL,
 	`created_at` text DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (`order_id`) REFERENCES `orders`(`id`) ON UPDATE no action ON DELETE no action
 );
@@ -121,6 +124,12 @@ CREATE TABLE `stock_adjustments` (
 	`created_at` text DEFAULT CURRENT_TIMESTAMP,
 	FOREIGN KEY (`inventory_item_id`) REFERENCES `inventory_items`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action
+);
+--> statement-breakpoint
+CREATE TABLE `store_settings` (
+	`id` text PRIMARY KEY DEFAULT 'default' NOT NULL,
+	`exchange_rate_riel_per_usd` real DEFAULT 4100 NOT NULL,
+	`updated_at` text DEFAULT CURRENT_TIMESTAMP
 );
 --> statement-breakpoint
 CREATE TABLE `users` (
