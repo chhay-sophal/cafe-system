@@ -10,14 +10,16 @@ import { db } from './db/index.js';
 import {
   users, categories, products, modifierGroups, modifiers, productModifiers,
   inventoryItems, recipes, stockAdjustments, orders, orderItems,
-  orderItemModifiers, payments,
+  orderItemModifiers, payments, storeSettings,
 } from './db/schema.js';
 import { authenticate, hashPin, requireRole, signToken, verifyPin } from './middleware/auth.js';
 import { validateBody } from './middleware/validate.js';
 import {
   categorySchema,
+  exchangeRateSchema,
   inventoryAdjustmentSchema,
   inventoryItemSchema,
+  mainCurrencySchema,
   managerApprovalSchema,
   orderSchema,
   pinLoginSchema,
@@ -26,6 +28,59 @@ import {
   userCreateSchema,
   userUpdateSchema,
 } from './shared-schemas.js';
+
+const DEFAULT_EXCHANGE_RATE_RIEL_PER_USD = 4100;
+const DEFAULT_MAIN_CURRENCY = 'USD' as const;
+
+function getExchangeRate(): number {
+  const row = db.select().from(storeSettings).where(eq(storeSettings.id, 'default')).get();
+  return row?.exchangeRateRielPerUsd ?? DEFAULT_EXCHANGE_RATE_RIEL_PER_USD;
+}
+
+function getStoreSettings(): { exchangeRateRielPerUsd: number; mainCurrency: 'USD' | 'KHR' } {
+  const row = db.select().from(storeSettings).where(eq(storeSettings.id, 'default')).get();
+  return {
+    exchangeRateRielPerUsd: row?.exchangeRateRielPerUsd ?? DEFAULT_EXCHANGE_RATE_RIEL_PER_USD,
+    mainCurrency: row?.mainCurrency ?? DEFAULT_MAIN_CURRENCY,
+  };
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+// Riel has no sub-unit in everyday use, so amounts are rounded to the
+// nearest 100 - the smallest note in common circulation.
+function usdToRiel(usdValue: number, exchangeRate: number): number {
+  return Math.round((usdValue * exchangeRate) / 100) * 100;
+}
+
+// Splits a USD change amount into whole dollars (returned as USD notes) plus
+// the sub-dollar remainder converted to Riel - used only when the customer
+// paid in pure USD (see computeChange).
+function splitChange(changeDueUsd: number, exchangeRate: number): { usd: number; riel: number } {
+  const wholeUsd = Math.floor(changeDueUsd);
+  const remainderUsd = round2(changeDueUsd - wholeUsd);
+  return { usd: wholeUsd, riel: usdToRiel(remainderUsd, exchangeRate) };
+}
+
+// Change currency follows how the customer paid: pure USD tender gets change
+// as whole USD notes plus a Riel remainder (the standard Cambodian cashier
+// split); paying in pure Riel, or a mix of both, gets change entirely in
+// Riel - handing back a few cents of USD on top of Riel change isn't
+// practical, and simplifies the mixed-tender case to a single currency.
+function computeChange(
+  changeDueUsd: number,
+  exchangeRate: number,
+  amountTenderedUsd: number,
+  amountTenderedRiel: number,
+): { usd: number; riel: number } {
+  const isPureUsdTender = amountTenderedUsd > 0 && amountTenderedRiel === 0;
+  if (isPureUsdTender) {
+    return splitChange(changeDueUsd, exchangeRate);
+  }
+  return { usd: 0, riel: usdToRiel(changeDueUsd, exchangeRate) };
+}
 
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
@@ -375,7 +430,9 @@ function createApp() {
   });
 
   app.post('/api/orders', authenticate, validateBody(orderSchema), async (req, res) => {
-    const { items, paymentMethod, amountTendered = 0, taxAmount = 0, discountAmount = 0 } = req.body;
+    const {
+      items, paymentMethod, amountTenderedUsd = 0, amountTenderedRiel = 0, taxAmount = 0, discountAmount = 0,
+    } = req.body;
     const actingUserId = req.user?.id;
 
     if (!actingUserId) {
@@ -400,7 +457,26 @@ function createApp() {
       }
 
       const totalAmount = subtotal + taxAmount - discountAmount;
-      const changeGiven = paymentMethod === 'CASH' ? (amountTendered - totalAmount) : 0;
+      const exchangeRate = getExchangeRate();
+
+      let paymentUsd = totalAmount;
+      let paymentRiel = 0;
+      let changeUsd = 0;
+      let changeRiel = 0;
+
+      if (paymentMethod === 'CASH') {
+        const tenderedTotalUsd = amountTenderedUsd + amountTenderedRiel / exchangeRate;
+        if (round2(tenderedTotalUsd) < round2(totalAmount)) {
+          return res.status(400).json({ error: 'Insufficient payment' });
+        }
+
+        paymentUsd = amountTenderedUsd;
+        paymentRiel = amountTenderedRiel;
+        const changeDueUsd = Math.max(0, round2(tenderedTotalUsd - totalAmount));
+        const change = computeChange(changeDueUsd, exchangeRate, amountTenderedUsd, amountTenderedRiel);
+        changeUsd = change.usd;
+        changeRiel = change.riel;
+      }
 
       db.transaction(() => {
         db.insert(orders).values({
@@ -418,8 +494,11 @@ function createApp() {
           id: randomUUID(),
           orderId,
           paymentMethod,
-          amountTendered: amountTendered || totalAmount,
-          changeGiven: changeGiven > 0 ? changeGiven : 0,
+          amountTenderedUsd: paymentUsd,
+          amountTenderedRiel: paymentRiel,
+          changeGivenUsd: changeUsd,
+          changeGivenRiel: changeRiel,
+          exchangeRateRielPerUsd: exchangeRate,
         }).run();
 
         for (const item of items) {
@@ -473,10 +552,66 @@ function createApp() {
         }
       });
 
-      res.status(201).json({ success: true, orderId, orderNumber, subtotal, totalAmount, changeGiven });
+      res.status(201).json({
+        success: true,
+        orderId,
+        orderNumber,
+        subtotal,
+        totalAmount,
+        changeGivenUsd: changeUsd,
+        changeGivenRiel: changeRiel,
+        exchangeRateRielPerUsd: exchangeRate,
+      });
     } catch (error) {
       console.error('Order creation error:', error);
       res.status(500).json({ error: 'Failed to process sale' });
+    }
+  });
+
+  app.get('/api/settings/exchange-rate', async (_req, res) => {
+    try {
+      res.json(getStoreSettings());
+    } catch (error) {
+      console.error('Fetch exchange rate error:', error);
+      res.status(500).json({ error: 'Failed to fetch exchange rate' });
+    }
+  });
+
+  app.put('/api/settings/exchange-rate', authenticate, requireRole(['ADMIN']), validateBody(exchangeRateSchema), async (req, res) => {
+    const { exchangeRateRielPerUsd } = req.body;
+
+    try {
+      db.insert(storeSettings)
+        .values({ id: 'default', exchangeRateRielPerUsd })
+        .onConflictDoUpdate({
+          target: storeSettings.id,
+          set: { exchangeRateRielPerUsd, updatedAt: sql`CURRENT_TIMESTAMP` },
+        })
+        .run();
+
+      res.json({ exchangeRateRielPerUsd });
+    } catch (error) {
+      console.error('Update exchange rate error:', error);
+      res.status(500).json({ error: 'Failed to update exchange rate' });
+    }
+  });
+
+  app.put('/api/settings/main-currency', authenticate, requireRole(['ADMIN']), validateBody(mainCurrencySchema), async (req, res) => {
+    const { mainCurrency } = req.body;
+
+    try {
+      db.insert(storeSettings)
+        .values({ id: 'default', mainCurrency })
+        .onConflictDoUpdate({
+          target: storeSettings.id,
+          set: { mainCurrency, updatedAt: sql`CURRENT_TIMESTAMP` },
+        })
+        .run();
+
+      res.json({ mainCurrency });
+    } catch (error) {
+      console.error('Update main currency error:', error);
+      res.status(500).json({ error: 'Failed to update main currency' });
     }
   });
 
@@ -695,9 +830,14 @@ function createApp() {
         netRevenue: sql<number>`coalesce(sum(${orders.totalAmount}), 0)`,
       }).from(orders).where(dateCondition).get();
 
+      // Riel legs are converted back to USD via each row's own snapshotted
+      // rate, since the store's rate can change between orders.
       const paymentBreakdown = db.select({
         method: payments.paymentMethod,
-        totalAmount: sql<number>`sum(${payments.amountTendered} - ${payments.changeGiven})`,
+        totalAmount: sql<number>`sum(
+          (${payments.amountTenderedUsd} + ${payments.amountTenderedRiel} / ${payments.exchangeRateRielPerUsd})
+          - (${payments.changeGivenUsd} + ${payments.changeGivenRiel} / ${payments.exchangeRateRielPerUsd})
+        )`,
       }).from(payments).innerJoin(orders, eq(payments.orderId, orders.id)).where(dateCondition).groupBy(payments.paymentMethod).all();
 
       const hourlyRows = db.select({

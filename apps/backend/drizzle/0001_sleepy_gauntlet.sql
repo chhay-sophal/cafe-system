@@ -1,0 +1,1 @@
+ALTER TABLE `store_settings` ADD `main_currency` text DEFAULT 'USD' NOT NULL;

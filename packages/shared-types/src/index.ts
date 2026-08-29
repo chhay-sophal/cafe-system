@@ -22,9 +22,18 @@ export const orderSchema = z.object({
     })).optional(),
   })).min(1),
   paymentMethod: z.enum(['CASH', 'CARD', 'QR_CODE']),
-  amountTendered: z.number().nonnegative().optional(),
+  amountTenderedUsd: z.number().nonnegative().optional(),
+  amountTenderedRiel: z.number().nonnegative().optional(),
   taxAmount: z.number().nonnegative().optional(),
   discountAmount: z.number().nonnegative().optional(),
+});
+
+export const exchangeRateSchema = z.object({
+  exchangeRateRielPerUsd: z.number().positive(),
+});
+
+export const mainCurrencySchema = z.object({
+  mainCurrency: z.enum(['USD', 'KHR']),
 });
 
 export const inventoryAdjustmentSchema = z.object({

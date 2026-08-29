@@ -136,7 +136,27 @@ export const payments = sqliteTable('payments', {
   id: text('id').primaryKey(),
   orderId: text('order_id').notNull().references(() => orders.id),
   paymentMethod: text('payment_method', { enum: ['CASH', 'CARD', 'QR_CODE'] }).notNull(),
-  amountTendered: real('amount_tendered').notNull(), // Cash given by customer
-  changeGiven: real('change_given').notNull().default(0),
+  amountTenderedUsd: real('amount_tendered_usd').notNull().default(0), // USD cash given by customer
+  amountTenderedRiel: real('amount_tendered_riel').notNull().default(0), // Riel cash given by customer
+  changeGivenUsd: real('change_given_usd').notNull().default(0),
+  changeGivenRiel: real('change_given_riel').notNull().default(0),
+  // Snapshot of the store's USD->Riel rate at sale time - the rate drifts over
+  // time, but a receipt/report must reflect what actually applied at sale.
+  exchangeRateRielPerUsd: real('exchange_rate_riel_per_usd').notNull(),
   createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
+});
+
+// ==========================================
+// 5. STORE SETTINGS
+// ==========================================
+// Single-row table (id is always 'default') holding store-wide settings that
+// admins can edit without a redeploy. The USD->Riel rate converts
+// prices/change to Cambodian Riel throughout IMS and POS. mainCurrency picks
+// which currency is shown prominently (display only - all prices/totals are
+// still stored and computed in USD regardless of this setting).
+export const storeSettings = sqliteTable('store_settings', {
+  id: text('id').primaryKey().default('default'),
+  exchangeRateRielPerUsd: real('exchange_rate_riel_per_usd').notNull().default(4100),
+  mainCurrency: text('main_currency', { enum: ['USD', 'KHR'] }).notNull().default('USD'),
+  updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`),
 });
