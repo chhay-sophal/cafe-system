@@ -10,7 +10,7 @@ const store = useReportsStore();
 
 const showTable = ref(false);
 
-const currencyFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+const { formatMain, formatSecondary } = useCurrency();
 
 function formatHourLabel(hour: number): string {
   if (hour === 0) return "12am";
@@ -56,7 +56,7 @@ const chartOptions = {
         label(context: TooltipItem<"bar">) {
           const entry = hourlyVolume.value[context.dataIndex];
           const orderCount = context.parsed.y ?? 0;
-          return ` ${t("hourlyVolume.orderCount", orderCount)} – ${currencyFormatter.format(entry?.revenue ?? 0)}`;
+          return ` ${t("hourlyVolume.orderCount", orderCount)} – ${formatMain(entry?.revenue ?? 0)}`;
         },
       },
     },
@@ -99,7 +99,10 @@ const chartOptions = {
           >
             <td class="py-2 text-slate-700">{{ formatHourLabel(entry.hour) }}</td>
             <td class="py-2 text-right font-medium text-slate-900">{{ entry.orderCount }}</td>
-            <td class="py-2 text-right text-slate-500">{{ currencyFormatter.format(entry.revenue) }}</td>
+            <td class="py-2 text-right text-slate-500">
+              {{ formatMain(entry.revenue) }}
+              <span class="block text-xs text-slate-400">{{ formatSecondary(entry.revenue) }}</span>
+            </td>
           </tr>
         </tbody>
       </table>

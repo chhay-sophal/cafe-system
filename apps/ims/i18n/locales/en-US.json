@@ -24,7 +24,8 @@
       "menu": "Menu",
       "recipes": "Recipes",
       "analytics": "Analytics",
-      "staff": "Staff"
+      "staff": "Staff",
+      "settings": "Settings"
     }
   },
   "login": {
@@ -229,5 +230,20 @@
       "active": "Active",
       "deactivated": "Deactivated"
     }
+  },
+  "settings": {
+    "heading": "Store Settings",
+    "mainCurrencyLabel": "Main Currency",
+    "mainCurrencyHint": "The currency shown prominently throughout IMS and POS. Prices are still stored and calculated in USD either way.",
+    "currencyUsd": "US Dollar ($)",
+    "currencyKhr": "Cambodian Riel (៛)",
+    "mainCurrencySaveError": "Failed to save main currency.",
+    "mainCurrencySaveSuccess": "Main currency updated.",
+    "exchangeRateLabel": "USD to Riel Exchange Rate",
+    "exchangeRateHint": "Used to show Riel (៛) equivalents throughout the system and to compute change in POS checkout.",
+    "rateError": "Enter a rate greater than 0",
+    "previewLabel": "1 USD ≈ {amount}",
+    "saveError": "Failed to save exchange rate.",
+    "saveSuccess": "Exchange rate updated."
   }
 }

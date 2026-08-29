@@ -20,7 +20,7 @@ const breakdown = computed(() => store.report?.paymentBreakdown ?? []);
 const hasData = computed(() => breakdown.value.some((entry) => entry.totalAmount > 0));
 const total = computed(() => breakdown.value.reduce((sum, entry) => sum + entry.totalAmount, 0));
 
-const currencyFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+const { formatMain, formatSecondary } = useCurrency();
 
 function labelFor(method: string): string {
   const key = `paymentBreakdown.methods.${method}`;
@@ -56,7 +56,7 @@ const chartOptions = {
         // Value leads, label follows - the reader already has the series.
         label(context: TooltipItem<"pie">) {
           const value = context.parsed;
-          return ` ${currencyFormatter.format(value)} (${shareOf(value)}) – ${context.label}`;
+          return ` ${formatMain(value)} (${shareOf(value)}) – ${context.label}`;
         },
       },
     },
@@ -99,7 +99,10 @@ const chartOptions = {
             />
             {{ labelFor(entry.method) }}
           </td>
-          <td class="py-2 text-right font-medium text-slate-900">{{ currencyFormatter.format(entry.totalAmount) }}</td>
+          <td class="py-2 text-right font-medium text-slate-900">
+            {{ formatMain(entry.totalAmount) }}
+            <span class="block text-xs font-normal text-slate-400">{{ formatSecondary(entry.totalAmount) }}</span>
+          </td>
           <td class="py-2 text-right text-slate-500">{{ shareOf(entry.totalAmount) }}</td>
         </tr>
       </tbody>

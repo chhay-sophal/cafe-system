@@ -7,8 +7,9 @@ import type { StaffUser } from "~/types/user";
 const { locale, locales, setLocale } = useI18n();
 const auth = useAuth();
 const store = useInventoryStore();
+const settingsStore = useSettingsStore();
 
-const activeView = ref<"inventory" | "menu" | "recipes" | "analytics" | "staff">("inventory");
+const activeView = ref<"inventory" | "menu" | "recipes" | "analytics" | "staff" | "settings">("inventory");
 const isAdjustOpen = ref(false);
 const selectedItem = ref<InventoryItem | null>(null);
 const isItemModalOpen = ref(false);
@@ -74,6 +75,7 @@ function openProductDeleteDialog(product: Product) {
 onMounted(() => {
   if (auth.session.value) {
     store.fetchInventory();
+    settingsStore.fetchExchangeRate();
   }
 });
 
@@ -82,6 +84,7 @@ watch(
   (session) => {
     if (session) {
       store.fetchInventory();
+      settingsStore.fetchExchangeRate();
     }
   },
 );
@@ -136,6 +139,15 @@ watch(
           >
             {{ $t("app.nav.staff") }}
           </button>
+          <button
+            v-if="isAdmin"
+            type="button"
+            class="rounded-lg px-3 py-1.5 text-sm font-semibold"
+            :class="activeView === 'settings' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'"
+            @click="activeView = 'settings'"
+          >
+            {{ $t("app.nav.settings") }}
+          </button>
         </nav>
       </div>
       <div class="flex items-center gap-3 text-sm">
@@ -174,6 +186,7 @@ watch(
       />
       <RecipeEditor v-else-if="activeView === 'recipes'" />
       <UserTable v-else-if="activeView === 'staff' && isAdmin" @create="openCreateUserModal" @edit="openEditUserModal" />
+      <SettingsPanel v-else-if="activeView === 'settings' && isAdmin" />
       <AnalyticsDashboard v-else />
     </main>
 
