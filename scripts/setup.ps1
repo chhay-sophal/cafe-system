@@ -56,12 +56,12 @@ $isFirstRun = -not (Test-Path $dbPath)
 
 Write-Host "==> Setting up the database"
 pnpm --filter @cafe-system/backend db:migrate
-if ($isFirstRun) {
-    Write-Host "Fresh database detected -- seeding initial data"
-    pnpm --filter @cafe-system/backend db:seed
-} else {
-    Write-Host "Existing database found -- skipping seed"
-}
+# if ($isFirstRun) {
+#     Write-Host "Fresh database detected -- seeding initial data"
+#     pnpm --filter @cafe-system/backend db:seed
+# } else {
+#     Write-Host "Existing database found -- skipping seed"
+# }
 
 Write-Host "==> Building production bundles"
 pnpm --filter @cafe-system/backend build
