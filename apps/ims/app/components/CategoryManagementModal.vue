@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import type { Category } from "~/types/catalog";
 
 const open = defineModel<boolean>("open", { default: false });
 
 const { t } = useI18n();
 const auth = useAuth();
 const store = useCatalogStore();
+
+const deletingCategory = ref<Category | null>(null);
+const isDeleteConfirmOpen = ref(false);
 
 const newName = ref("");
 const newSortOrder = ref<number | null>(null);
@@ -62,6 +66,11 @@ function startEdit(category: { id: string; name: string; sortOrder: number | nul
   editName.value = category.name;
   editSortOrder.value = category.sortOrder;
   editError.value = null;
+}
+
+function startDelete(category: Category) {
+  deletingCategory.value = category;
+  isDeleteConfirmOpen.value = true;
 }
 
 function cancelEdit() {
@@ -148,13 +157,22 @@ async function saveEdit() {
 
           <div v-else class="flex items-center justify-between">
             <span class="text-sm text-slate-700">{{ category.name }}</span>
-            <button
-              type="button"
-              class="rounded-lg border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-              @click="startEdit(category)"
-            >
-              {{ $t("common.edit") }}
-            </button>
+            <div class="flex gap-2">
+              <button
+                type="button"
+                class="rounded-lg border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                @click="startEdit(category)"
+              >
+                {{ $t("common.edit") }}
+              </button>
+              <button
+                type="button"
+                class="rounded-lg border border-red-200 px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
+                @click="startDelete(category)"
+              >
+                {{ $t("common.delete") }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -186,5 +204,7 @@ async function saveEdit() {
         </button>
       </div>
     </div>
+
+    <CategoryDeleteConfirmModal v-model:open="isDeleteConfirmOpen" :category="deletingCategory" />
   </div>
 </template>

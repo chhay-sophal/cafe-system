@@ -83,7 +83,13 @@
     "add": "Add Category",
     "adding": "Adding...",
     "createError": "Failed to create category.",
-    "updateError": "Failed to update category."
+    "updateError": "Failed to update category.",
+    "deleteHeading": "Delete Category",
+    "deleteConfirm": "Are you sure you want to delete {name}? This cannot be undone.",
+    "deleteError": "Failed to delete category.",
+    "reassignHint": "{count} product(s) in \"{name}\" need a new category before it can be deleted.",
+    "reassignLabel": "Move products to",
+    "reassignNoTarget": "Create another category first - there's nowhere to move these products to."
   },
   "inventoryItem": {
     "deleteHeading": "Delete Inventory Item",
