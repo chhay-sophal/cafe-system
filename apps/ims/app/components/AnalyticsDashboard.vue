@@ -30,6 +30,8 @@ onMounted(() => {
         <PaymentBreakdownChart />
         <HourlyVolumeChart />
       </div>
+
+      <OrdersTable />
     </template>
   </div>
 </template>

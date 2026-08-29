@@ -3,6 +3,7 @@ import type {
   Category, CategoryPayload, ImageUploadResult, ModifierGroup, Product, ProductPayload,
 } from "~/types/catalog";
 import type { InventoryItem, InventoryItemPayload, StockAdjustmentPayload } from "~/types/inventory";
+import type { OrderDetail, OrderSummary } from "~/types/orders";
 import type { RecipeIngredientRecord, RecipeSummary, RecipeTarget, RecipeUpdatePayload } from "~/types/recipe";
 import type { DailySummaryReport } from "~/types/reports";
 import type { ExchangeRateSetting, MainCurrencySetting, StoreSettings } from "~/types/settings";
@@ -177,6 +178,14 @@ export function useApi() {
     return getJson<DailySummaryReport>(`/api/reports/daily-summary?startDate=${startDate}&endDate=${endDate}`);
   }
 
+  function fetchOrders(startDate: string, endDate: string, token: string): Promise<OrderSummary[]> {
+    return getJson<OrderSummary[]>(`/api/orders?startDate=${startDate}&endDate=${endDate}`, token);
+  }
+
+  function fetchOrderDetail(id: string, token: string): Promise<OrderDetail> {
+    return getJson<OrderDetail>(`/api/orders/${id}`, token);
+  }
+
   function fetchUsers(token: string): Promise<StaffUser[]> {
     return getJson<StaffUser[]>("/api/users", token);
   }
@@ -216,6 +225,8 @@ export function useApi() {
     fetchRecipeSummary,
     deleteRecipe,
     fetchDailySummary,
+    fetchOrders,
+    fetchOrderDetail,
     fetchUsers,
     createUser,
     updateUser,
