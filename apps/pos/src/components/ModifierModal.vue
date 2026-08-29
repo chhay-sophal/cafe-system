@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive } from "vue";
 import { useI18n } from "vue-i18n";
+import { useExchangeRate } from "../composables/useExchangeRate";
+import { formatMain, formatSecondary } from "../lib/currency";
 import type { CartModifier, ModifierGroup, ModifierOption } from "../types/cart";
 import type { Product } from "../types/catalog";
 
@@ -20,7 +22,7 @@ const selections = reactive<Record<string, string[]>>(
   Object.fromEntries(props.groups.map((group) => [group.id, []])),
 );
 
-const currencyFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+const { exchangeRateRielPerUsd, mainCurrency } = useExchangeRate();
 
 const selectedModifiers = computed<CartModifier[]>(() => {
   const flat: CartModifier[] = [];
@@ -37,6 +39,9 @@ const selectedModifiers = computed<CartModifier[]>(() => {
 
 const runningUnitPrice = computed(
   () => props.product.basePrice + selectedModifiers.value.reduce((sum, m) => sum + m.priceExtra, 0),
+);
+const runningUnitPriceSecondary = computed(() =>
+  formatSecondary(runningUnitPrice.value, mainCurrency.value, exchangeRateRielPerUsd.value),
 );
 
 function isGroupSatisfied(group: ModifierGroup): boolean {
@@ -136,7 +141,7 @@ onUnmounted(() => {
             >
               <span class="modifier-option__name">{{ option.name }}</span>
               <span v-if="option.priceExtra" class="modifier-option__price">
-                +{{ currencyFormatter.format(option.priceExtra) }}
+                +{{ formatMain(option.priceExtra, mainCurrency, exchangeRateRielPerUsd) }}
               </span>
             </button>
           </div>
@@ -148,7 +153,10 @@ onUnmounted(() => {
           {{ t("modifier.selectPrompt", { list: unsatisfiedGroups.map((g) => g.name).join(", ") }) }}
         </p>
         <div class="modifier-modal__actions">
-          <span class="modifier-modal__running-price">{{ currencyFormatter.format(runningUnitPrice) }}</span>
+          <span class="modifier-modal__running-price">
+            {{ formatMain(runningUnitPrice, mainCurrency, exchangeRateRielPerUsd) }}
+            <span class="modifier-modal__running-price-secondary">{{ runningUnitPriceSecondary }}</span>
+          </span>
           <button type="button" class="modifier-modal__cancel" @click="handleCancel">{{ t("common.cancel") }}</button>
           <button type="button" class="modifier-modal__confirm" :disabled="!canConfirm" @click="handleConfirm">
             {{ t("modifier.addToOrder") }}
@@ -310,6 +318,13 @@ onUnmounted(() => {
   margin-right: auto;
 }
 
+.modifier-modal__running-price-secondary {
+  margin-left: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #999999;
+}
+
 .modifier-modal__cancel,
 .modifier-modal__confirm {
   min-height: 48px;
@@ -374,6 +389,10 @@ onUnmounted(() => {
     background: #ffffff;
     border-color: #ffffff;
     color: #111111;
+  }
+
+  .modifier-modal__running-price-secondary {
+    color: #777777;
   }
 }
 </style>

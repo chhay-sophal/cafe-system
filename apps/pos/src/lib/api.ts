@@ -3,6 +3,7 @@ import type { AuthSession } from "../types/auth";
 import type { Category, Product } from "../types/catalog";
 import type { ModifierGroup } from "../types/cart";
 import type { OrderPayload, OrderResult } from "../types/order";
+import type { StoreSettings } from "../types/settings";
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
 const REQUEST_TIMEOUT_MS = 5000;
@@ -85,4 +86,8 @@ export function login(pin: string): Promise<AuthSession> {
 
 export function submitOrder(payload: OrderPayload, token: string): Promise<OrderResult> {
   return postJson<OrderResult>("/api/orders", payload, token);
+}
+
+export function fetchExchangeRate(): Promise<StoreSettings> {
+  return getJson<StoreSettings>("/api/settings/exchange-rate");
 }

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useExchangeRate } from "../composables/useExchangeRate";
+import { formatMain, formatSecondary } from "../lib/currency";
 import { resolveImageUrl } from "../lib/image";
 import type { Product } from "../types/catalog";
 
@@ -14,12 +16,15 @@ const emit = defineEmits<{
   select: [product: Product];
 }>();
 
+const { exchangeRateRielPerUsd, mainCurrency } = useExchangeRate();
+
 const imageFailed = ref(false);
 const resolvedImageUrl = computed(() => resolveImageUrl(props.product.imageUrl));
 const showImage = computed(() => Boolean(resolvedImageUrl.value) && !imageFailed.value);
 
-const formattedPrice = computed(() =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(props.product.basePrice),
+const formattedPrice = computed(() => formatMain(props.product.basePrice, mainCurrency.value, exchangeRateRielPerUsd.value));
+const formattedSecondaryPrice = computed(() =>
+  formatSecondary(props.product.basePrice, mainCurrency.value, exchangeRateRielPerUsd.value),
 );
 
 function handleTap() {
@@ -59,6 +64,7 @@ function handleTap() {
     <div class="product-card__body">
       <span class="product-card__name">{{ product.name }}</span>
       <span class="product-card__price">{{ formattedPrice }}</span>
+      <span class="product-card__price-secondary">{{ formattedSecondaryPrice }}</span>
     </div>
   </button>
 </template>
@@ -160,6 +166,11 @@ function handleTap() {
   color: #2a7a4f;
 }
 
+.product-card__price-secondary {
+  font-size: 0.78rem;
+  color: #999999;
+}
+
 .product-card--unavailable .product-card__name,
 .product-card--unavailable .product-card__price {
   color: #999999;
@@ -186,6 +197,10 @@ function handleTap() {
 
   .product-card__price {
     color: #5fd897;
+  }
+
+  .product-card__price-secondary {
+    color: #777777;
   }
 
   .product-card--unavailable .product-card__name,

@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
+import { useExchangeRate } from "../composables/useExchangeRate";
+import { formatMain, formatSecondary } from "../lib/currency";
 import type { CartLineItem } from "../types/cart";
 import CartItemRow from "./CartItemRow.vue";
 
@@ -21,10 +23,14 @@ const emit = defineEmits<{
   checkout: [];
 }>();
 
-const currencyFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+const { exchangeRateRielPerUsd, mainCurrency } = useExchangeRate();
 
 function format(value: number): string {
-  return currencyFormatter.format(value);
+  return formatMain(value, mainCurrency.value, exchangeRateRielPerUsd.value);
+}
+
+function formatSecondaryEquivalent(value: number): string {
+  return formatSecondary(value, mainCurrency.value, exchangeRateRielPerUsd.value);
 }
 
 function handleDiscountInput(event: Event) {
@@ -77,7 +83,10 @@ function handleDiscountInput(event: Event) {
       </div>
       <div class="cart-sidebar__row cart-sidebar__row--total">
         <span>{{ t("cart.total") }}</span>
-        <span>{{ format(props.totalAmount) }}</span>
+        <span>
+          {{ format(props.totalAmount) }}
+          <span class="cart-sidebar__total-secondary">{{ formatSecondaryEquivalent(props.totalAmount) }}</span>
+        </span>
       </div>
 
       <button
@@ -178,6 +187,14 @@ function handleDiscountInput(event: Event) {
   font-size: 1.2rem;
   font-weight: 700;
   color: #1a1a1a;
+  align-items: baseline;
+}
+
+.cart-sidebar__total-secondary {
+  margin-left: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #999999;
 }
 
 .cart-sidebar__checkout {
@@ -232,6 +249,10 @@ function handleDiscountInput(event: Event) {
   .cart-sidebar__row--total {
     color: #f2f2f2;
     border-top-color: #444444;
+  }
+
+  .cart-sidebar__total-secondary {
+    color: #777777;
   }
 
   .cart-sidebar__checkout {

@@ -2,6 +2,8 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { HttpError, submitOrder } from "../lib/api";
+import { computeChange, formatMain, formatRiel, formatSecondary, formatUsd, round2 } from "../lib/currency";
+import { useExchangeRate } from "../composables/useExchangeRate";
 import { useNetworkStatus } from "../composables/useNetworkStatus";
 import { useOfflineQueue } from "../composables/useOfflineQueue";
 import type { CartLineItem } from "../types/cart";
@@ -31,25 +33,38 @@ const PAYMENT_METHODS = computed<Array<{ value: PaymentMethod; label: string }>>
   { value: "QR_CODE", label: t("checkout.methods.QR_CODE") },
 ]);
 
-const FAST_CASH_AMOUNTS = [10, 20, 50];
-
-const currencyFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+const FAST_CASH_USD_AMOUNTS = [1, 5, 10, 20, 50];
+const FAST_CASH_RIEL_AMOUNTS = [1000, 2000, 5000, 10000, 20000, 50000, 100000];
 
 const network = useNetworkStatus();
 const offlineQueue = useOfflineQueue();
+const { exchangeRateRielPerUsd, mainCurrency } = useExchangeRate();
 
 const phase = ref<Phase>("payment");
 const paymentMethod = ref<PaymentMethod>("CASH");
-const amountTendered = ref(0);
+const amountTenderedUsd = ref(0);
+const amountTenderedRiel = ref(0);
 const errorMessage = ref<string | null>(null);
 const orderResult = ref<OrderResult | null>(null);
 const isQueuedOffline = ref(false);
 
 const isCash = computed(() => paymentMethod.value === "CASH");
 
-const changeDue = computed(() => Math.max(0, amountTendered.value - props.totalAmount));
-const amountShort = computed(() => Math.max(0, props.totalAmount - amountTendered.value));
-const isInsufficient = computed(() => isCash.value && amountTendered.value < props.totalAmount);
+// The Riel leg is converted back to USD via the live exchange rate so
+// tendering can mix both currencies (e.g. $3 + 2,000 riel) against a
+// USD-denominated total.
+const tenderedTotalUsd = computed(() => amountTenderedUsd.value + amountTenderedRiel.value / exchangeRateRielPerUsd.value);
+
+const changeDueUsd = computed(() => Math.max(0, round2(tenderedTotalUsd.value - props.totalAmount)));
+// Pure-USD tender gets USD notes + a Riel remainder; pure-Riel or mixed
+// tender gets change entirely in Riel. Mirrors the backend's authoritative
+// rule (POST /api/orders) for the optimistic/offline display.
+const changeSplit = computed(() =>
+  computeChange(changeDueUsd.value, exchangeRateRielPerUsd.value, amountTenderedUsd.value, amountTenderedRiel.value),
+);
+
+const amountShort = computed(() => Math.max(0, round2(props.totalAmount - tenderedTotalUsd.value)));
+const isInsufficient = computed(() => isCash.value && round2(tenderedTotalUsd.value) < round2(props.totalAmount));
 const canComplete = computed(() => !isInsufficient.value);
 
 const successLabel = computed(() => {
@@ -61,37 +76,71 @@ const successLabel = computed(() => {
 
 // Offline orders have no server-confirmed change/total yet, so fall back to
 // the client-side calculation until the sync engine reconciles them.
-const successAmount = computed(() => {
+const successDisplay = computed(() => {
   if (isCash.value) {
-    return isQueuedOffline.value ? changeDue.value : orderResult.value?.changeGiven ?? changeDue.value;
+    const split = isQueuedOffline.value || !orderResult.value
+      ? changeSplit.value
+      : { usd: orderResult.value.changeGivenUsd, riel: orderResult.value.changeGivenRiel };
+    return formatChangeAmount(split.usd, split.riel);
   }
-  return isQueuedOffline.value ? props.totalAmount : orderResult.value?.totalAmount ?? props.totalAmount;
+  const total = isQueuedOffline.value ? props.totalAmount : orderResult.value?.totalAmount ?? props.totalAmount;
+  return format(total);
 });
 
 function format(value: number): string {
-  return currencyFormatter.format(value);
+  return formatMain(value, mainCurrency.value, exchangeRateRielPerUsd.value);
+}
+
+function formatSecondaryAmount(value: number): string {
+  return formatSecondary(value, mainCurrency.value, exchangeRateRielPerUsd.value);
+}
+
+// USD/Riel tender order follows the main-currency setting so the more
+// prominent currency's input and fast-cash row appear first.
+const isMainKhr = computed(() => mainCurrency.value === "KHR");
+
+function formatChangeAmount(usd: number, riel: number): string {
+  if (usd > 0 && riel > 0) {
+    return `${formatUsd(usd)} + ${formatRiel(riel)}`;
+  }
+  if (riel > 0) {
+    return formatRiel(riel);
+  }
+  return formatUsd(usd);
 }
 
 function selectPaymentMethod(method: PaymentMethod) {
   paymentMethod.value = method;
-  amountTendered.value = method === "CASH" ? 0 : props.totalAmount;
+  amountTenderedUsd.value = method === "CASH" ? 0 : props.totalAmount;
+  amountTenderedRiel.value = 0;
 }
 
-function addFastCash(amount: number) {
-  amountTendered.value = Math.round((amountTendered.value + amount) * 100) / 100;
+function addFastCashUsd(amount: number) {
+  amountTenderedUsd.value = round2(amountTenderedUsd.value + amount);
+}
+
+function addFastCashRiel(amount: number) {
+  amountTenderedRiel.value = amountTenderedRiel.value + amount;
 }
 
 function setExactChange() {
-  amountTendered.value = props.totalAmount;
+  amountTenderedUsd.value = props.totalAmount;
+  amountTenderedRiel.value = 0;
 }
 
 function clearTendered() {
-  amountTendered.value = 0;
+  amountTenderedUsd.value = 0;
+  amountTenderedRiel.value = 0;
 }
 
-function handleTenderedInput(event: Event) {
+function handleTenderedUsdInput(event: Event) {
   const value = Number((event.target as HTMLInputElement).value);
-  amountTendered.value = Number.isFinite(value) && value >= 0 ? value : 0;
+  amountTenderedUsd.value = Number.isFinite(value) && value >= 0 ? value : 0;
+}
+
+function handleTenderedRielInput(event: Event) {
+  const value = Number((event.target as HTMLInputElement).value);
+  amountTenderedRiel.value = Number.isFinite(value) && value >= 0 ? value : 0;
 }
 
 function buildOrderPayload(): OrderPayload {
@@ -104,7 +153,8 @@ function buildOrderPayload(): OrderPayload {
       selectedModifiers: item.modifiers,
     })),
     paymentMethod: paymentMethod.value,
-    amountTendered: amountTendered.value,
+    amountTenderedUsd: amountTenderedUsd.value,
+    amountTenderedRiel: amountTenderedRiel.value,
     taxAmount: props.taxAmount,
     discountAmount: props.discountAmount,
   };
@@ -192,7 +242,10 @@ function handleDone() {
       <div v-if="phase === 'payment'" class="checkout-modal__body">
         <div class="checkout-total">
           <span>{{ t("checkout.totalDue") }}</span>
-          <span class="checkout-total__amount">{{ format(totalAmount) }}</span>
+          <span class="checkout-total__amount">
+            {{ format(totalAmount) }}
+            <span class="checkout-total__amount-secondary">{{ formatSecondaryAmount(totalAmount) }}</span>
+          </span>
         </div>
 
         <div class="payment-methods">
@@ -209,40 +262,72 @@ function handleDone() {
         </div>
 
         <template v-if="isCash">
-          <div class="tendered-display">
-            <span class="tendered-display__label">{{ t("checkout.amountTendered") }}</span>
-            <div class="tendered-display__input-wrap">
-              <span>$</span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                :value="amountTendered"
-                @input="handleTenderedInput"
-              />
-            </div>
-          </div>
+          <div class="tender-sections">
+            <div class="tender-section" :style="{ order: isMainKhr ? 2 : 1 }">
+              <div class="tendered-display">
+                <span class="tendered-display__label">{{ t("checkout.amountTenderedUsd") }}</span>
+                <div class="tendered-display__input-wrap">
+                  <span>$</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    :value="amountTenderedUsd"
+                    @input="handleTenderedUsdInput"
+                  />
+                </div>
+              </div>
 
-          <div class="fast-cash">
-            <button
-              v-for="amount in FAST_CASH_AMOUNTS"
-              :key="amount"
-              type="button"
-              class="fast-cash__button"
-              @click="addFastCash(amount)"
-            >
-              +${{ amount }}
-            </button>
-            <button type="button" class="fast-cash__button fast-cash__button--exact" @click="setExactChange">
-              {{ t("checkout.exactChange") }}
-            </button>
+              <div class="fast-cash">
+                <button
+                  v-for="amount in FAST_CASH_USD_AMOUNTS"
+                  :key="amount"
+                  type="button"
+                  class="fast-cash__button"
+                  @click="addFastCashUsd(amount)"
+                >
+                  +${{ amount }}
+                </button>
+                <button type="button" class="fast-cash__button fast-cash__button--exact" @click="setExactChange">
+                  {{ t("checkout.exactChange") }}
+                </button>
+              </div>
+            </div>
+
+            <div class="tender-section" :style="{ order: isMainKhr ? 1 : 2 }">
+              <div class="tendered-display">
+                <span class="tendered-display__label">{{ t("checkout.amountTenderedRiel") }}</span>
+                <div class="tendered-display__input-wrap">
+                  <input
+                    type="number"
+                    min="0"
+                    step="100"
+                    :value="amountTenderedRiel"
+                    @input="handleTenderedRielInput"
+                  />
+                  <span>៛</span>
+                </div>
+              </div>
+
+              <div class="fast-cash">
+                <button
+                  v-for="amount in FAST_CASH_RIEL_AMOUNTS"
+                  :key="amount"
+                  type="button"
+                  class="fast-cash__button"
+                  @click="addFastCashRiel(amount)"
+                >
+                  +{{ amount.toLocaleString() }}៛
+                </button>
+              </div>
+            </div>
           </div>
 
           <button type="button" class="tendered-clear" @click="clearTendered">{{ t("common.clear") }}</button>
 
           <div class="change-banner" :class="{ 'change-banner--warning': isInsufficient }">
             <span v-if="isInsufficient">{{ t("checkout.amountShort", { amount: format(amountShort) }) }}</span>
-            <span v-else>{{ t("checkout.changeDue", { amount: format(changeDue) }) }}</span>
+            <span v-else>{{ t("checkout.changeDue", { amount: formatChangeAmount(changeSplit.usd, changeSplit.riel) }) }}</span>
           </div>
         </template>
 
@@ -257,7 +342,7 @@ function handleDone() {
 
       <div v-else-if="phase === 'success'" class="checkout-modal__body checkout-modal__body--centered">
         <p class="checkout-success__label">{{ successLabel }}</p>
-        <p class="checkout-success__amount">{{ format(successAmount) }}</p>
+        <p class="checkout-success__amount">{{ successDisplay }}</p>
         <p v-if="isQueuedOffline" class="checkout-success__order">{{ t("checkout.savedOffline") }}</p>
         <p v-else class="checkout-success__order">{{ t("checkout.orderNumber", { number: orderResult?.orderNumber }) }}</p>
         <button type="button" class="checkout-modal__complete" @click="handleDone">{{ t("common.done") }}</button>
@@ -353,6 +438,13 @@ function handleDone() {
   color: #111111;
 }
 
+.checkout-total__amount-secondary {
+  margin-left: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #999999;
+}
+
 .payment-methods {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -380,6 +472,18 @@ function handleDone() {
   background: #111111;
   border-color: #111111;
   color: #ffffff;
+}
+
+.tender-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.tender-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
 .tendered-display {
@@ -541,6 +645,10 @@ function handleDone() {
 
   .checkout-total__amount {
     color: #f2f2f2;
+  }
+
+  .checkout-total__amount-secondary {
+    color: #777777;
   }
 
   .payment-method {

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useExchangeRate } from "../composables/useExchangeRate";
+import { formatMain, formatSecondary } from "../lib/currency";
 import type { CartLineItem } from "../types/cart";
 
 const props = defineProps<{
@@ -22,15 +24,16 @@ const dragStartX = ref(0);
 const baseOffsetAtDragStart = ref(0);
 const isDragging = ref(false);
 
-const currencyFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+const { exchangeRateRielPerUsd, mainCurrency } = useExchangeRate();
 
 const unitPrice = computed(
   () => props.item.unitBasePrice + props.item.modifiers.reduce((sum, mod) => sum + mod.priceExtra, 0),
 );
 const lineTotal = computed(() => unitPrice.value * props.item.quantity);
+const lineTotalSecondary = computed(() => formatSecondary(lineTotal.value, mainCurrency.value, exchangeRateRielPerUsd.value));
 
 function format(value: number): string {
-  return currencyFormatter.format(value);
+  return formatMain(value, mainCurrency.value, exchangeRateRielPerUsd.value);
 }
 
 function onPointerDown(event: PointerEvent) {
@@ -72,7 +75,10 @@ function onPointerUp() {
     >
       <div class="cart-row__top">
         <span class="cart-row__name">{{ item.productName }}</span>
-        <span class="cart-row__line-total">{{ format(lineTotal) }}</span>
+        <span class="cart-row__totals">
+          <span class="cart-row__line-total">{{ format(lineTotal) }}</span>
+          <span class="cart-row__line-total-secondary">{{ lineTotalSecondary }}</span>
+        </span>
         <button type="button" class="cart-row__close" :aria-label="t('cart.removeAria')" @click="emit('remove')">
           &times;
         </button>
@@ -143,9 +149,20 @@ function onPointerUp() {
   color: #1a1a1a;
 }
 
+.cart-row__totals {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
 .cart-row__line-total {
   font-weight: 700;
   color: #1a1a1a;
+}
+
+.cart-row__line-total-secondary {
+  font-size: 0.75rem;
+  color: #999999;
 }
 
 .cart-row__close {
@@ -219,6 +236,10 @@ function onPointerUp() {
   .cart-row__name,
   .cart-row__line-total {
     color: #f2f2f2;
+  }
+
+  .cart-row__line-total-secondary {
+    color: #777777;
   }
 
   .cart-row__stepper button {
