@@ -11,17 +11,23 @@ import type { StaffUser, UserCreatePayload, UserUpdatePayload } from "~/types/us
 
 export class HttpError extends Error {
   status: number;
+  // The parsed JSON error body, when the server sent one - lets callers read
+  // structured fields beyond the plain message (e.g. category deletion's
+  // `productCount`) without a parallel error-handling path.
+  body: unknown;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, body?: unknown) {
     super(message);
     this.name = "HttpError";
     this.status = status;
+    this.body = body;
   }
 }
 
-async function parseErrorMessage(response: Response, t: (key: string, params: Record<string, unknown>) => string): Promise<string> {
+async function parseError(response: Response, t: (key: string, params: Record<string, unknown>) => string): Promise<{ message: string; body: unknown }> {
   const body = await response.json().catch(() => null);
-  return body?.error ?? t("common.requestFailed", { status: response.status });
+  const message = body?.error ?? t("common.requestFailed", { status: response.status });
+  return { message, body };
 }
 
 export function useApi() {
@@ -41,7 +47,8 @@ export function useApi() {
     const response = await fetch(`${baseUrl}${path}`, { headers });
 
     if (!response.ok) {
-      throw new HttpError(await parseErrorMessage(response, t), response.status);
+      const { message, body } = await parseError(response, t);
+      throw new HttpError(message, response.status, body);
     }
 
     return response.json() as Promise<T>;
@@ -60,7 +67,8 @@ export function useApi() {
     });
 
     if (!response.ok) {
-      throw new HttpError(await parseErrorMessage(response, t), response.status);
+      const { message, body } = await parseError(response, t);
+      throw new HttpError(message, response.status, body);
     }
 
     return response.json() as Promise<T>;
@@ -73,7 +81,8 @@ export function useApi() {
     });
 
     if (!response.ok) {
-      throw new HttpError(await parseErrorMessage(response, t), response.status);
+      const { message, body } = await parseError(response, t);
+      throw new HttpError(message, response.status, body);
     }
 
     return response.json() as Promise<T>;
@@ -89,7 +98,8 @@ export function useApi() {
     });
 
     if (!response.ok) {
-      throw new HttpError(await parseErrorMessage(response, t), response.status);
+      const { message, body } = await parseError(response, t);
+      throw new HttpError(message, response.status, body);
     }
 
     return response.json() as Promise<T>;
@@ -137,6 +147,11 @@ export function useApi() {
 
   function updateCategory(id: string, payload: CategoryPayload, token: string): Promise<Category> {
     return sendJson<Category>("PUT", `/api/categories/${id}`, payload, token);
+  }
+
+  function deleteCategory(id: string, token: string, reassignToCategoryId?: string): Promise<{ success: boolean; reassignedCount: number }> {
+    const query = reassignToCategoryId ? `?reassignToCategoryId=${reassignToCategoryId}` : "";
+    return deleteJson<{ success: boolean; reassignedCount: number }>(`/api/categories/${id}${query}`, token);
   }
 
   function createProduct(payload: ProductPayload, token: string): Promise<Product> {
@@ -232,6 +247,7 @@ export function useApi() {
     updateUser,
     createCategory,
     updateCategory,
+    deleteCategory,
     createProduct,
     updateProduct,
     deleteProduct,

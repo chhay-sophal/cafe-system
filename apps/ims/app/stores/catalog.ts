@@ -57,5 +57,13 @@ export const useCatalogStore = defineStore("catalog", {
       await updateCategory(id, payload, token);
       await this.fetchCatalog();
     },
+
+    async deleteCategory(id: string, token: string, reassignToCategoryId?: string) {
+      const { deleteCategory } = useApi();
+      await deleteCategory(id, token, reassignToCategoryId);
+      // Deletion also recalculates every remaining category's sortOrder
+      // server-side, so a full refetch is needed, not just removing the id.
+      await this.fetchCatalog();
+    },
   },
 });
