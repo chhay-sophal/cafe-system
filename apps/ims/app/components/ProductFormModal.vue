@@ -12,6 +12,7 @@ const { t } = useI18n();
 const auth = useAuth();
 const store = useCatalogStore();
 const { uploadProductImage } = useApi();
+const { formatRielEquivalent } = useCurrency();
 
 const name = ref("");
 const categoryId = ref("");
@@ -33,6 +34,12 @@ const categoryError = computed(() => (categoryId.value.length === 0 ? t("product
 const priceError = computed(() =>
   basePrice.value === null || Number.isNaN(basePrice.value) || basePrice.value < 0
     ? t("product.priceError")
+    : null,
+);
+
+const priceRielPreview = computed(() =>
+  basePrice.value !== null && !Number.isNaN(basePrice.value) && basePrice.value >= 0
+    ? formatRielEquivalent(basePrice.value)
     : null,
 );
 
@@ -208,6 +215,7 @@ async function submit() {
             placeholder="0.00"
             class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
           />
+          <p v-if="priceRielPreview" class="mt-1 text-xs text-slate-400">≈ {{ priceRielPreview }}</p>
         </div>
       </div>
 

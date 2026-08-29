@@ -3,12 +3,7 @@ import { computed } from "vue";
 
 const { t } = useI18n();
 const store = useReportsStore();
-
-const currencyFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
-
-function formatCurrency(value: number): string {
-  return currencyFormatter.format(value);
-}
+const { formatMain, formatSecondary } = useCurrency();
 
 const averageOrderValue = computed(() => {
   const orders = store.report?.metrics.totalOrders ?? 0;
@@ -17,10 +12,22 @@ const averageOrderValue = computed(() => {
 });
 
 const cards = computed(() => [
-  { label: t("summaryCards.grossRevenue"), value: formatCurrency(store.report?.metrics.grossRevenue ?? 0) },
-  { label: t("summaryCards.netRevenue"), value: formatCurrency(store.report?.metrics.netRevenue ?? 0) },
-  { label: t("summaryCards.orders"), value: String(store.report?.metrics.totalOrders ?? 0) },
-  { label: t("summaryCards.averageOrderValue"), value: formatCurrency(averageOrderValue.value) },
+  {
+    label: t("summaryCards.grossRevenue"),
+    value: formatMain(store.report?.metrics.grossRevenue ?? 0),
+    subValue: formatSecondary(store.report?.metrics.grossRevenue ?? 0),
+  },
+  {
+    label: t("summaryCards.netRevenue"),
+    value: formatMain(store.report?.metrics.netRevenue ?? 0),
+    subValue: formatSecondary(store.report?.metrics.netRevenue ?? 0),
+  },
+  { label: t("summaryCards.orders"), value: String(store.report?.metrics.totalOrders ?? 0), subValue: null },
+  {
+    label: t("summaryCards.averageOrderValue"),
+    value: formatMain(averageOrderValue.value),
+    subValue: formatSecondary(averageOrderValue.value),
+  },
 ]);
 </script>
 
@@ -32,6 +39,7 @@ const cards = computed(() => [
     <div v-for="card in cards" :key="card.label" class="rounded-lg border border-slate-200 bg-white p-4">
       <p class="text-sm text-slate-500">{{ card.label }}</p>
       <p class="mt-1 text-2xl font-semibold text-slate-900">{{ card.value }}</p>
+      <p v-if="card.subValue" class="mt-0.5 text-xs text-slate-400">{{ card.subValue }}</p>
     </div>
   </div>
 </template>

@@ -11,6 +11,7 @@ const open = defineModel<boolean>("open", { default: false });
 const { t } = useI18n();
 const auth = useAuth();
 const store = useInventoryStore();
+const { formatRielEquivalent } = useCurrency();
 
 const UNITS = ["grams", "ml", "pieces"];
 
@@ -32,6 +33,12 @@ const costError = computed(() =>
 );
 
 const canSubmit = computed(() => !nameError.value && !reorderError.value && !costError.value && !isSubmitting.value);
+
+const costRielPreview = computed(() =>
+  costPerUnit.value !== null && !Number.isNaN(costPerUnit.value) && costPerUnit.value >= 0
+    ? formatRielEquivalent(costPerUnit.value)
+    : null,
+);
 
 watch(open, (isOpen) => {
   if (!isOpen) {
@@ -143,6 +150,7 @@ async function submit() {
             min="0"
             class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
           />
+          <p v-if="costRielPreview" class="mt-1 text-xs text-slate-400">≈ {{ costRielPreview }}</p>
         </div>
       </div>
 

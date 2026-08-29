@@ -33,11 +33,7 @@ const categoryNameById = computed(() => {
   return map;
 });
 
-const currencyFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
-
-function formatPrice(value: number): string {
-  return currencyFormatter.format(value);
-}
+const { formatMain, formatSecondary } = useCurrency();
 
 async function toggleAvailability(product: Product) {
   const token = auth.session.value?.token;
@@ -132,7 +128,10 @@ async function toggleAvailability(product: Product) {
             </td>
             <td class="px-4 py-3 text-slate-700">{{ product.name }}</td>
             <td class="px-4 py-3 text-slate-700">{{ categoryNameById.get(product.categoryId) ?? $t("common.dash") }}</td>
-            <td class="px-4 py-3 text-slate-700">{{ formatPrice(product.basePrice) }}</td>
+            <td class="px-4 py-3 text-slate-700">
+              {{ formatMain(product.basePrice) }}
+              <span class="ml-1 text-xs text-slate-400">({{ formatSecondary(product.basePrice) }})</span>
+            </td>
             <td class="px-4 py-3">
               <button
                 type="button"
