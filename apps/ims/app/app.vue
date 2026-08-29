@@ -9,7 +9,28 @@ const auth = useAuth();
 const store = useInventoryStore();
 const settingsStore = useSettingsStore();
 
-const activeView = ref<"inventory" | "menu" | "recipes" | "analytics" | "staff" | "settings">("inventory");
+type ActiveView = "inventory" | "menu" | "recipes" | "analytics" | "staff" | "settings";
+
+const ACTIVE_VIEW_STORAGE_KEY = "ims.activeView";
+const ACTIVE_VIEWS: ActiveView[] = ["inventory", "menu", "recipes", "analytics", "staff", "settings"];
+
+function loadStoredActiveView(): ActiveView {
+  if (!import.meta.client) {
+    return "inventory";
+  }
+
+  const stored = localStorage.getItem(ACTIVE_VIEW_STORAGE_KEY);
+  return ACTIVE_VIEWS.includes(stored as ActiveView) ? (stored as ActiveView) : "inventory";
+}
+
+const activeView = ref<ActiveView>(loadStoredActiveView());
+
+watch(activeView, (view) => {
+  if (import.meta.client) {
+    localStorage.setItem(ACTIVE_VIEW_STORAGE_KEY, view);
+  }
+});
+
 const isAdjustOpen = ref(false);
 const selectedItem = ref<InventoryItem | null>(null);
 const isItemModalOpen = ref(false);
@@ -72,10 +93,20 @@ function openProductDeleteDialog(product: Product) {
   isProductDeleteOpen.value = true;
 }
 
+// A restored tab can outlive the session that set it - e.g. an admin left
+// the Settings tab active, logged out, and a manager (not admin) later logs
+// in on the same browser - so re-validate against the current role too.
+function ensureValidActiveView() {
+  if ((activeView.value === "staff" || activeView.value === "settings") && !isAdmin.value) {
+    activeView.value = "inventory";
+  }
+}
+
 onMounted(() => {
   if (auth.session.value) {
     store.fetchInventory();
     settingsStore.fetchExchangeRate();
+    ensureValidActiveView();
   }
 });
 
@@ -85,6 +116,7 @@ watch(
     if (session) {
       store.fetchInventory();
       settingsStore.fetchExchangeRate();
+      ensureValidActiveView();
     }
   },
 );
