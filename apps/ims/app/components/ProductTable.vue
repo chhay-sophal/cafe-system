@@ -69,7 +69,7 @@ async function toggleAvailability(product: Product) {
 </script>
 
 <template>
-  <div>
+  <div class="flex h-full min-h-0 flex-col">
     <div class="mb-4 flex items-center justify-between">
       <h2 class="text-sm font-semibold text-slate-700">{{ $t("productTable.heading") }}</h2>
       <div class="flex gap-2">
@@ -96,9 +96,9 @@ async function toggleAvailability(product: Product) {
       {{ $t("productTable.loading") }}
     </p>
 
-    <div v-else class="overflow-x-auto rounded-lg border border-slate-200">
+    <div v-else class="min-h-0 flex-1 overflow-auto rounded-lg border border-slate-200">
       <table class="min-w-full divide-y divide-slate-200 text-sm">
-        <thead class="bg-slate-50">
+        <thead class="sticky top-0 z-10 bg-slate-50">
           <tr>
             <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("productTable.image") }}</th>
             <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("productTable.item") }}</th>
