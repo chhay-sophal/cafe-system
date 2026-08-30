@@ -9,6 +9,7 @@ import LoginScreen from "./components/LoginScreen.vue";
 import ModifierModal from "./components/ModifierModal.vue";
 import NetworkStatusBar from "./components/NetworkStatusBar.vue";
 import ProductGrid from "./components/ProductGrid.vue";
+import { checkForUpdateAndInstall } from "./composables/useAppUpdater";
 import { useAuth } from "./composables/useAuth";
 import { useCart } from "./composables/useCart";
 import { onRequestSync, publishCartUpdate, type CartUpdatePayload } from "./composables/useCustomerDisplayChannel";
@@ -118,6 +119,10 @@ function handleOnline() {
 }
 
 onMounted(async () => {
+  // Cold start, before login and before any order is in progress - the
+  // safe moment for a silent self-update-and-relaunch.
+  checkForUpdateAndInstall();
+
   try {
     const [categoryList, productList] = await Promise.all([
       fetchCategories(),
