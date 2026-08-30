@@ -153,10 +153,13 @@ export const payments = sqliteTable('payments', {
 // admins can edit without a redeploy. The USD->Riel rate converts
 // prices/change to Cambodian Riel throughout IMS and POS. mainCurrency picks
 // which currency is shown prominently (display only - all prices/totals are
-// still stored and computed in USD regardless of this setting).
+// still stored and computed in USD regardless of this setting). taxEnabled
+// lets a manager turn tax off entirely - many Cambodian SME/family-run
+// stores don't charge it at all.
 export const storeSettings = sqliteTable('store_settings', {
   id: text('id').primaryKey().default('default'),
   exchangeRateRielPerUsd: real('exchange_rate_riel_per_usd').notNull().default(4100),
   mainCurrency: text('main_currency', { enum: ['USD', 'KHR'] }).notNull().default('USD'),
+  taxEnabled: integer('tax_enabled', { mode: 'boolean' }).notNull().default(true),
   updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`),
 });

@@ -36,6 +36,10 @@ export const mainCurrencySchema = z.object({
   mainCurrency: z.enum(['USD', 'KHR']),
 });
 
+export const taxSettingSchema = z.object({
+  taxEnabled: z.boolean(),
+});
+
 export const inventoryAdjustmentSchema = z.object({
   inventoryItemId: z.string().min(1),
   quantityChanged: z.number(),

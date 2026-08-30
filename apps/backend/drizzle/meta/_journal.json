@@ -15,6 +15,13 @@
       "when": 1788020533553,
       "tag": "0001_sleepy_gauntlet",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788065336822,
+      "tag": "0002_cultured_frank_castle",
+      "breakpoints": true
     }
   ]
 }

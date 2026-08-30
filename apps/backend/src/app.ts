@@ -25,12 +25,14 @@ import {
   pinLoginSchema,
   productSchema,
   recipeUpdateSchema,
+  taxSettingSchema,
   userCreateSchema,
   userUpdateSchema,
 } from './shared-schemas.js';
 
 const DEFAULT_EXCHANGE_RATE_RIEL_PER_USD = 4100;
 const DEFAULT_MAIN_CURRENCY = 'USD' as const;
+const DEFAULT_TAX_ENABLED = true;
 
 // Single physical cafe in Cambodia (Asia/Phnom_Penh, UTC+7, no DST) - a fixed
 // offset is enough, no need for per-user timezone detection. `orders.createdAt`
@@ -47,16 +49,12 @@ function storeTodayDateString(): string {
   return shifted.toISOString().slice(0, 10);
 }
 
-function getExchangeRate(): number {
-  const row = db.select().from(storeSettings).where(eq(storeSettings.id, 'default')).get();
-  return row?.exchangeRateRielPerUsd ?? DEFAULT_EXCHANGE_RATE_RIEL_PER_USD;
-}
-
-function getStoreSettings(): { exchangeRateRielPerUsd: number; mainCurrency: 'USD' | 'KHR' } {
+function getStoreSettings(): { exchangeRateRielPerUsd: number; mainCurrency: 'USD' | 'KHR'; taxEnabled: boolean } {
   const row = db.select().from(storeSettings).where(eq(storeSettings.id, 'default')).get();
   return {
     exchangeRateRielPerUsd: row?.exchangeRateRielPerUsd ?? DEFAULT_EXCHANGE_RATE_RIEL_PER_USD,
     mainCurrency: row?.mainCurrency ?? DEFAULT_MAIN_CURRENCY,
+    taxEnabled: row?.taxEnabled ?? DEFAULT_TAX_ENABLED,
   };
 }
 
@@ -504,7 +502,7 @@ function createApp() {
 
   app.post('/api/orders', authenticate, validateBody(orderSchema), async (req, res) => {
     const {
-      items, paymentMethod, amountTenderedUsd = 0, amountTenderedRiel = 0, taxAmount = 0, discountAmount = 0,
+      items, paymentMethod, amountTenderedUsd = 0, amountTenderedRiel = 0, taxAmount: requestedTaxAmount = 0, discountAmount = 0,
     } = req.body;
     const actingUserId = req.user?.id;
 
@@ -532,8 +530,12 @@ function createApp() {
         subtotal += itemPrice * item.quantity;
       }
 
+      const { exchangeRateRielPerUsd: exchangeRate, taxEnabled } = getStoreSettings();
+      // A manager can disable tax store-wide - enforced here, not just
+      // trusted from the client, so a stale/misbehaving POS can't still
+      // charge it once disabled.
+      const taxAmount = taxEnabled ? requestedTaxAmount : 0;
       const totalAmount = subtotal + taxAmount - discountAmount;
-      const exchangeRate = getExchangeRate();
 
       let paymentUsd = totalAmount;
       let paymentRiel = 0;
@@ -795,6 +797,25 @@ function createApp() {
     } catch (error) {
       console.error('Update main currency error:', error);
       res.status(500).json({ error: 'Failed to update main currency' });
+    }
+  });
+
+  app.put('/api/settings/tax', authenticate, requireRole(['ADMIN']), validateBody(taxSettingSchema), async (req, res) => {
+    const { taxEnabled } = req.body;
+
+    try {
+      db.insert(storeSettings)
+        .values({ id: 'default', taxEnabled })
+        .onConflictDoUpdate({
+          target: storeSettings.id,
+          set: { taxEnabled, updatedAt: sql`CURRENT_TIMESTAMP` },
+        })
+        .run();
+
+      res.json({ taxEnabled });
+    } catch (error) {
+      console.error('Update tax setting error:', error);
+      res.status(500).json({ error: 'Failed to update tax setting' });
     }
   });
 
