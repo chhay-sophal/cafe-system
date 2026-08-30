@@ -23,7 +23,7 @@ const emit = defineEmits<{
   checkout: [];
 }>();
 
-const { exchangeRateRielPerUsd, mainCurrency } = useExchangeRate();
+const { exchangeRateRielPerUsd, mainCurrency, taxEnabled } = useExchangeRate();
 
 function format(value: number): string {
   return formatMain(value, mainCurrency.value, exchangeRateRielPerUsd.value);
@@ -63,7 +63,7 @@ function handleDiscountInput(event: Event) {
         <span>{{ t("cart.subtotal") }}</span>
         <span>{{ format(props.subtotal) }}</span>
       </div>
-      <div class="cart-sidebar__row">
+      <div v-if="taxEnabled" class="cart-sidebar__row">
         <span>{{ t("cart.tax") }}</span>
         <span>{{ format(props.taxAmount) }}</span>
       </div>

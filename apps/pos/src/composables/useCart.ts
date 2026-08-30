@@ -1,9 +1,11 @@
 import { computed, ref } from "vue";
+import { useExchangeRate } from "./useExchangeRate";
 import type { CartLineItem, CartModifier } from "../types/cart";
 import type { Product } from "../types/catalog";
 
-// Placeholder rate: the backend has no tax configuration endpoint, so the
-// register computes it locally and submits the resulting amount with the order.
+// Placeholder rate: the backend has no tax-rate configuration endpoint (only
+// enable/disable, via useExchangeRate's taxEnabled), so the register
+// computes it locally and submits the resulting amount with the order.
 const TAX_RATE = 0.08;
 
 function modifierKey(modifiers: CartModifier[]): string {
@@ -14,6 +16,8 @@ function modifierKey(modifiers: CartModifier[]): string {
 }
 
 export function useCart() {
+  const { taxEnabled } = useExchangeRate();
+
   const items = ref<CartLineItem[]>([]);
   const discountAmount = ref(0);
 
@@ -24,7 +28,7 @@ export function useCart() {
     }, 0),
   );
 
-  const taxAmount = computed(() => subtotal.value * TAX_RATE);
+  const taxAmount = computed(() => (taxEnabled.value ? subtotal.value * TAX_RATE : 0));
 
   const clampedDiscount = computed(() => Math.min(Math.max(discountAmount.value, 0), subtotal.value));
 
