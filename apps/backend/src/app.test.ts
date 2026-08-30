@@ -66,13 +66,13 @@ describe('exchange rate settings', () => {
     db.delete(users).run();
   });
 
-  it('returns the default rate, main currency, and tax setting when none has been set', async () => {
+  it('returns the first-setup defaults (KHR, tax off, 4100 riel/usd) when none has been set', async () => {
     const response = await request(app).get('/api/settings/exchange-rate');
 
     expect(response.status).toBe(200);
     expect(response.body.exchangeRateRielPerUsd).toBe(4100);
-    expect(response.body.mainCurrency).toBe('USD');
-    expect(response.body.taxEnabled).toBe(true);
+    expect(response.body.mainCurrency).toBe('KHR');
+    expect(response.body.taxEnabled).toBe(false);
   });
 
   it('rejects a rate update from a non-admin', async () => {

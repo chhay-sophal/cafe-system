@@ -155,11 +155,12 @@ export const payments = sqliteTable('payments', {
 // which currency is shown prominently (display only - all prices/totals are
 // still stored and computed in USD regardless of this setting). taxEnabled
 // lets a manager turn tax off entirely - many Cambodian SME/family-run
-// stores don't charge it at all.
+// stores don't charge it at all. Defaults (KHR, tax off, 4100 riel/usd)
+// match how those same stores are typically set up out of the box.
 export const storeSettings = sqliteTable('store_settings', {
   id: text('id').primaryKey().default('default'),
   exchangeRateRielPerUsd: real('exchange_rate_riel_per_usd').notNull().default(4100),
-  mainCurrency: text('main_currency', { enum: ['USD', 'KHR'] }).notNull().default('USD'),
-  taxEnabled: integer('tax_enabled', { mode: 'boolean' }).notNull().default(true),
+  mainCurrency: text('main_currency', { enum: ['USD', 'KHR'] }).notNull().default('KHR'),
+  taxEnabled: integer('tax_enabled', { mode: 'boolean' }).notNull().default(false),
   updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`),
 });
