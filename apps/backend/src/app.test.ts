@@ -66,12 +66,13 @@ describe('exchange rate settings', () => {
     db.delete(users).run();
   });
 
-  it('returns the default rate and main currency when none has been set', async () => {
+  it('returns the default rate, main currency, and tax setting when none has been set', async () => {
     const response = await request(app).get('/api/settings/exchange-rate');
 
     expect(response.status).toBe(200);
     expect(response.body.exchangeRateRielPerUsd).toBe(4100);
     expect(response.body.mainCurrency).toBe('USD');
+    expect(response.body.taxEnabled).toBe(true);
   });
 
   it('rejects a rate update from a non-admin', async () => {
@@ -148,6 +149,36 @@ describe('exchange rate settings', () => {
 
     expect(response.status).toBe(400);
   });
+
+  it('rejects a tax setting update from a non-admin', async () => {
+    const pinHash = await hashPin('1234');
+    db.insert(users).values({ id: 'cashier-1', name: 'Cashier', pinHash, role: 'CASHIER', isActive: true }).run();
+    const token = signToken({ id: 'cashier-1', name: 'Cashier', role: 'CASHIER' });
+
+    const response = await request(app)
+      .put('/api/settings/tax')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ taxEnabled: false });
+
+    expect(response.status).toBe(403);
+  });
+
+  it('lets an admin disable tax, reflected by later reads', async () => {
+    const pinHash = await hashPin('9999');
+    db.insert(users).values({ id: 'admin-1', name: 'Admin', pinHash, role: 'ADMIN', isActive: true }).run();
+    const token = signToken({ id: 'admin-1', name: 'Admin', role: 'ADMIN' });
+
+    const putResponse = await request(app)
+      .put('/api/settings/tax')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ taxEnabled: false });
+
+    expect(putResponse.status).toBe(200);
+    expect(putResponse.body.taxEnabled).toBe(false);
+
+    const getResponse = await request(app).get('/api/settings/exchange-rate');
+    expect(getResponse.body.taxEnabled).toBe(false);
+  });
 });
 
 describe('order payments in mixed USD/Riel', () => {
@@ -182,6 +213,29 @@ describe('order payments in mixed USD/Riel', () => {
     db.insert(products).values({ id: productId, categoryId, name: 'Test Product', basePrice: 3.25 }).run();
     return productId;
   }
+
+  it('ignores a client-supplied taxAmount once tax is disabled', async () => {
+    db.insert(storeSettings).values({ id: 'default', taxEnabled: false }).run();
+    const token = await cashierToken();
+
+    const response = await request(app)
+      .post('/api/orders')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        items: [{ productId: testProductId(), productName: 'Latte', quantity: 1, unitPrice: 3.25 }],
+        paymentMethod: 'CASH',
+        amountTenderedUsd: 5,
+        amountTenderedRiel: 0,
+        taxAmount: 1, // a stale/misbehaving client still sending tax - should be ignored
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.subtotal).toBe(3.25);
+    expect(response.body.totalAmount).toBe(3.25);
+
+    const savedOrder = db.select().from(orders).where(eq(orders.id, response.body.orderId)).get();
+    expect(savedOrder?.taxAmount).toBe(0);
+  });
 
   it('gives change for a pure-USD tender as whole dollars plus a Riel remainder', async () => {
     const token = await cashierToken();

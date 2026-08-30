@@ -9,6 +9,7 @@ export {
   pinLoginSchema,
   productSchema,
   recipeUpdateSchema,
+  taxSettingSchema,
   userCreateSchema,
   userUpdateSchema,
 } from '../../../packages/shared-types/src/index.js';
