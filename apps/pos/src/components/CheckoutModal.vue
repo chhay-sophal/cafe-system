@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { HttpError, submitOrder } from "../lib/api";
 import { computeChange, formatMain, formatRiel, formatSecondary, formatUsd, round2 } from "../lib/currency";
 import { useExchangeRate } from "../composables/useExchangeRate";
+import { publishSaleCompleted } from "../composables/useCustomerDisplayChannel";
 import { useNetworkStatus } from "../composables/useNetworkStatus";
 import { useOfflineQueue } from "../composables/useOfflineQueue";
 import type { CartLineItem } from "../types/cart";
@@ -209,6 +210,41 @@ async function handleComplete() {
     await queueOffline(payload);
   }
 }
+
+// Publishes the finished sale to the customer-facing display once, at the
+// exact moment the sale actually succeeds (online or queued offline) -
+// matches successDisplay's own preference for the server-confirmed change
+// amounts over the locally-computed ones when both are available.
+watch(phase, (newPhase) => {
+  if (newPhase !== "success") {
+    return;
+  }
+
+  const change = isQueuedOffline.value || !orderResult.value
+    ? changeSplit.value
+    : { usd: orderResult.value.changeGivenUsd, riel: orderResult.value.changeGivenRiel };
+
+  publishSaleCompleted({
+    items: props.items.map((item) => {
+      const unitPrice = item.unitBasePrice + item.modifiers.reduce((sum, modifier) => sum + modifier.priceExtra, 0);
+      return {
+        cartItemId: item.cartItemId,
+        productName: item.productName,
+        modifierNames: item.modifiers.map((modifier) => modifier.name),
+        unitPrice,
+        quantity: item.quantity,
+        lineTotal: unitPrice * item.quantity,
+      };
+    }),
+    discountAmount: props.discountAmount,
+    totalAmount: props.totalAmount,
+    paymentMethod: paymentMethod.value,
+    amountTenderedUsd: amountTenderedUsd.value,
+    amountTenderedRiel: amountTenderedRiel.value,
+    changeGivenUsd: change.usd,
+    changeGivenRiel: change.riel,
+  });
+});
 
 function handleCancel() {
   emit("cancel");
