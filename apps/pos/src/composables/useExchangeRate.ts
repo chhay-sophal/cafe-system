@@ -5,9 +5,13 @@ import type { MainCurrency } from "../types/settings";
 const RATE_STORAGE_KEY = "pos.exchangeRateRielPerUsd";
 const CURRENCY_STORAGE_KEY = "pos.mainCurrency";
 const TAX_ENABLED_STORAGE_KEY = "pos.taxEnabled";
+// First-setup defaults, matching how Cambodian SME/family-run stores are
+// typically set up out of the box (also the backend's own fallback in
+// getStoreSettings) - used before the first real fetch resolves, or when
+// there's no cache yet and the register is offline on first launch.
 const DEFAULT_RATE = 4100;
-const DEFAULT_CURRENCY: MainCurrency = "USD";
-const DEFAULT_TAX_ENABLED = true;
+const DEFAULT_CURRENCY: MainCurrency = "KHR";
+const DEFAULT_TAX_ENABLED = false;
 
 function loadCachedRate(): number {
   const raw = localStorage.getItem(RATE_STORAGE_KEY);
@@ -16,7 +20,11 @@ function loadCachedRate(): number {
 }
 
 function loadCachedCurrency(): MainCurrency {
-  return localStorage.getItem(CURRENCY_STORAGE_KEY) === "KHR" ? "KHR" : DEFAULT_CURRENCY;
+  const raw = localStorage.getItem(CURRENCY_STORAGE_KEY);
+  // Distinguish "cached as USD" from "no cache yet" - collapsing both to a
+  // ternary against DEFAULT_CURRENCY would silently discard an actually
+  // -cached USD preference now that the default itself is KHR.
+  return raw === "USD" || raw === "KHR" ? raw : DEFAULT_CURRENCY;
 }
 
 function loadCachedTaxEnabled(): boolean {
