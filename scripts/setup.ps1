@@ -56,12 +56,13 @@ $isFirstRun = -not (Test-Path $dbPath)
 
 Write-Host "==> Setting up the database"
 pnpm --filter @cafe-system/backend db:migrate
-# if ($isFirstRun) {
-#     Write-Host "Fresh database detected -- seeding initial data"
-#     pnpm --filter @cafe-system/backend db:seed
-# } else {
-#     Write-Host "Existing database found -- skipping seed"
-# }
+if ($isFirstRun) {
+    Write-Host "Fresh database detected -- no accounts exist yet, and every login"
+    Write-Host "needs one, so let's create the first admin account now."
+    pnpm --filter @cafe-system/backend db:create-admin
+} else {
+    Write-Host "Existing database found -- skipping admin account creation"
+}
 
 Write-Host "==> Building production bundles"
 pnpm --filter @cafe-system/backend build

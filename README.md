@@ -112,7 +112,7 @@ After cloning the repo onto the shop machine, run the setup script for that OS i
 ./scripts/setup.sh
 ```
 
-This installs dependencies, creates `.env` files (generating a random `JWT_SECRET` for the backend if it's still at the placeholder default), migrates and seeds the database on first run only, builds production bundles, and starts backend + IMS under [pm2](https://www.npmjs.com/package/pm2) via the committed [`ecosystem.config.js`](ecosystem.config.js). Requires Node.js 18+, pnpm (`corepack enable`), and git already on the machine — the script installs pm2 itself if missing. Rust/Tauri tooling is **not** needed here; POS is installed from a prebuilt installer, not built from source (see below).
+This installs dependencies, creates `.env` files (generating a random `JWT_SECRET` for the backend if it's still at the placeholder default), migrates the database and — on first run only — walks you through creating the first admin account interactively, builds production bundles, and starts backend + IMS under [pm2](https://www.npmjs.com/package/pm2) via the committed [`ecosystem.config.js`](ecosystem.config.js). Requires Node.js 18+, pnpm (`corepack enable`), and git already on the machine — the script installs pm2 itself if missing. Rust/Tauri tooling is **not** needed here; POS is installed from a prebuilt installer, not built from source (see below).
 
 <details>
 <summary>What the script does, step by step (for reference or if you need to run it manually)</summary>
@@ -121,7 +121,7 @@ This installs dependencies, creates `.env` files (generating a random `JWT_SECRE
 2. `pnpm install`.
 3. Copy `apps/backend/.env.example` → `.env` and `apps/ims/.env.example` → `.env` if they don't exist yet.
 4. Generate a random `JWT_SECRET` in `apps/backend/.env` if it's still the `.env.example` placeholder.
-5. `pnpm --filter @cafe-system/backend db:migrate`, then `db:seed` only if `apps/backend/data/store_data.db` didn't already exist.
+5. `pnpm --filter @cafe-system/backend db:migrate`, then — only if `apps/backend/data/store_data.db` didn't already exist — `db:create-admin`, an interactive prompt for the first admin's name and 4-digit PIN (there's no other way to log in on a fresh database).
 6. `pnpm --filter @cafe-system/backend build` and `pnpm --filter ims build`.
 7. `pm2 start ecosystem.config.js && pm2 save`.
 8. Create a desktop shortcut ("Cafe IMS") pointing at `http://localhost:8080`, so staff never need to type it.

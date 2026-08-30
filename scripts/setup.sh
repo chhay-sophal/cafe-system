@@ -59,10 +59,11 @@ FIRST_RUN=false
 echo "==> Setting up the database"
 pnpm --filter @cafe-system/backend db:migrate
 if [ "$FIRST_RUN" = true ]; then
-  echo "Fresh database detected -- seeding initial data"
-  pnpm --filter @cafe-system/backend db:seed
+  echo "Fresh database detected -- no accounts exist yet, and every login"
+  echo "needs one, so let's create the first admin account now."
+  pnpm --filter @cafe-system/backend db:create-admin
 else
-  echo "Existing database found -- skipping seed"
+  echo "Existing database found -- skipping admin account creation"
 fi
 
 echo "==> Building production bundles"
