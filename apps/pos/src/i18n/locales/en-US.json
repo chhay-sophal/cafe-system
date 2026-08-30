@@ -79,5 +79,20 @@
     "soldOut": "Sold Out",
     "loading": "Loading menu...",
     "empty": "No items in this category."
+  },
+  "customerDisplay": {
+    "idleTitle": "Welcome",
+    "columns": {
+      "no": "No.",
+      "item": "Item",
+      "price": "Price",
+      "amount": "Amount",
+      "total": "Total",
+      "grandTotal": "Grand Total",
+      "discount": "Discount",
+      "tender": "Tendered",
+      "change": "Change",
+      "paymentMethod": "Payment Method"
+    }
   }
 }

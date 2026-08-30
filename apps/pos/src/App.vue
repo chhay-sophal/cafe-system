@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { setLocale } from "./i18n";
 import CartSidebar from "./components/CartSidebar.vue";
@@ -11,6 +11,7 @@ import NetworkStatusBar from "./components/NetworkStatusBar.vue";
 import ProductGrid from "./components/ProductGrid.vue";
 import { useAuth } from "./composables/useAuth";
 import { useCart } from "./composables/useCart";
+import { onRequestSync, publishCartUpdate, type CartUpdatePayload } from "./composables/useCustomerDisplayChannel";
 import { useExchangeRate } from "./composables/useExchangeRate";
 import { useNetworkStatus } from "./composables/useNetworkStatus";
 import { useOfflineQueue } from "./composables/useOfflineQueue";
@@ -36,6 +37,29 @@ const cart = useCart();
 const network = useNetworkStatus();
 const offlineQueue = useOfflineQueue();
 const exchangeRate = useExchangeRate();
+
+// Mirrored to the customer-facing display over Tauri's event bus (see
+// composables/useCustomerDisplayChannel.ts) - the second window has no
+// access to this cart state otherwise, being a separate webview.
+const cartUpdatePayload = computed<CartUpdatePayload>(() => ({
+  items: cart.items.value.map((item) => {
+    const unitPrice = cart.lineUnitPrice(item);
+    return {
+      cartItemId: item.cartItemId,
+      productName: item.productName,
+      modifierNames: item.modifiers.map((modifier) => modifier.name),
+      unitPrice,
+      quantity: item.quantity,
+      lineTotal: unitPrice * item.quantity,
+    };
+  }),
+  discountAmount: cart.discountAmount.value,
+  totalAmount: cart.totalAmount.value,
+}));
+
+watch(cartUpdatePayload, publishCartUpdate, { immediate: true });
+
+let unlistenRequestSync: (() => void) | undefined;
 
 const filteredProducts = computed(() => {
   if (selectedCategoryId.value === null) {
@@ -108,6 +132,13 @@ onMounted(async () => {
     isLoading.value = false;
   }
 
+  // A freshly (re)opened customer-display window has missed every prior
+  // cart-update, so it asks for a resync on its own mount - answer with
+  // the live cart instead of leaving it blank.
+  onRequestSync(() => publishCartUpdate(cartUpdatePayload.value)).then((unlisten) => {
+    unlistenRequestSync = unlisten;
+  });
+
   // Primary trigger: the browser/OS telling us connectivity is back.
   window.addEventListener("online", handleOnline);
   if (network.isOnline.value) {
@@ -128,6 +159,7 @@ onUnmounted(() => {
   if (syncIntervalId) {
     clearInterval(syncIntervalId);
   }
+  unlistenRequestSync?.();
 });
 </script>
 

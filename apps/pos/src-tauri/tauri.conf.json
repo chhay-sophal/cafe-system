@@ -12,6 +12,7 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Cafe POS",
         "fullscreen": true,
         "resizable": false,
