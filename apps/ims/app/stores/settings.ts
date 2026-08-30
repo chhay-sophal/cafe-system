@@ -1,9 +1,12 @@
 import { defineStore } from "pinia";
 import type { MainCurrency } from "~/types/settings";
 
+// First-setup defaults, matching how Cambodian SME/family-run stores are
+// typically set up out of the box - used before fetchExchangeRate()
+// resolves for the first time.
 const DEFAULT_EXCHANGE_RATE_RIEL_PER_USD = 4100;
-const DEFAULT_MAIN_CURRENCY: MainCurrency = "USD";
-const DEFAULT_TAX_ENABLED = true;
+const DEFAULT_MAIN_CURRENCY: MainCurrency = "KHR";
+const DEFAULT_TAX_ENABLED = false;
 
 interface SettingsState {
   exchangeRateRielPerUsd: number;
