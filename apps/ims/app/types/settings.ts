@@ -7,8 +7,13 @@ export interface ExchangeRateSetting {
 export interface StoreSettings {
   exchangeRateRielPerUsd: number;
   mainCurrency: MainCurrency;
+  taxEnabled: boolean;
 }
 
 export interface MainCurrencySetting {
   mainCurrency: MainCurrency;
+}
+
+export interface TaxSetting {
+  taxEnabled: boolean;
 }
