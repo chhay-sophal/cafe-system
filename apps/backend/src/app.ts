@@ -31,8 +31,8 @@ import {
 } from './shared-schemas.js';
 
 const DEFAULT_EXCHANGE_RATE_RIEL_PER_USD = 4100;
-const DEFAULT_MAIN_CURRENCY = 'USD' as const;
-const DEFAULT_TAX_ENABLED = true;
+const DEFAULT_MAIN_CURRENCY = 'KHR' as const;
+const DEFAULT_TAX_ENABLED = false;
 
 // Single physical cafe in Cambodia (Asia/Phnom_Penh, UTC+7, no DST) - a fixed
 // offset is enough, no need for per-user timezone detection. `orders.createdAt`
