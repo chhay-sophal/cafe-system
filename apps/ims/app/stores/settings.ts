@@ -3,10 +3,12 @@ import type { MainCurrency } from "~/types/settings";
 
 const DEFAULT_EXCHANGE_RATE_RIEL_PER_USD = 4100;
 const DEFAULT_MAIN_CURRENCY: MainCurrency = "USD";
+const DEFAULT_TAX_ENABLED = true;
 
 interface SettingsState {
   exchangeRateRielPerUsd: number;
   mainCurrency: MainCurrency;
+  taxEnabled: boolean;
   isLoading: boolean;
   error: string | null;
 }
@@ -15,6 +17,7 @@ export const useSettingsStore = defineStore("settings", {
   state: (): SettingsState => ({
     exchangeRateRielPerUsd: DEFAULT_EXCHANGE_RATE_RIEL_PER_USD,
     mainCurrency: DEFAULT_MAIN_CURRENCY,
+    taxEnabled: DEFAULT_TAX_ENABLED,
     isLoading: false,
     error: null,
   }),
@@ -29,6 +32,7 @@ export const useSettingsStore = defineStore("settings", {
         const result = await fetchExchangeRate();
         this.exchangeRateRielPerUsd = result.exchangeRateRielPerUsd;
         this.mainCurrency = result.mainCurrency;
+        this.taxEnabled = result.taxEnabled;
       } catch (error) {
         this.error = error instanceof Error ? error.message : "Failed to load exchange rate.";
       } finally {
@@ -46,6 +50,12 @@ export const useSettingsStore = defineStore("settings", {
       const { updateMainCurrency } = useApi();
       const result = await updateMainCurrency({ mainCurrency: currency }, token);
       this.mainCurrency = result.mainCurrency;
+    },
+
+    async updateTaxEnabled(enabled: boolean, token: string) {
+      const { updateTaxSetting } = useApi();
+      const result = await updateTaxSetting({ taxEnabled: enabled }, token);
+      this.taxEnabled = result.taxEnabled;
     },
   },
 });

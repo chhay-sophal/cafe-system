@@ -59,6 +59,35 @@ async function submit() {
   }
 }
 
+const isTaxSubmitting = ref(false);
+const taxErrorMessage = ref<string | null>(null);
+const taxSuccessMessage = ref(false);
+
+async function toggleTaxEnabled() {
+  if (isTaxSubmitting.value) {
+    return;
+  }
+
+  const token = auth.session.value?.token;
+  if (!token) {
+    taxErrorMessage.value = t("common.sessionExpired");
+    return;
+  }
+
+  isTaxSubmitting.value = true;
+  taxErrorMessage.value = null;
+  taxSuccessMessage.value = false;
+
+  try {
+    await store.updateTaxEnabled(!store.taxEnabled, token);
+    taxSuccessMessage.value = true;
+  } catch (error) {
+    taxErrorMessage.value = error instanceof Error ? error.message : t("settings.taxSaveError");
+  } finally {
+    isTaxSubmitting.value = false;
+  }
+}
+
 async function selectMainCurrency(currency: MainCurrency) {
   if (currency === store.mainCurrency || isCurrencySubmitting.value) {
     return;
@@ -116,6 +145,36 @@ async function selectMainCurrency(currency: MainCurrency) {
       </p>
       <p v-else-if="currencySuccessMessage" class="mt-3 rounded-lg bg-emerald-50 p-3 text-sm font-medium text-emerald-700">
         {{ t("settings.mainCurrencySaveSuccess") }}
+      </p>
+    </div>
+
+    <div class="mt-5 max-w-md rounded-lg border border-slate-200 p-5">
+      <div class="flex items-center justify-between">
+        <div>
+          <label class="block text-sm font-medium text-slate-700">{{ t("settings.taxLabel") }}</label>
+          <p class="mt-1 text-xs text-slate-500">{{ t("settings.taxHint") }}</p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          :aria-checked="store.taxEnabled"
+          :disabled="isTaxSubmitting"
+          class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          :class="store.taxEnabled ? 'bg-emerald-500' : 'bg-slate-300'"
+          @click="toggleTaxEnabled"
+        >
+          <span
+            class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+            :class="store.taxEnabled ? 'translate-x-6' : 'translate-x-1'"
+          />
+        </button>
+      </div>
+
+      <p v-if="taxErrorMessage" class="mt-3 rounded-lg bg-red-50 p-3 text-sm font-medium text-red-700">
+        {{ taxErrorMessage }}
+      </p>
+      <p v-else-if="taxSuccessMessage" class="mt-3 rounded-lg bg-emerald-50 p-3 text-sm font-medium text-emerald-700">
+        {{ t("settings.taxSaveSuccess") }}
       </p>
     </div>
 
