@@ -4,14 +4,18 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'drizzle-kit';
 
 const backendDir = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.resolve(backendDir, 'data', 'store_data.db');
-fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+const defaultDbPath = path.resolve(backendDir, 'data', 'store_data.db');
+
+if (!process.env.TURSO_DATABASE_URL || process.env.TURSO_DATABASE_URL.startsWith('file:')) {
+  fs.mkdirSync(path.dirname(defaultDbPath), { recursive: true });
+}
 
 export default defineConfig({
   schema: './src/db/schema.ts',
   out: './drizzle',
-  dialect: 'sqlite',
+  dialect: 'turso',
   dbCredentials: {
-    url: dbPath,
+    url: process.env.TURSO_DATABASE_URL ?? `file:${defaultDbPath}`,
+    authToken: process.env.TURSO_AUTH_TOKEN,
   },
 });
