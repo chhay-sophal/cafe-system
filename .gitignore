@@ -71,6 +71,7 @@ apps/ims/.output/
 apps/ims/.nitro/
 apps/ims/.cache/
 apps/ims/.data/
+apps/ims/.wrangler/
 **/.nuxt/
 **/.output/
 
