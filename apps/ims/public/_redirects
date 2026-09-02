@@ -1,1 +1,20 @@
-/* /200 200
+# Cloudflare matches _redirects against the raw request path regardless of
+# whether a real static file exists there, so the catch-all SPA fallback
+# below would otherwise also swallow real assets (verified: without these
+# exclusions, /_nuxt/*.js came back as text/html instead of
+# application/javascript). Each of these rewrites a path to itself so
+# Cloudflare resolves it as a normal static-asset lookup instead of falling
+# through to the SPA shell. Keep in sync with apps/ims/public/'s contents.
+/_nuxt/*  /_nuxt/:splat  200
+/fonts/*  /fonts/:splat  200
+/icons/*  /icons/:splat  200
+/favicon.ico  /favicon.ico  200
+/favicon.svg  /favicon.svg  200
+/robots.txt  /robots.txt  200
+/manifest.webmanifest  /manifest.webmanifest  200
+
+# SPA fallback: any other path (client-side routes, deep links, refreshes)
+# serves the app shell. /200 (not /200.html) is deliberate - Cloudflare
+# 308-redirects .html paths to their extensionless form, and that redirect
+# target would match this same rule again, looping forever.
+/*  /200  200
