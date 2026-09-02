@@ -39,11 +39,14 @@ export default defineNuxtConfig({
     // IMS_PORT default in ecosystem.config.js so dev and prod agree.
     port: 8080
   },
-  // Pinned so `pnpm build` always emits a standalone Node server at
-  // .output/server/index.mjs, regardless of the host platform's
-  // auto-detected preset.
+  // Defaults to a standalone Node server at .output/server/index.mjs for the
+  // on-prem PM2 deploy (unaffected: NITRO_PRESET is unset there). Cloudflare
+  // Pages' build sets NITRO_PRESET=cloudflare-pages-static (see
+  // package.json's build:cloudflare) - pure static output, no Pages
+  // Function/Worker, since ssr:false means there's nothing to render
+  // server-side anyway.
   nitro: {
-    preset: 'node-server'
+    preset: process.env.NITRO_PRESET || 'node-server'
   },
   runtimeConfig: {
     public: {
