@@ -1,22 +1,20 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import Database from 'better-sqlite3';
-import { drizzle } from 'drizzle-orm/better-sqlite3';
+import { createClient } from '@libsql/client';
+import { drizzle } from 'drizzle-orm/libsql';
 import * as schema from './schema.js';
-import { backendRoot } from '../paths.js';
+import { env } from '../env.js';
 
-const dbPath = path.resolve(backendRoot, 'data', 'store_data.db');
-fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+// Local file mode (default for dev/CI/on-prem) needs its parent directory to
+// exist; a remote libsql:// URL (Turso) has no local path to create.
+if (env.TURSO_DATABASE_URL.startsWith('file:')) {
+  const dbPath = env.TURSO_DATABASE_URL.slice('file:'.length);
+  fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+}
 
-// Open SQLite DB file
-const sqlite = new Database(dbPath);
+export const client = createClient({
+  url: env.TURSO_DATABASE_URL,
+  authToken: env.TURSO_AUTH_TOKEN,
+});
 
-// Enable WAL Mode and Busy Timeout for smooth multi-register concurrency
-sqlite.pragma('journal_mode = WAL');
-sqlite.pragma('busy_timeout = 5000');
-// NORMAL is safe (not just fast) under WAL: durability only depends on
-// checkpoints, not every commit, and WAL itself survives a crash.
-sqlite.pragma('synchronous = NORMAL');
-
-export const db = drizzle(sqlite, { schema });
-export { sqlite };
+export const db = drizzle(client, { schema });

@@ -6,7 +6,7 @@
 // on a fresh install.
 import { randomUUID } from 'crypto';
 import { createInterface, type Interface } from 'node:readline/promises';
-import { db, sqlite } from './index.js';
+import { client, db } from './index.js';
 import { users } from './schema.js';
 import { hashPin, verifyPin } from '../middleware/auth.js';
 
@@ -23,7 +23,7 @@ async function promptName(rl: Interface): Promise<string> {
 }
 
 async function pinIsTaken(pin: string): Promise<boolean> {
-  const existing = db.select().from(users).all();
+  const existing = await db.select().from(users).all();
   for (const user of existing) {
     if (await verifyPin(pin, user.pinHash)) {
       return true;
@@ -56,7 +56,7 @@ async function main() {
     const pin = await promptPin(rl);
     const pinHash = await hashPin(pin);
 
-    db.insert(users).values({
+    await db.insert(users).values({
       id: randomUUID(),
       name,
       pinHash,
@@ -76,5 +76,5 @@ main()
     process.exitCode = 1;
   })
   .finally(() => {
-    sqlite.close();
+    client.close();
   });

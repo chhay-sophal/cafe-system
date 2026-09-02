@@ -18,12 +18,12 @@ describe('backend auth and validation', () => {
     // so users must be cleared in FK-dependency order - any leftover orders
     // or stock adjustments referencing a user otherwise abort the delete
     // with a foreign key constraint failure.
-    db.delete(payments).run();
-    db.delete(orderItemModifiers).run();
-    db.delete(orderItems).run();
-    db.delete(orders).run();
-    db.delete(stockAdjustments).run();
-    db.delete(users).run();
+    await db.delete(payments).run();
+    await db.delete(orderItemModifiers).run();
+    await db.delete(orderItems).run();
+    await db.delete(orders).run();
+    await db.delete(stockAdjustments).run();
+    await db.delete(users).run();
   });
 
   it('returns 400 for invalid login payload', async () => {
@@ -37,7 +37,7 @@ describe('backend auth and validation', () => {
 
   it('logs in a cashier with a valid PIN', async () => {
     const pinHash = await hashPin('1234');
-    db.insert(users).values({
+    await db.insert(users).values({
       id: 'cashier-1',
       name: 'Test Cashier',
       pinHash,
@@ -57,13 +57,13 @@ describe('backend auth and validation', () => {
 
 describe('exchange rate settings', () => {
   beforeEach(async () => {
-    db.delete(storeSettings).run();
-    db.delete(payments).run();
-    db.delete(orderItemModifiers).run();
-    db.delete(orderItems).run();
-    db.delete(orders).run();
-    db.delete(stockAdjustments).run();
-    db.delete(users).run();
+    await db.delete(storeSettings).run();
+    await db.delete(payments).run();
+    await db.delete(orderItemModifiers).run();
+    await db.delete(orderItems).run();
+    await db.delete(orders).run();
+    await db.delete(stockAdjustments).run();
+    await db.delete(users).run();
   });
 
   it('returns the first-setup defaults (KHR, tax off, 4100 riel/usd) when none has been set', async () => {
@@ -77,7 +77,7 @@ describe('exchange rate settings', () => {
 
   it('rejects a rate update from a non-admin', async () => {
     const pinHash = await hashPin('1234');
-    db.insert(users).values({ id: 'cashier-1', name: 'Cashier', pinHash, role: 'CASHIER', isActive: true }).run();
+    await db.insert(users).values({ id: 'cashier-1', name: 'Cashier', pinHash, role: 'CASHIER', isActive: true }).run();
     const token = signToken({ id: 'cashier-1', name: 'Cashier', role: 'CASHIER' });
 
     const response = await request(app)
@@ -90,7 +90,7 @@ describe('exchange rate settings', () => {
 
   it('lets an admin update the rate, reflected by later reads', async () => {
     const pinHash = await hashPin('9999');
-    db.insert(users).values({ id: 'admin-1', name: 'Admin', pinHash, role: 'ADMIN', isActive: true }).run();
+    await db.insert(users).values({ id: 'admin-1', name: 'Admin', pinHash, role: 'ADMIN', isActive: true }).run();
     const token = signToken({ id: 'admin-1', name: 'Admin', role: 'ADMIN' });
 
     const putResponse = await request(app)
@@ -107,7 +107,7 @@ describe('exchange rate settings', () => {
 
   it('rejects a main currency update from a non-admin', async () => {
     const pinHash = await hashPin('1234');
-    db.insert(users).values({ id: 'cashier-1', name: 'Cashier', pinHash, role: 'CASHIER', isActive: true }).run();
+    await db.insert(users).values({ id: 'cashier-1', name: 'Cashier', pinHash, role: 'CASHIER', isActive: true }).run();
     const token = signToken({ id: 'cashier-1', name: 'Cashier', role: 'CASHIER' });
 
     const response = await request(app)
@@ -120,7 +120,7 @@ describe('exchange rate settings', () => {
 
   it('lets an admin switch the main currency to KHR, reflected by later reads', async () => {
     const pinHash = await hashPin('9999');
-    db.insert(users).values({ id: 'admin-1', name: 'Admin', pinHash, role: 'ADMIN', isActive: true }).run();
+    await db.insert(users).values({ id: 'admin-1', name: 'Admin', pinHash, role: 'ADMIN', isActive: true }).run();
     const token = signToken({ id: 'admin-1', name: 'Admin', role: 'ADMIN' });
 
     const putResponse = await request(app)
@@ -139,7 +139,7 @@ describe('exchange rate settings', () => {
 
   it('rejects an invalid main currency value', async () => {
     const pinHash = await hashPin('9999');
-    db.insert(users).values({ id: 'admin-1', name: 'Admin', pinHash, role: 'ADMIN', isActive: true }).run();
+    await db.insert(users).values({ id: 'admin-1', name: 'Admin', pinHash, role: 'ADMIN', isActive: true }).run();
     const token = signToken({ id: 'admin-1', name: 'Admin', role: 'ADMIN' });
 
     const response = await request(app)
@@ -152,7 +152,7 @@ describe('exchange rate settings', () => {
 
   it('rejects a tax setting update from a non-admin', async () => {
     const pinHash = await hashPin('1234');
-    db.insert(users).values({ id: 'cashier-1', name: 'Cashier', pinHash, role: 'CASHIER', isActive: true }).run();
+    await db.insert(users).values({ id: 'cashier-1', name: 'Cashier', pinHash, role: 'CASHIER', isActive: true }).run();
     const token = signToken({ id: 'cashier-1', name: 'Cashier', role: 'CASHIER' });
 
     const response = await request(app)
@@ -165,7 +165,7 @@ describe('exchange rate settings', () => {
 
   it('lets an admin disable tax, reflected by later reads', async () => {
     const pinHash = await hashPin('9999');
-    db.insert(users).values({ id: 'admin-1', name: 'Admin', pinHash, role: 'ADMIN', isActive: true }).run();
+    await db.insert(users).values({ id: 'admin-1', name: 'Admin', pinHash, role: 'ADMIN', isActive: true }).run();
     const token = signToken({ id: 'admin-1', name: 'Admin', role: 'ADMIN' });
 
     const putResponse = await request(app)
@@ -183,46 +183,46 @@ describe('exchange rate settings', () => {
 
 describe('order payments in mixed USD/Riel', () => {
   beforeEach(async () => {
-    db.delete(storeSettings).run();
-    db.delete(payments).run();
-    db.delete(orderItemModifiers).run();
-    db.delete(orderItems).run();
-    db.delete(orders).run();
-    db.delete(stockAdjustments).run();
-    db.delete(users).run();
+    await db.delete(storeSettings).run();
+    await db.delete(payments).run();
+    await db.delete(orderItemModifiers).run();
+    await db.delete(orderItems).run();
+    await db.delete(orders).run();
+    await db.delete(stockAdjustments).run();
+    await db.delete(users).run();
   });
 
   async function cashierToken() {
     const pinHash = await hashPin('1234');
-    db.insert(users).values({ id: 'cashier-1', name: 'Cashier', pinHash, role: 'CASHIER', isActive: true }).run();
+    await db.insert(users).values({ id: 'cashier-1', name: 'Cashier', pinHash, role: 'CASHIER', isActive: true }).run();
     return signToken({ id: 'cashier-1', name: 'Cashier', role: 'CASHIER' });
   }
 
   // orderItems.productId is a real FK - reuse a seeded product rather than
   // touching the categories/products tables (recipes still reference the
   // seeded catalog, so wiping it here would break unrelated FKs).
-  function testProductId(): string {
-    const existing = db.select({ id: products.id }).from(products).limit(1).get();
+  async function testProductId(): Promise<string> {
+    const existing = await db.select({ id: products.id }).from(products).limit(1).get();
     if (existing) {
       return existing.id;
     }
 
     const categoryId = randomUUID();
     const productId = randomUUID();
-    db.insert(categories).values({ id: categoryId, name: 'Test Category' }).run();
-    db.insert(products).values({ id: productId, categoryId, name: 'Test Product', basePrice: 3.25 }).run();
+    await db.insert(categories).values({ id: categoryId, name: 'Test Category' }).run();
+    await db.insert(products).values({ id: productId, categoryId, name: 'Test Product', basePrice: 3.25 }).run();
     return productId;
   }
 
   it('ignores a client-supplied taxAmount once tax is disabled', async () => {
-    db.insert(storeSettings).values({ id: 'default', taxEnabled: false }).run();
+    await db.insert(storeSettings).values({ id: 'default', taxEnabled: false }).run();
     const token = await cashierToken();
 
     const response = await request(app)
       .post('/api/orders')
       .set('Authorization', `Bearer ${token}`)
       .send({
-        items: [{ productId: testProductId(), productName: 'Latte', quantity: 1, unitPrice: 3.25 }],
+        items: [{ productId: await testProductId(), productName: 'Latte', quantity: 1, unitPrice: 3.25 }],
         paymentMethod: 'CASH',
         amountTenderedUsd: 5,
         amountTenderedRiel: 0,
@@ -233,7 +233,7 @@ describe('order payments in mixed USD/Riel', () => {
     expect(response.body.subtotal).toBe(3.25);
     expect(response.body.totalAmount).toBe(3.25);
 
-    const savedOrder = db.select().from(orders).where(eq(orders.id, response.body.orderId)).get();
+    const savedOrder = await db.select().from(orders).where(eq(orders.id, response.body.orderId)).get();
     expect(savedOrder?.taxAmount).toBe(0);
   });
 
@@ -245,7 +245,7 @@ describe('order payments in mixed USD/Riel', () => {
       .post('/api/orders')
       .set('Authorization', `Bearer ${token}`)
       .send({
-        items: [{ productId: testProductId(), productName: 'Latte', quantity: 1, unitPrice: 3.25 }],
+        items: [{ productId: await testProductId(), productName: 'Latte', quantity: 1, unitPrice: 3.25 }],
         paymentMethod: 'CASH',
         amountTenderedUsd: 5,
         amountTenderedRiel: 0,
@@ -266,7 +266,7 @@ describe('order payments in mixed USD/Riel', () => {
       .post('/api/orders')
       .set('Authorization', `Bearer ${token}`)
       .send({
-        items: [{ productId: testProductId(), productName: 'Latte', quantity: 1, unitPrice: 3.25 }],
+        items: [{ productId: await testProductId(), productName: 'Latte', quantity: 1, unitPrice: 3.25 }],
         paymentMethod: 'CASH',
         amountTenderedUsd: 0,
         amountTenderedRiel: 20000,
@@ -287,7 +287,7 @@ describe('order payments in mixed USD/Riel', () => {
       .post('/api/orders')
       .set('Authorization', `Bearer ${token}`)
       .send({
-        items: [{ productId: testProductId(), productName: 'Latte', quantity: 1, unitPrice: 3.25 }],
+        items: [{ productId: await testProductId(), productName: 'Latte', quantity: 1, unitPrice: 3.25 }],
         paymentMethod: 'CASH',
         amountTenderedUsd: 5,
         amountTenderedRiel: 1000,
@@ -305,7 +305,7 @@ describe('order payments in mixed USD/Riel', () => {
       .post('/api/orders')
       .set('Authorization', `Bearer ${token}`)
       .send({
-        items: [{ productId: testProductId(), productName: 'Latte', quantity: 1, unitPrice: 3.25 }],
+        items: [{ productId: await testProductId(), productName: 'Latte', quantity: 1, unitPrice: 3.25 }],
         paymentMethod: 'CASH',
         amountTenderedUsd: 1,
         amountTenderedRiel: 1000,
@@ -318,22 +318,22 @@ describe('order payments in mixed USD/Riel', () => {
 
 describe('daily summary date range (store-local timezone)', () => {
   beforeEach(async () => {
-    db.delete(payments).run();
-    db.delete(orderItemModifiers).run();
-    db.delete(orderItems).run();
-    db.delete(orders).run();
-    db.delete(stockAdjustments).run();
-    db.delete(users).run();
+    await db.delete(payments).run();
+    await db.delete(orderItemModifiers).run();
+    await db.delete(orderItems).run();
+    await db.delete(orders).run();
+    await db.delete(stockAdjustments).run();
+    await db.delete(users).run();
   });
 
   it('buckets an order by the store-local calendar day, not its UTC calendar day', async () => {
     const pinHash = await hashPin('1234');
-    db.insert(users).values({ id: 'cashier-1', name: 'Cashier', pinHash, role: 'CASHIER', isActive: true }).run();
+    await db.insert(users).values({ id: 'cashier-1', name: 'Cashier', pinHash, role: 'CASHIER', isActive: true }).run();
 
     // 18:30 UTC on the 29th is 01:30 local (store is UTC+7) on the 30th - a
     // report for local "the 30th" must include this order; a report for
     // local "the 29th" must not.
-    db.insert(orders).values({
+    await db.insert(orders).values({
       id: 'order-1',
       userId: 'cashier-1',
       orderNumber: 1,
@@ -353,30 +353,30 @@ describe('daily summary date range (store-local timezone)', () => {
 
 describe('order list and detail', () => {
   beforeEach(async () => {
-    db.delete(payments).run();
-    db.delete(orderItemModifiers).run();
-    db.delete(orderItems).run();
-    db.delete(orders).run();
-    db.delete(stockAdjustments).run();
-    db.delete(users).run();
+    await db.delete(payments).run();
+    await db.delete(orderItemModifiers).run();
+    await db.delete(orderItems).run();
+    await db.delete(orders).run();
+    await db.delete(stockAdjustments).run();
+    await db.delete(users).run();
   });
 
   async function cashierToken() {
     const pinHash = await hashPin('1234');
-    db.insert(users).values({ id: 'cashier-1', name: 'Cashier', pinHash, role: 'CASHIER', isActive: true }).run();
+    await db.insert(users).values({ id: 'cashier-1', name: 'Cashier', pinHash, role: 'CASHIER', isActive: true }).run();
     return signToken({ id: 'cashier-1', name: 'Cashier', role: 'CASHIER' });
   }
 
-  function testProductId(): string {
-    const existing = db.select({ id: products.id }).from(products).limit(1).get();
+  async function testProductId(): Promise<string> {
+    const existing = await db.select({ id: products.id }).from(products).limit(1).get();
     if (existing) {
       return existing.id;
     }
 
     const categoryId = randomUUID();
     const productId = randomUUID();
-    db.insert(categories).values({ id: categoryId, name: 'Test Category' }).run();
-    db.insert(products).values({ id: productId, categoryId, name: 'Test Product', basePrice: 3.25 }).run();
+    await db.insert(categories).values({ id: categoryId, name: 'Test Category' }).run();
+    await db.insert(products).values({ id: productId, categoryId, name: 'Test Product', basePrice: 3.25 }).run();
     return productId;
   }
 
@@ -394,15 +394,15 @@ describe('order list and detail', () => {
     // orderItemModifiers.modifierId is a real FK - needs an actual modifier row.
     const groupId = randomUUID();
     const modifierId = randomUUID();
-    db.insert(modifierGroups).values({ id: groupId, name: 'Milk Choice' }).run();
-    db.insert(modifiers).values({ id: modifierId, groupId, name: 'Oat Milk', priceExtra: 0.5 }).run();
+    await db.insert(modifierGroups).values({ id: groupId, name: 'Milk Choice' }).run();
+    await db.insert(modifiers).values({ id: modifierId, groupId, name: 'Oat Milk', priceExtra: 0.5 }).run();
 
     const createResponse = await request(app)
       .post('/api/orders')
       .set('Authorization', `Bearer ${token}`)
       .send({
         items: [{
-          productId: testProductId(),
+          productId: await testProductId(),
           productName: 'Latte',
           quantity: 2,
           unitPrice: 4,
@@ -459,25 +459,25 @@ describe('category deletion', () => {
     // Doesn't touch categories/products - the real seeded catalog stays
     // intact (recipes/orderItems reference it), only test-created rows
     // (given high sortOrder values below, out of the seeded range) are used.
-    db.delete(payments).run();
-    db.delete(orderItemModifiers).run();
-    db.delete(orderItems).run();
-    db.delete(orders).run();
-    db.delete(stockAdjustments).run();
-    db.delete(users).run();
+    await db.delete(payments).run();
+    await db.delete(orderItemModifiers).run();
+    await db.delete(orderItems).run();
+    await db.delete(orders).run();
+    await db.delete(stockAdjustments).run();
+    await db.delete(users).run();
   });
 
   async function managerToken() {
     const pinHash = await hashPin('9999');
-    db.insert(users).values({ id: 'manager-1', name: 'Manager', pinHash, role: 'MANAGER', isActive: true }).run();
+    await db.insert(users).values({ id: 'manager-1', name: 'Manager', pinHash, role: 'MANAGER', isActive: true }).run();
     return signToken({ id: 'manager-1', name: 'Manager', role: 'MANAGER' });
   }
 
   it('rejects deletion when the category still has products assigned and no reassignment target is given', async () => {
     const token = await managerToken();
     const categoryId = randomUUID();
-    db.insert(categories).values({ id: categoryId, name: 'Test Drinks', sortOrder: 1000 }).run();
-    db.insert(products).values({ id: randomUUID(), categoryId, name: 'Test Latte', basePrice: 4 }).run();
+    await db.insert(categories).values({ id: categoryId, name: 'Test Drinks', sortOrder: 1000 }).run();
+    await db.insert(products).values({ id: randomUUID(), categoryId, name: 'Test Latte', basePrice: 4 }).run();
 
     const response = await request(app)
       .delete(`/api/categories/${categoryId}`)
@@ -485,10 +485,10 @@ describe('category deletion', () => {
 
     expect(response.status).toBe(409);
     expect(response.body.productCount).toBe(1);
-    expect(db.select().from(categories).where(eq(categories.id, categoryId)).get()).toBeDefined();
+    expect(await db.select().from(categories).where(eq(categories.id, categoryId)).get()).toBeDefined();
 
-    db.delete(products).where(eq(products.categoryId, categoryId)).run();
-    db.delete(categories).where(eq(categories.id, categoryId)).run();
+    await db.delete(products).where(eq(products.categoryId, categoryId)).run();
+    await db.delete(categories).where(eq(categories.id, categoryId)).run();
   });
 
   it('reassigns products to the target category and deletes the source category', async () => {
@@ -496,11 +496,11 @@ describe('category deletion', () => {
     const sourceId = randomUUID();
     const targetId = randomUUID();
     const productId = randomUUID();
-    db.insert(categories).values([
+    await db.insert(categories).values([
       { id: sourceId, name: 'Test Source', sortOrder: 1000 },
       { id: targetId, name: 'Test Target', sortOrder: 1001 },
     ]).run();
-    db.insert(products).values({ id: productId, categoryId: sourceId, name: 'Test Latte', basePrice: 4 }).run();
+    await db.insert(products).values({ id: productId, categoryId: sourceId, name: 'Test Latte', basePrice: 4 }).run();
 
     const response = await request(app)
       .delete(`/api/categories/${sourceId}?reassignToCategoryId=${targetId}`)
@@ -508,18 +508,18 @@ describe('category deletion', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.reassignedCount).toBe(1);
-    expect(db.select().from(categories).where(eq(categories.id, sourceId)).get()).toBeUndefined();
-    expect(db.select().from(products).where(eq(products.id, productId)).get()).toMatchObject({ categoryId: targetId });
+    expect(await db.select().from(categories).where(eq(categories.id, sourceId)).get()).toBeUndefined();
+    expect(await db.select().from(products).where(eq(products.id, productId)).get()).toMatchObject({ categoryId: targetId });
 
-    db.delete(products).where(eq(products.id, productId)).run();
-    db.delete(categories).where(eq(categories.id, targetId)).run();
+    await db.delete(products).where(eq(products.id, productId)).run();
+    await db.delete(categories).where(eq(categories.id, targetId)).run();
   });
 
   it('rejects reassigning products to the category being deleted', async () => {
     const token = await managerToken();
     const categoryId = randomUUID();
-    db.insert(categories).values({ id: categoryId, name: 'Test Drinks', sortOrder: 1000 }).run();
-    db.insert(products).values({ id: randomUUID(), categoryId, name: 'Test Latte', basePrice: 4 }).run();
+    await db.insert(categories).values({ id: categoryId, name: 'Test Drinks', sortOrder: 1000 }).run();
+    await db.insert(products).values({ id: randomUUID(), categoryId, name: 'Test Latte', basePrice: 4 }).run();
 
     const response = await request(app)
       .delete(`/api/categories/${categoryId}?reassignToCategoryId=${categoryId}`)
@@ -527,15 +527,15 @@ describe('category deletion', () => {
 
     expect(response.status).toBe(400);
 
-    db.delete(products).where(eq(products.categoryId, categoryId)).run();
-    db.delete(categories).where(eq(categories.id, categoryId)).run();
+    await db.delete(products).where(eq(products.categoryId, categoryId)).run();
+    await db.delete(categories).where(eq(categories.id, categoryId)).run();
   });
 
   it('rejects reassigning to a non-existent target category', async () => {
     const token = await managerToken();
     const categoryId = randomUUID();
-    db.insert(categories).values({ id: categoryId, name: 'Test Drinks', sortOrder: 1000 }).run();
-    db.insert(products).values({ id: randomUUID(), categoryId, name: 'Test Latte', basePrice: 4 }).run();
+    await db.insert(categories).values({ id: categoryId, name: 'Test Drinks', sortOrder: 1000 }).run();
+    await db.insert(products).values({ id: randomUUID(), categoryId, name: 'Test Latte', basePrice: 4 }).run();
 
     const response = await request(app)
       .delete(`/api/categories/${categoryId}?reassignToCategoryId=does-not-exist`)
@@ -543,8 +543,8 @@ describe('category deletion', () => {
 
     expect(response.status).toBe(404);
 
-    db.delete(products).where(eq(products.categoryId, categoryId)).run();
-    db.delete(categories).where(eq(categories.id, categoryId)).run();
+    await db.delete(products).where(eq(products.categoryId, categoryId)).run();
+    await db.delete(categories).where(eq(categories.id, categoryId)).run();
   });
 
   it('deletes an empty category and compacts the remaining sortOrder values', async () => {
@@ -553,7 +553,7 @@ describe('category deletion', () => {
     // recalculation's effect on these three is checkable by their *relative*
     // spacing regardless of how many other categories precede them globally.
     const [catA, catB, catC, catD] = [randomUUID(), randomUUID(), randomUUID(), randomUUID()];
-    db.insert(categories).values([
+    await db.insert(categories).values([
       { id: catA, name: 'Test A', sortOrder: 1000 },
       { id: catB, name: 'Test B', sortOrder: 1001 },
       { id: catC, name: 'Test C', sortOrder: 1002 },
@@ -566,15 +566,15 @@ describe('category deletion', () => {
 
     expect(response.status).toBe(200);
 
-    const a = db.select().from(categories).where(eq(categories.id, catA)).get();
-    const c = db.select().from(categories).where(eq(categories.id, catC)).get();
-    const d = db.select().from(categories).where(eq(categories.id, catD)).get();
+    const a = await db.select().from(categories).where(eq(categories.id, catA)).get();
+    const c = await db.select().from(categories).where(eq(categories.id, catC)).get();
+    const d = await db.select().from(categories).where(eq(categories.id, catD)).get();
 
     expect(c!.sortOrder).toBe(a!.sortOrder! + 1);
     expect(d!.sortOrder).toBe(a!.sortOrder! + 2);
 
-    db.delete(categories).where(eq(categories.id, catA)).run();
-    db.delete(categories).where(eq(categories.id, catC)).run();
-    db.delete(categories).where(eq(categories.id, catD)).run();
+    await db.delete(categories).where(eq(categories.id, catA)).run();
+    await db.delete(categories).where(eq(categories.id, catC)).run();
+    await db.delete(categories).where(eq(categories.id, catD)).run();
   });
 });

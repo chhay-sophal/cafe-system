@@ -1,7 +1,5 @@
 import express from 'express';
 import cors from 'cors';
-import fs from 'fs';
-import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
@@ -14,6 +12,7 @@ import {
 } from './db/schema.js';
 import { authenticate, hashPin, requireRole, signToken, verifyPin } from './middleware/auth.js';
 import { validateBody } from './middleware/validate.js';
+import { productImageUpload, saveProductImage } from './lib/uploads.js';
 import {
   categorySchema,
   exchangeRateSchema,
@@ -49,8 +48,8 @@ function storeTodayDateString(): string {
   return shifted.toISOString().slice(0, 10);
 }
 
-function getStoreSettings(): { exchangeRateRielPerUsd: number; mainCurrency: 'USD' | 'KHR'; taxEnabled: boolean } {
-  const row = db.select().from(storeSettings).where(eq(storeSettings.id, 'default')).get();
+async function getStoreSettings(): Promise<{ exchangeRateRielPerUsd: number; mainCurrency: 'USD' | 'KHR'; taxEnabled: boolean }> {
+  const row = await db.select().from(storeSettings).where(eq(storeSettings.id, 'default')).get();
   return {
     exchangeRateRielPerUsd: row?.exchangeRateRielPerUsd ?? DEFAULT_EXCHANGE_RATE_RIEL_PER_USD,
     mainCurrency: row?.mainCurrency ?? DEFAULT_MAIN_CURRENCY,
@@ -95,8 +94,6 @@ function computeChange(
   return { usd: 0, riel: usdToRiel(changeDueUsd, exchangeRate) };
 }
 
-const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
-
 const USER_PUBLIC_COLUMNS = {
   id: users.id,
   name: users.name,
@@ -114,36 +111,26 @@ function createApp() {
   app.use(express.json());
   app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-  const productImageUpload = multer({
-    storage: multer.diskStorage({
-      destination: (_req, _file, cb) => {
-        const dir = path.join(__dirname, '../uploads/products');
-        fs.mkdirSync(dir, { recursive: true });
-        cb(null, dir);
-      },
-      filename: (_req, file, cb) => {
-        cb(null, `${randomUUID()}${path.extname(file.originalname).toLowerCase()}`);
-      },
-    }),
-    limits: { fileSize: 5 * 1024 * 1024 },
-    fileFilter: (_req, file, cb) => {
-      if (!ALLOWED_IMAGE_TYPES.has(file.mimetype)) {
-        cb(new Error('Only JPEG, PNG, and WEBP images are allowed'));
-        return;
-      }
-      cb(null, true);
-    },
+  app.get('/health', (_req, res) => {
+    res.sendStatus(200);
   });
 
   app.post('/api/upload', authenticate, requireRole(['MANAGER', 'ADMIN']), (req, res) => {
-    productImageUpload.single('image')(req, res, (error: unknown) => {
+    productImageUpload.single('image')(req, res, async (error: unknown) => {
       if (error) {
         return res.status(400).json({ error: error instanceof Error ? error.message : 'Failed to upload image' });
       }
       if (!req.file) {
         return res.status(400).json({ error: 'No image file provided' });
       }
-      res.status(201).json({ url: `/uploads/products/${req.file.filename}` });
+
+      try {
+        const url = await saveProductImage(req.file);
+        res.status(201).json({ url });
+      } catch (uploadError) {
+        console.error('Image upload error:', uploadError);
+        res.status(500).json({ error: 'Failed to upload image' });
+      }
     });
   });
 
@@ -156,7 +143,7 @@ function createApp() {
 
     try {
       const normalizedPin = String(pin).trim();
-      const candidates = db.select().from(users).all();
+      const candidates = await db.select().from(users).all();
       let user = null as (typeof candidates[number] | null);
 
       for (const candidate of candidates) {
@@ -177,7 +164,7 @@ function createApp() {
 
       if (!/\$2[aby]\$\d{2}\$/.test(user.pinHash)) {
         const nextHash = await hashPin(normalizedPin);
-        db.update(users)
+        await db.update(users)
           .set({ pinHash: nextHash })
           .where(eq(users.id, user.id))
           .run();
@@ -212,7 +199,7 @@ function createApp() {
 
   app.get('/api/users', authenticate, requireRole(['ADMIN']), async (_req, res) => {
     try {
-      const result = db.select(USER_PUBLIC_COLUMNS).from(users).all();
+      const result = await db.select(USER_PUBLIC_COLUMNS).from(users).all();
       res.json(result);
     } catch (error) {
       res.status(500).json({ error: 'Failed to fetch users' });
@@ -225,9 +212,9 @@ function createApp() {
     try {
       const id = randomUUID();
       const pinHash = await hashPin(pin);
-      db.insert(users).values({ id, name, pinHash, role, isActive }).run();
+      await db.insert(users).values({ id, name, pinHash, role, isActive }).run();
 
-      const created = db.select(USER_PUBLIC_COLUMNS).from(users).where(eq(users.id, id)).get();
+      const created = await db.select(USER_PUBLIC_COLUMNS).from(users).where(eq(users.id, id)).get();
       res.status(201).json(created);
     } catch (error) {
       res.status(500).json({ error: 'Failed to create user' });
@@ -240,7 +227,7 @@ function createApp() {
     const actingUserId = req.user?.id;
 
     try {
-      const existing = db.select().from(users).where(eq(users.id, id)).get();
+      const existing = await db.select().from(users).where(eq(users.id, id)).get();
       if (!existing) {
         return res.status(404).json({ error: 'User not found' });
       }
@@ -254,9 +241,9 @@ function createApp() {
         updates.pinHash = await hashPin(pin);
       }
 
-      db.update(users).set(updates).where(eq(users.id, id)).run();
+      await db.update(users).set(updates).where(eq(users.id, id)).run();
 
-      const updated = db.select(USER_PUBLIC_COLUMNS).from(users).where(eq(users.id, id)).get();
+      const updated = await db.select(USER_PUBLIC_COLUMNS).from(users).where(eq(users.id, id)).get();
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: 'Failed to update user' });
@@ -265,7 +252,7 @@ function createApp() {
 
   app.get('/api/categories', async (_req, res) => {
     try {
-      const result = db.select().from(categories).orderBy(categories.sortOrder).all();
+      const result = await db.select().from(categories).orderBy(categories.sortOrder).all();
       res.json(result);
     } catch (error) {
       res.status(500).json({ error: 'Failed to fetch categories' });
@@ -277,9 +264,9 @@ function createApp() {
 
     try {
       const id = randomUUID();
-      db.insert(categories).values({ id, name, sortOrder }).run();
+      await db.insert(categories).values({ id, name, sortOrder }).run();
 
-      const created = db.select().from(categories).where(eq(categories.id, id)).get();
+      const created = await db.select().from(categories).where(eq(categories.id, id)).get();
       res.status(201).json(created);
     } catch (error) {
       res.status(500).json({ error: 'Failed to create category' });
@@ -291,14 +278,14 @@ function createApp() {
     const { name, sortOrder } = req.body;
 
     try {
-      const existing = db.select().from(categories).where(eq(categories.id, id)).get();
+      const existing = await db.select().from(categories).where(eq(categories.id, id)).get();
       if (!existing) {
         return res.status(404).json({ error: 'Category not found' });
       }
 
-      db.update(categories).set({ name, sortOrder }).where(eq(categories.id, id)).run();
+      await db.update(categories).set({ name, sortOrder }).where(eq(categories.id, id)).run();
 
-      const updated = db.select().from(categories).where(eq(categories.id, id)).get();
+      const updated = await db.select().from(categories).where(eq(categories.id, id)).get();
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: 'Failed to update category' });
@@ -310,12 +297,12 @@ function createApp() {
     const reassignToCategoryId = req.query.reassignToCategoryId ? String(req.query.reassignToCategoryId) : undefined;
 
     try {
-      const existing = db.select().from(categories).where(eq(categories.id, id)).get();
+      const existing = await db.select().from(categories).where(eq(categories.id, id)).get();
       if (!existing) {
         return res.status(404).json({ error: 'Category not found' });
       }
 
-      const productsInCategory = db.select().from(products).where(eq(products.categoryId, id)).all();
+      const productsInCategory = await db.select().from(products).where(eq(products.categoryId, id)).all();
 
       if (productsInCategory.length > 0) {
         // No target given yet - tell the client how many products are
@@ -332,28 +319,28 @@ function createApp() {
           return res.status(400).json({ error: 'Cannot reassign products to the category being deleted' });
         }
 
-        const targetCategory = db.select().from(categories).where(eq(categories.id, reassignToCategoryId)).get();
+        const targetCategory = await db.select().from(categories).where(eq(categories.id, reassignToCategoryId)).get();
         if (!targetCategory) {
           return res.status(404).json({ error: 'Target category not found' });
         }
       }
 
-      db.transaction(() => {
+      await db.transaction(async (tx) => {
         if (productsInCategory.length > 0 && reassignToCategoryId) {
-          db.update(products).set({ categoryId: reassignToCategoryId }).where(eq(products.categoryId, id)).run();
+          await tx.update(products).set({ categoryId: reassignToCategoryId }).where(eq(products.categoryId, id)).run();
         }
 
-        db.delete(categories).where(eq(categories.id, id)).run();
+        await tx.delete(categories).where(eq(categories.id, id)).run();
 
         // Recalculate sortOrder for the remaining categories so there's no
         // gap left by the deleted one - keeps their relative order, just
         // compacted (e.g. 0,1,2,3 minus #1 becomes 0,1,2, not 0,2,3).
-        const remaining = db.select().from(categories).orderBy(categories.sortOrder).all();
-        remaining.forEach((category, index) => {
+        const remaining = await tx.select().from(categories).orderBy(categories.sortOrder).all();
+        for (const [index, category] of remaining.entries()) {
           if (category.sortOrder !== index) {
-            db.update(categories).set({ sortOrder: index }).where(eq(categories.id, category.id)).run();
+            await tx.update(categories).set({ sortOrder: index }).where(eq(categories.id, category.id)).run();
           }
-        });
+        }
       });
 
       res.json({ success: true, reassignedCount: productsInCategory.length });
@@ -371,7 +358,7 @@ function createApp() {
         ? db.select().from(products).where(eq(products.categoryId, categoryId))
         : db.select().from(products);
 
-      res.json(query.all());
+      res.json(await query.all());
     } catch (error) {
       res.status(500).json({ error: 'Failed to fetch products' });
     }
@@ -381,13 +368,13 @@ function createApp() {
     const { categoryId, name, basePrice, sku, imageUrl, isAvailable } = req.body;
 
     try {
-      const categoryExists = db.select().from(categories).where(eq(categories.id, categoryId)).get();
+      const categoryExists = await db.select().from(categories).where(eq(categories.id, categoryId)).get();
       if (!categoryExists) {
         return res.status(400).json({ error: 'Selected category does not exist' });
       }
 
       const id = randomUUID();
-      db.insert(products).values({
+      await db.insert(products).values({
         id,
         categoryId,
         name,
@@ -397,7 +384,7 @@ function createApp() {
         isAvailable,
       }).run();
 
-      const created = db.select().from(products).where(eq(products.id, id)).get();
+      const created = await db.select().from(products).where(eq(products.id, id)).get();
       res.status(201).json(created);
     } catch (error) {
       res.status(500).json({ error: 'Failed to create product' });
@@ -409,17 +396,17 @@ function createApp() {
     const { categoryId, name, basePrice, sku, imageUrl, isAvailable } = req.body;
 
     try {
-      const existing = db.select().from(products).where(eq(products.id, id)).get();
+      const existing = await db.select().from(products).where(eq(products.id, id)).get();
       if (!existing) {
         return res.status(404).json({ error: 'Product not found' });
       }
 
-      const categoryExists = db.select().from(categories).where(eq(categories.id, categoryId)).get();
+      const categoryExists = await db.select().from(categories).where(eq(categories.id, categoryId)).get();
       if (!categoryExists) {
         return res.status(400).json({ error: 'Selected category does not exist' });
       }
 
-      db.update(products).set({
+      await db.update(products).set({
         categoryId,
         name,
         basePrice,
@@ -428,7 +415,7 @@ function createApp() {
         isAvailable,
       }).where(eq(products.id, id)).run();
 
-      const updated = db.select().from(products).where(eq(products.id, id)).get();
+      const updated = await db.select().from(products).where(eq(products.id, id)).get();
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: 'Failed to update product' });
@@ -439,22 +426,22 @@ function createApp() {
     const id = String(req.params.id);
 
     try {
-      const existing = db.select().from(products).where(eq(products.id, id)).get();
+      const existing = await db.select().from(products).where(eq(products.id, id)).get();
       if (!existing) {
         return res.status(404).json({ error: 'Product not found' });
       }
 
-      const historicalOrderItems = db.select().from(orderItems).where(eq(orderItems.productId, id)).all();
+      const historicalOrderItems = await db.select().from(orderItems).where(eq(orderItems.productId, id)).all();
       if (historicalOrderItems.length > 0) {
         return res.status(409).json({
           error: `"${existing.name}" has ${historicalOrderItems.length} historical order line(s) and cannot be deleted.`,
         });
       }
 
-      db.transaction(() => {
-        db.delete(recipes).where(eq(recipes.productId, id)).run();
-        db.delete(productModifiers).where(eq(productModifiers.productId, id)).run();
-        db.delete(products).where(eq(products.id, id)).run();
+      await db.transaction(async (tx) => {
+        await tx.delete(recipes).where(eq(recipes.productId, id)).run();
+        await tx.delete(productModifiers).where(eq(productModifiers.productId, id)).run();
+        await tx.delete(products).where(eq(products.id, id)).run();
       });
 
       res.json({ success: true });
@@ -467,18 +454,18 @@ function createApp() {
     const { id } = req.params;
 
     try {
-      const links = db.select().from(productModifiers).where(eq(productModifiers.productId, id)).all();
+      const links = await db.select().from(productModifiers).where(eq(productModifiers.productId, id)).all();
       const groupIds = links.map((link) => link.groupId);
 
       if (groupIds.length === 0) {
         return res.json([]);
       }
 
-      const groups = db.select().from(modifierGroups).where(inArray(modifierGroups.id, groupIds)).all();
-      const result = groups.map((group) => {
-        const options = db.select().from(modifiers).where(eq(modifiers.groupId, group.id)).all();
+      const groups = await db.select().from(modifierGroups).where(inArray(modifierGroups.id, groupIds)).all();
+      const result = await Promise.all(groups.map(async (group) => {
+        const options = await db.select().from(modifiers).where(eq(modifiers.groupId, group.id)).all();
         return { ...group, options };
-      });
+      }));
 
       res.json(result);
     } catch (error) {
@@ -488,11 +475,11 @@ function createApp() {
 
   app.get('/api/modifiers', async (_req, res) => {
     try {
-      const groups = db.select().from(modifierGroups).all();
-      const result = groups.map((group) => {
-        const options = db.select().from(modifiers).where(eq(modifiers.groupId, group.id)).all();
+      const groups = await db.select().from(modifierGroups).all();
+      const result = await Promise.all(groups.map(async (group) => {
+        const options = await db.select().from(modifiers).where(eq(modifiers.groupId, group.id)).all();
         return { ...group, options };
-      });
+      }));
 
       res.json(result);
     } catch (error) {
@@ -512,10 +499,10 @@ function createApp() {
 
     try {
       const today = storeTodayDateString();
-      const todayOrdersCount = db.select({ count: sql<number>`count(*)` })
+      const todayOrdersCount = (await db.select({ count: sql<number>`count(*)` })
         .from(orders)
         .where(gte(sql`datetime(${orders.createdAt}, ${STORE_UTC_OFFSET_SQL_MODIFIER})`, today))
-        .get()?.count || 0;
+        .get())?.count || 0;
       const orderNumber = todayOrdersCount + 1;
       const orderId = randomUUID();
 
@@ -530,7 +517,7 @@ function createApp() {
         subtotal += itemPrice * item.quantity;
       }
 
-      const { exchangeRateRielPerUsd: exchangeRate, taxEnabled } = getStoreSettings();
+      const { exchangeRateRielPerUsd: exchangeRate, taxEnabled } = await getStoreSettings();
       // A manager can disable tax store-wide - enforced here, not just
       // trusted from the client, so a stale/misbehaving POS can't still
       // charge it once disabled.
@@ -556,8 +543,8 @@ function createApp() {
         changeRiel = change.riel;
       }
 
-      db.transaction(() => {
-        db.insert(orders).values({
+      await db.transaction(async (tx) => {
+        await tx.insert(orders).values({
           id: orderId,
           userId: actingUserId,
           orderNumber,
@@ -568,7 +555,7 @@ function createApp() {
           status: 'COMPLETED',
         }).run();
 
-        db.insert(payments).values({
+        await tx.insert(payments).values({
           id: randomUUID(),
           orderId,
           paymentMethod,
@@ -582,7 +569,7 @@ function createApp() {
         for (const item of items) {
           const orderItemId = randomUUID();
 
-          db.insert(orderItems).values({
+          await tx.insert(orderItems).values({
             id: orderItemId,
             orderId,
             productId: item.productId,
@@ -592,10 +579,10 @@ function createApp() {
             totalPrice: item.unitPrice * item.quantity,
           }).run();
 
-          const baseRecipes = db.select().from(recipes).where(eq(recipes.productId, item.productId)).all();
+          const baseRecipes = await tx.select().from(recipes).where(eq(recipes.productId, item.productId)).all();
           for (const recipe of baseRecipes) {
             const totalDeduction = recipe.quantityRequired * item.quantity;
-            db.update(inventoryItems)
+            await tx.update(inventoryItems)
               .set({
                 stockQuantity: sql`${inventoryItems.stockQuantity} - ${totalDeduction}`,
                 updatedAt: sql`CURRENT_TIMESTAMP`,
@@ -606,7 +593,7 @@ function createApp() {
 
           if (item.selectedModifiers && item.selectedModifiers.length) {
             for (const mod of item.selectedModifiers) {
-              db.insert(orderItemModifiers).values({
+              await tx.insert(orderItemModifiers).values({
                 id: randomUUID(),
                 orderItemId,
                 modifierId: mod.id,
@@ -614,10 +601,10 @@ function createApp() {
                 priceExtra: mod.priceExtra,
               }).run();
 
-              const modRecipes = db.select().from(recipes).where(eq(recipes.modifierId, mod.id)).all();
+              const modRecipes = await tx.select().from(recipes).where(eq(recipes.modifierId, mod.id)).all();
               for (const recipe of modRecipes) {
                 const totalDeduction = recipe.quantityRequired * item.quantity;
-                db.update(inventoryItems)
+                await tx.update(inventoryItems)
                   .set({
                     stockQuantity: sql`${inventoryItems.stockQuantity} - ${totalDeduction}`,
                     updatedAt: sql`CURRENT_TIMESTAMP`,
@@ -660,7 +647,7 @@ function createApp() {
     );
 
     try {
-      const rows = db.select({
+      const rows = await db.select({
         id: orders.id,
         orderNumber: orders.orderNumber,
         createdAt: localCreatedAt,
@@ -692,7 +679,7 @@ function createApp() {
     const localCreatedAt = sql`datetime(${orders.createdAt}, ${STORE_UTC_OFFSET_SQL_MODIFIER})`;
 
     try {
-      const order = db.select({
+      const order = await db.select({
         id: orders.id,
         orderNumber: orders.orderNumber,
         createdAt: localCreatedAt,
@@ -712,7 +699,7 @@ function createApp() {
         return res.status(404).json({ error: 'Order not found' });
       }
 
-      const items = db.select({
+      const items = await db.select({
         id: orderItems.id,
         productName: orderItems.productName,
         quantity: orderItems.quantity,
@@ -720,7 +707,7 @@ function createApp() {
         totalPrice: orderItems.totalPrice,
       }).from(orderItems).where(eq(orderItems.orderId, id)).all();
 
-      const itemModifiers = db.select({
+      const itemModifiers = await db.select({
         orderItemId: orderItemModifiers.orderItemId,
         modifierName: orderItemModifiers.modifierName,
         priceExtra: orderItemModifiers.priceExtra,
@@ -737,7 +724,7 @@ function createApp() {
           .map(({ modifierName, priceExtra }) => ({ modifierName, priceExtra })),
       }));
 
-      const payment = db.select({
+      const payment = await db.select({
         paymentMethod: payments.paymentMethod,
         amountTenderedUsd: payments.amountTenderedUsd,
         amountTenderedRiel: payments.amountTenderedRiel,
@@ -755,7 +742,7 @@ function createApp() {
 
   app.get('/api/settings/exchange-rate', async (_req, res) => {
     try {
-      res.json(getStoreSettings());
+      res.json(await getStoreSettings());
     } catch (error) {
       console.error('Fetch exchange rate error:', error);
       res.status(500).json({ error: 'Failed to fetch exchange rate' });
@@ -766,7 +753,7 @@ function createApp() {
     const { exchangeRateRielPerUsd } = req.body;
 
     try {
-      db.insert(storeSettings)
+      await db.insert(storeSettings)
         .values({ id: 'default', exchangeRateRielPerUsd })
         .onConflictDoUpdate({
           target: storeSettings.id,
@@ -785,7 +772,7 @@ function createApp() {
     const { mainCurrency } = req.body;
 
     try {
-      db.insert(storeSettings)
+      await db.insert(storeSettings)
         .values({ id: 'default', mainCurrency })
         .onConflictDoUpdate({
           target: storeSettings.id,
@@ -804,7 +791,7 @@ function createApp() {
     const { taxEnabled } = req.body;
 
     try {
-      db.insert(storeSettings)
+      await db.insert(storeSettings)
         .values({ id: 'default', taxEnabled })
         .onConflictDoUpdate({
           target: storeSettings.id,
@@ -821,7 +808,7 @@ function createApp() {
 
   app.get('/api/inventory', async (_req, res) => {
     try {
-      const items = db.select().from(inventoryItems).all();
+      const items = await db.select().from(inventoryItems).all();
       const result = items.map((item) => ({ ...item, isLowStock: item.stockQuantity <= item.reorderThreshold }));
       res.json(result);
     } catch (error) {
@@ -834,9 +821,9 @@ function createApp() {
 
     try {
       const id = randomUUID();
-      db.insert(inventoryItems).values({ id, name, unit, reorderThreshold, costPerUnit, stockQuantity: 0 }).run();
+      await db.insert(inventoryItems).values({ id, name, unit, reorderThreshold, costPerUnit, stockQuantity: 0 }).run();
 
-      const created = db.select().from(inventoryItems).where(eq(inventoryItems.id, id)).get()!;
+      const created = (await db.select().from(inventoryItems).where(eq(inventoryItems.id, id)).get())!;
       res.status(201).json({ ...created, isLowStock: created.stockQuantity <= created.reorderThreshold });
     } catch (error) {
       res.status(500).json({ error: 'Failed to create inventory item' });
@@ -848,17 +835,17 @@ function createApp() {
     const { name, unit, reorderThreshold, costPerUnit } = req.body;
 
     try {
-      const existing = db.select().from(inventoryItems).where(eq(inventoryItems.id, id)).get();
+      const existing = await db.select().from(inventoryItems).where(eq(inventoryItems.id, id)).get();
       if (!existing) {
         return res.status(404).json({ error: 'Inventory item not found' });
       }
 
-      db.update(inventoryItems)
+      await db.update(inventoryItems)
         .set({ name, unit, reorderThreshold, costPerUnit, updatedAt: sql`CURRENT_TIMESTAMP` })
         .where(eq(inventoryItems.id, id))
         .run();
 
-      const updated = db.select().from(inventoryItems).where(eq(inventoryItems.id, id)).get()!;
+      const updated = (await db.select().from(inventoryItems).where(eq(inventoryItems.id, id)).get())!;
       res.json({ ...updated, isLowStock: updated.stockQuantity <= updated.reorderThreshold });
     } catch (error) {
       res.status(500).json({ error: 'Failed to update inventory item' });
@@ -869,19 +856,19 @@ function createApp() {
     const id = String(req.params.id);
 
     try {
-      const existing = db.select().from(inventoryItems).where(eq(inventoryItems.id, id)).get();
+      const existing = await db.select().from(inventoryItems).where(eq(inventoryItems.id, id)).get();
       if (!existing) {
         return res.status(404).json({ error: 'Inventory item not found' });
       }
 
-      const linkedRecipes = db.select().from(recipes).where(eq(recipes.inventoryItemId, id)).all();
+      const linkedRecipes = await db.select().from(recipes).where(eq(recipes.inventoryItemId, id)).all();
       if (linkedRecipes.length > 0) {
         return res.status(409).json({
           error: `"${existing.name}" is used in ${linkedRecipes.length} recipe(s). Remove the recipe link(s) before deleting this item.`,
         });
       }
 
-      db.delete(inventoryItems).where(eq(inventoryItems.id, id)).run();
+      await db.delete(inventoryItems).where(eq(inventoryItems.id, id)).run();
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: 'Failed to delete inventory item' });
@@ -897,8 +884,8 @@ function createApp() {
     }
 
     try {
-      db.transaction(() => {
-        db.insert(stockAdjustments).values({
+      await db.transaction(async (tx) => {
+        await tx.insert(stockAdjustments).values({
           id: randomUUID(),
           inventoryItemId,
           userId: actingUserId,
@@ -907,7 +894,7 @@ function createApp() {
           notes,
         }).run();
 
-        db.update(inventoryItems)
+        await tx.update(inventoryItems)
           .set({
             stockQuantity: sql`${inventoryItems.stockQuantity} + ${quantityChanged}`,
             updatedAt: sql`CURRENT_TIMESTAMP`,
@@ -924,12 +911,12 @@ function createApp() {
 
   app.get('/api/recipes/summary', async (_req, res) => {
     try {
-      const productCounts = db.select({
+      const productCounts = await db.select({
         id: recipes.productId,
         ingredientCount: sql<number>`count(*)`,
       }).from(recipes).where(isNotNull(recipes.productId)).groupBy(recipes.productId).all();
 
-      const modifierCounts = db.select({
+      const modifierCounts = await db.select({
         id: recipes.modifierId,
         ingredientCount: sql<number>`count(*)`,
       }).from(recipes).where(isNotNull(recipes.modifierId)).groupBy(recipes.modifierId).all();
@@ -944,12 +931,12 @@ function createApp() {
     const productId = String(req.params.productId);
 
     try {
-      const existing = db.select().from(products).where(eq(products.id, productId)).get();
+      const existing = await db.select().from(products).where(eq(products.id, productId)).get();
       if (!existing) {
         return res.status(404).json({ error: 'Product not found' });
       }
 
-      db.delete(recipes).where(eq(recipes.productId, productId)).run();
+      await db.delete(recipes).where(eq(recipes.productId, productId)).run();
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: 'Failed to delete recipe' });
@@ -968,7 +955,7 @@ function createApp() {
         ? eq(recipes.productId, productId)
         : eq(recipes.modifierId, String(modifierId));
 
-      const rows = db.select({
+      const rows = await db.select({
         id: recipes.id,
         inventoryItemId: recipes.inventoryItemId,
         quantityRequired: recipes.quantityRequired,
@@ -989,15 +976,15 @@ function createApp() {
     const { productId, modifierId, ingredients } = req.body;
 
     try {
-      db.transaction(() => {
+      await db.transaction(async (tx) => {
         const condition = productId
           ? eq(recipes.productId, productId)
           : eq(recipes.modifierId, modifierId);
 
-        db.delete(recipes).where(condition).run();
+        await tx.delete(recipes).where(condition).run();
 
         for (const ingredient of ingredients) {
-          db.insert(recipes).values({
+          await tx.insert(recipes).values({
             id: randomUUID(),
             productId: productId ?? null,
             modifierId: modifierId ?? null,
@@ -1030,7 +1017,7 @@ function createApp() {
       // SUM() over zero matching rows returns NULL, not 0 - coalesce so an
       // empty date range reports clean zeros instead of nulls the frontend
       // would have to guard against.
-      const summary = db.select({
+      const summary = await db.select({
         totalOrders: sql<number>`count(${orders.id})`,
         grossRevenue: sql<number>`coalesce(sum(${orders.subtotal}), 0)`,
         totalTax: sql<number>`coalesce(sum(${orders.taxAmount}), 0)`,
@@ -1040,7 +1027,7 @@ function createApp() {
 
       // Riel legs are converted back to USD via each row's own snapshotted
       // rate, since the store's rate can change between orders.
-      const paymentBreakdown = db.select({
+      const paymentBreakdown = await db.select({
         method: payments.paymentMethod,
         totalAmount: sql<number>`sum(
           (${payments.amountTenderedUsd} + ${payments.amountTenderedRiel} / ${payments.exchangeRateRielPerUsd})
@@ -1048,7 +1035,7 @@ function createApp() {
         )`,
       }).from(payments).innerJoin(orders, eq(payments.orderId, orders.id)).where(dateCondition).groupBy(payments.paymentMethod).all();
 
-      const hourlyRows = db.select({
+      const hourlyRows = await db.select({
         hour: sql<string>`strftime('%H', ${orders.createdAt}, ${STORE_UTC_OFFSET_SQL_MODIFIER})`,
         orderCount: sql<number>`count(${orders.id})`,
         revenue: sql<number>`coalesce(sum(${orders.totalAmount}), 0)`,

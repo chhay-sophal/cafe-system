@@ -4,6 +4,7 @@ import { compare, hash } from 'bcryptjs';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { users } from '../db/schema.js';
+import { env } from '../env.js';
 
 export interface AuthUser {
   id: string;
@@ -19,7 +20,7 @@ declare global {
   }
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'cafe-local-dev-secret';
+const JWT_SECRET = env.JWT_SECRET;
 const JWT_EXPIRES_IN = '8h';
 
 function isBcryptHash(value: string) {
@@ -48,7 +49,7 @@ export function verifyToken(token: string) {
   return jwt.verify(token, JWT_SECRET) as JwtPayload & { sub?: string; role?: string };
 }
 
-export function authenticate(req: Request, res: Response, next: NextFunction) {
+export async function authenticate(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
 
@@ -64,7 +65,7 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
       return res.status(401).json({ error: 'Invalid token payload' });
     }
 
-    const user = db
+    const user = await db
       .select({
         id: users.id,
         name: users.name,

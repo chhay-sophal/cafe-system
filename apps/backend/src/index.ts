@@ -1,17 +1,7 @@
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { config } from 'dotenv';
-
-// Resolved relative to this file rather than process.cwd(), since process
-// managers like PM2 default cwd to the ecosystem file's directory, not
-// this app's own directory.
-const backendDir = path.dirname(fileURLToPath(import.meta.url));
-config({ path: path.resolve(backendDir, '..', '.env'), quiet: true });
-
-const { env } = await import('./env.js');
-const { createApp } = await import('./app.js');
-const { runBackup } = await import('./db/backup.js');
-const cron = (await import('node-cron')).default;
+import cron from 'node-cron';
+import { env } from './env.js';
+import { createApp } from './app.js';
+import { runBackup } from './db/backup.js';
 
 const app = createApp();
 
