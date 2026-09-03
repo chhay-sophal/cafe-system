@@ -52,6 +52,7 @@ export const inventoryItemSchema = z.object({
   unit: z.enum(['grams', 'ml', 'pieces']),
   reorderThreshold: z.number().nonnegative(),
   costPerUnit: z.number().nonnegative(),
+  isActive: z.boolean().optional().default(true),
 });
 
 export const userRoleSchema = z.enum(['CASHIER', 'BARISTA', 'MANAGER', 'ADMIN']);

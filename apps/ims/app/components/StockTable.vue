@@ -22,11 +22,13 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const auth = useAuth();
 const store = useInventoryStore();
 const { items, isLoading, error } = storeToRefs(store);
 
 const search = ref("");
 const unitFilter = ref("");
+const togglingIds = ref<Set<string>>(new Set());
 
 const features = tableFeatures({
   columnFilteringFeature,
@@ -55,6 +57,33 @@ function handleUnitFilterChange() {
 }
 
 const units = computed(() => store.units);
+
+async function toggleActive(item: InventoryItem) {
+  const token = auth.session.value?.token;
+  if (!token || togglingIds.value.has(item.id)) {
+    return;
+  }
+
+  togglingIds.value.add(item.id);
+  try {
+    await store.updateItem(
+      item.id,
+      {
+        name: item.name,
+        unit: item.unit,
+        reorderThreshold: item.reorderThreshold,
+        costPerUnit: item.costPerUnit,
+        isActive: !item.isActive,
+      },
+      token,
+    );
+  } catch {
+    // The table already reflects the last-known server state; a failed
+    // toggle just leaves it unchanged, no separate error UI needed here.
+  } finally {
+    togglingIds.value.delete(item.id);
+  }
+}
 
 function formatUpdatedAt(value: string | null): string {
   if (!value) {
@@ -113,6 +142,7 @@ function formatUpdatedAt(value: string | null): string {
               <FlexRender v-if="!header.isPlaceholder" :header="header" />
             </th>
             <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("stockTable.columns.status") }}</th>
+            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("stockTable.columns.active") }}</th>
             <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("stockTable.columns.updated") }}</th>
             <th class="px-4 py-3" />
           </tr>
@@ -120,7 +150,7 @@ function formatUpdatedAt(value: string | null): string {
 
         <tbody class="divide-y divide-slate-100 bg-white">
           <tr v-if="table.getRowModel().rows.length === 0">
-            <td :colspan="columns.length + 3" class="px-4 py-8 text-center text-slate-400">
+            <td :colspan="columns.length + 4" class="px-4 py-8 text-center text-slate-400">
               {{ $t("stockTable.empty") }}
             </td>
           </tr>
@@ -128,7 +158,7 @@ function formatUpdatedAt(value: string | null): string {
           <tr
             v-for="row in table.getRowModel().rows"
             :key="row.id"
-            :class="row.original.isLowStock ? 'bg-red-50/60' : ''"
+            :class="[row.original.isLowStock ? 'bg-red-50/60' : '', !row.original.isActive ? 'opacity-50' : '']"
           >
             <td v-for="cell in row.getAllCells()" :key="cell.id" class="px-4 py-3 text-slate-700">
               <FlexRender :cell="cell" />
@@ -147,6 +177,23 @@ function formatUpdatedAt(value: string | null): string {
               >
                 {{ $t("stockTable.ok") }}
               </span>
+            </td>
+
+            <td class="px-4 py-3">
+              <button
+                type="button"
+                role="switch"
+                :aria-checked="row.original.isActive"
+                :disabled="togglingIds.has(row.original.id)"
+                class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50"
+                :class="row.original.isActive ? 'bg-emerald-500' : 'bg-slate-300'"
+                @click="toggleActive(row.original)"
+              >
+                <span
+                  class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+                  :class="row.original.isActive ? 'translate-x-6' : 'translate-x-1'"
+                />
+              </button>
             </td>
 
             <td class="px-4 py-3 text-xs text-slate-400">{{ formatUpdatedAt(row.original.updatedAt) }}</td>

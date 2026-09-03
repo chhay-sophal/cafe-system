@@ -70,6 +70,7 @@ export const inventoryItems = sqliteTable('inventory_items', {
   unit: text('unit').notNull(), // "grams", "ml", "pieces"
   reorderThreshold: real('reorder_threshold').notNull().default(1000), // Minimum stock warning alert
   costPerUnit: real('cost_per_unit').notNull().default(0), // Purchase cost for COGS tracking
+  isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true), // Retire a discontinued ingredient without losing its stock/recipe history
   updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`),
 });
 

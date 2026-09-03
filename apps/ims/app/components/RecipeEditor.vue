@@ -71,6 +71,21 @@ function unitForRow(row: RecipeIngredientDraft): string {
   return inventoryItems.value.find((item) => item.id === row.inventoryItemId)?.unit ?? "-";
 }
 
+// Retired ingredients shouldn't be offered for new recipe rows, but an
+// existing row already pointing at one (from before it was deactivated)
+// must keep showing it - otherwise editing that recipe silently blanks
+// out a valid, saved ingredient link.
+function pickerOptionsForRow(row: RecipeIngredientDraft): InventoryItem[] {
+  const active = inventoryItems.value.filter((item) => item.isActive);
+  if (row.inventoryItemId && !active.some((item) => item.id === row.inventoryItemId)) {
+    const selected = inventoryItems.value.find((item) => item.id === row.inventoryItemId);
+    if (selected) {
+      return [...active, selected];
+    }
+  }
+  return active;
+}
+
 function rowError(row: RecipeIngredientDraft): string | null {
   if (!row.inventoryItemId) {
     return t("recipe.selectIngredientRequired");
@@ -358,7 +373,7 @@ onMounted(async () => {
                   class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
                 >
                   <option value="">{{ $t("recipe.selectIngredientOption") }}</option>
-                  <option v-for="item in inventoryItems" :key="item.id" :value="item.id">{{ item.name }}</option>
+                  <option v-for="item in pickerOptionsForRow(row)" :key="item.id" :value="item.id">{{ item.name }}</option>
                 </select>
               </div>
 

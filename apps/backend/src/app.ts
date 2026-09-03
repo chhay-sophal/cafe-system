@@ -817,11 +817,11 @@ function createApp() {
   });
 
   app.post('/api/inventory', authenticate, requireRole(['MANAGER', 'ADMIN']), validateBody(inventoryItemSchema), async (req, res) => {
-    const { name, unit, reorderThreshold, costPerUnit } = req.body;
+    const { name, unit, reorderThreshold, costPerUnit, isActive } = req.body;
 
     try {
       const id = randomUUID();
-      await db.insert(inventoryItems).values({ id, name, unit, reorderThreshold, costPerUnit, stockQuantity: 0 }).run();
+      await db.insert(inventoryItems).values({ id, name, unit, reorderThreshold, costPerUnit, isActive, stockQuantity: 0 }).run();
 
       const created = (await db.select().from(inventoryItems).where(eq(inventoryItems.id, id)).get())!;
       res.status(201).json({ ...created, isLowStock: created.stockQuantity <= created.reorderThreshold });
@@ -832,7 +832,7 @@ function createApp() {
 
   app.put('/api/inventory/:id', authenticate, requireRole(['MANAGER', 'ADMIN']), validateBody(inventoryItemSchema), async (req, res) => {
     const id = String(req.params.id);
-    const { name, unit, reorderThreshold, costPerUnit } = req.body;
+    const { name, unit, reorderThreshold, costPerUnit, isActive } = req.body;
 
     try {
       const existing = await db.select().from(inventoryItems).where(eq(inventoryItems.id, id)).get();
@@ -841,7 +841,7 @@ function createApp() {
       }
 
       await db.update(inventoryItems)
-        .set({ name, unit, reorderThreshold, costPerUnit, updatedAt: sql`CURRENT_TIMESTAMP` })
+        .set({ name, unit, reorderThreshold, costPerUnit, isActive, updatedAt: sql`CURRENT_TIMESTAMP` })
         .where(eq(inventoryItems.id, id))
         .run();
 

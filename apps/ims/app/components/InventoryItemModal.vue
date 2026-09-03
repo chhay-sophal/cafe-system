@@ -19,6 +19,7 @@ const name = ref("");
 const unit = ref("grams");
 const reorderThreshold = ref<number | null>(null);
 const costPerUnit = ref<number | null>(null);
+const isActive = ref(true);
 const isSubmitting = ref(false);
 const errorMessage = ref<string | null>(null);
 
@@ -52,11 +53,13 @@ watch(open, (isOpen) => {
     unit.value = props.item.unit;
     reorderThreshold.value = props.item.reorderThreshold;
     costPerUnit.value = props.item.costPerUnit;
+    isActive.value = props.item.isActive;
   } else {
     name.value = "";
     unit.value = "grams";
     reorderThreshold.value = null;
     costPerUnit.value = null;
+    isActive.value = true;
   }
 });
 
@@ -83,6 +86,7 @@ async function submit() {
     unit: unit.value,
     reorderThreshold: reorderThreshold.value as number,
     costPerUnit: costPerUnit.value as number,
+    isActive: isActive.value,
   };
 
   try {
@@ -152,6 +156,23 @@ async function submit() {
           />
           <p v-if="costRielPreview" class="mt-1 text-xs text-slate-400">≈ {{ costRielPreview }}</p>
         </div>
+      </div>
+
+      <div class="mt-4 flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2.5">
+        <span class="text-sm font-medium text-slate-700">{{ $t("inventoryItem.activeItem") }}</span>
+        <button
+          type="button"
+          role="switch"
+          :aria-checked="isActive"
+          class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
+          :class="isActive ? 'bg-emerald-500' : 'bg-slate-300'"
+          @click="isActive = !isActive"
+        >
+          <span
+            class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+            :class="isActive ? 'translate-x-6' : 'translate-x-1'"
+          />
+        </button>
       </div>
 
       <p v-if="errorMessage" class="mt-4 text-sm font-medium text-red-600">{{ errorMessage }}</p>

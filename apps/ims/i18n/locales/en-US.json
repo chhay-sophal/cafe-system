@@ -103,6 +103,7 @@
     "reorderError": "Enter a reorder threshold of 0 or more",
     "costPerUnit": "Cost Per Unit",
     "costError": "Enter a cost of 0 or more",
+    "activeItem": "Active item",
     "saveError": "Failed to save item.",
     "createButton": "Create Item"
   },
@@ -203,6 +204,7 @@
       "unit": "Unit",
       "reorderAt": "Reorder At",
       "status": "Status",
+      "active": "Active",
       "updated": "Updated"
     }
   },
