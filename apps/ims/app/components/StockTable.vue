@@ -100,7 +100,7 @@ function formatUpdatedAt(value: string | null): string {
         v-model="search"
         type="search"
         :placeholder="$t('stockTable.searchPlaceholder')"
-        class="w-64 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+        class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 sm:w-64"
         @input="handleSearchInput"
       />
 

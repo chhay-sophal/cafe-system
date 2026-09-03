@@ -27,7 +27,7 @@ function formatCreatedAt(value: string | null): string {
 
 <template>
   <div class="flex h-full min-h-0 flex-col">
-    <div class="mb-4 flex items-center justify-between">
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
       <h2 class="text-sm font-semibold text-slate-700">{{ $t("staff.table.heading") }}</h2>
       <button
         type="button"

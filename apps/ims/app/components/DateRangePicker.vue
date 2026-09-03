@@ -109,7 +109,7 @@ function toggleOpen() {
 
     <div
       v-if="isOpen"
-      class="absolute z-20 mt-2 w-72 rounded-lg border border-slate-200 bg-white shadow-lg"
+      class="absolute z-20 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-lg border border-slate-200 bg-white shadow-lg"
       :class="menuAlign === 'right' ? 'right-0' : 'left-0'"
     >
       <div class="p-2">

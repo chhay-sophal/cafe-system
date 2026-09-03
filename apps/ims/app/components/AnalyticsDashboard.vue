@@ -12,7 +12,7 @@ onMounted(() => {
 
 <template>
   <div>
-    <div class="mb-6 flex items-center justify-between">
+    <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
       <h2 class="text-lg font-bold text-slate-900">{{ $t("analytics.heading") }}</h2>
       <DateRangePicker />
     </div>

@@ -4,7 +4,7 @@ import type { Product } from "~/types/catalog";
 import type { InventoryItem } from "~/types/inventory";
 import type { StaffUser } from "~/types/user";
 
-const { locale, locales, setLocale } = useI18n();
+const { locale, locales, setLocale, t } = useI18n();
 const auth = useAuth();
 const store = useInventoryStore();
 const settingsStore = useSettingsStore();
@@ -47,6 +47,29 @@ const deletingProduct = ref<Product | null>(null);
 const isCategoryModalOpen = ref(false);
 
 const isAdmin = computed(() => auth.session.value?.user.role === "ADMIN");
+
+const isDrawerOpen = ref(false);
+
+// Single source of truth for both the desktop horizontal nav and the
+// mobile drawer's vertical nav, so the two never drift apart.
+const navItems = computed<Array<{ key: ActiveView; label: string }>>(() => {
+  const items: Array<{ key: ActiveView; label: string }> = [
+    { key: "inventory", label: t("app.nav.stock") },
+    { key: "menu", label: t("app.nav.menu") },
+    { key: "recipes", label: t("app.nav.recipes") },
+    { key: "analytics", label: t("app.nav.analytics") },
+  ];
+  if (isAdmin.value) {
+    items.push({ key: "staff", label: t("app.nav.staff") });
+    items.push({ key: "settings", label: t("app.nav.settings") });
+  }
+  return items;
+});
+
+function selectView(view: ActiveView) {
+  activeView.value = view;
+  isDrawerOpen.value = false;
+}
 
 function openAdjustModal(item: InventoryItem) {
   selectedItem.value = item;
@@ -126,63 +149,24 @@ watch(
   <LoginForm v-if="!auth.session.value" />
 
   <div v-else class="flex h-screen flex-col bg-slate-100">
-    <header class="flex shrink-0 items-center justify-between bg-white px-6 py-4 shadow-sm">
+    <header class="flex shrink-0 items-center justify-between bg-white px-4 py-4 shadow-sm sm:px-6">
       <div class="flex items-center gap-6">
         <h1 class="text-lg font-bold text-slate-900">{{ $t("app.title") }}</h1>
-        <nav class="flex gap-1">
+        <nav class="hidden gap-1 md:flex">
           <button
+            v-for="item in navItems"
+            :key="item.key"
             type="button"
             class="rounded-lg px-3 py-1.5 text-sm font-semibold"
-            :class="activeView === 'inventory' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'"
-            @click="activeView = 'inventory'"
+            :class="activeView === item.key ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'"
+            @click="selectView(item.key)"
           >
-            {{ $t("app.nav.stock") }}
-          </button>
-          <button
-            type="button"
-            class="rounded-lg px-3 py-1.5 text-sm font-semibold"
-            :class="activeView === 'menu' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'"
-            @click="activeView = 'menu'"
-          >
-            {{ $t("app.nav.menu") }}
-          </button>
-          <button
-            type="button"
-            class="rounded-lg px-3 py-1.5 text-sm font-semibold"
-            :class="activeView === 'recipes' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'"
-            @click="activeView = 'recipes'"
-          >
-            {{ $t("app.nav.recipes") }}
-          </button>
-          <button
-            type="button"
-            class="rounded-lg px-3 py-1.5 text-sm font-semibold"
-            :class="activeView === 'analytics' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'"
-            @click="activeView = 'analytics'"
-          >
-            {{ $t("app.nav.analytics") }}
-          </button>
-          <button
-            v-if="isAdmin"
-            type="button"
-            class="rounded-lg px-3 py-1.5 text-sm font-semibold"
-            :class="activeView === 'staff' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'"
-            @click="activeView = 'staff'"
-          >
-            {{ $t("app.nav.staff") }}
-          </button>
-          <button
-            v-if="isAdmin"
-            type="button"
-            class="rounded-lg px-3 py-1.5 text-sm font-semibold"
-            :class="activeView === 'settings' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'"
-            @click="activeView = 'settings'"
-          >
-            {{ $t("app.nav.settings") }}
+            {{ item.label }}
           </button>
         </nav>
       </div>
-      <div class="flex items-center gap-3 text-sm">
+
+      <div class="hidden items-center gap-3 text-sm md:flex">
         <select
           :value="locale"
           class="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-700 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
@@ -199,9 +183,70 @@ watch(
           {{ $t("app.logout") }}
         </button>
       </div>
+
+      <button
+        type="button"
+        class="flex h-10 w-10 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 md:hidden"
+        :aria-label="$t('app.openMenu')"
+        @click="isDrawerOpen = true"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-6 w-6">
+          <path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
     </header>
 
-    <main class="mx-auto flex w-full max-w-6xl flex-1 flex-col overflow-y-auto p-6">
+    <div v-if="isDrawerOpen" class="fixed inset-0 z-40 bg-black/50 md:hidden" @click="isDrawerOpen = false" />
+
+    <div
+      class="fixed inset-y-0 left-0 z-50 flex w-72 max-w-[80vw] flex-col bg-white shadow-xl transition-transform md:hidden"
+      :class="isDrawerOpen ? 'translate-x-0' : '-translate-x-full'"
+    >
+      <div class="flex items-center justify-between border-b border-slate-200 px-4 py-4">
+        <h1 class="text-lg font-bold text-slate-900">{{ $t("app.title") }}</h1>
+        <button
+          type="button"
+          class="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
+          :aria-label="$t('common.close')"
+          @click="isDrawerOpen = false"
+        >
+          &times;
+        </button>
+      </div>
+
+      <nav class="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
+        <button
+          v-for="item in navItems"
+          :key="item.key"
+          type="button"
+          class="rounded-lg px-3 py-2.5 text-left text-sm font-semibold"
+          :class="activeView === item.key ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'"
+          @click="selectView(item.key)"
+        >
+          {{ item.label }}
+        </button>
+      </nav>
+
+      <div class="flex flex-col gap-3 border-t border-slate-200 p-4 text-sm">
+        <select
+          :value="locale"
+          class="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-700 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+          @change="setLocale(($event.target as HTMLSelectElement).value as 'en-US' | 'km-KH')"
+        >
+          <option v-for="loc in locales" :key="loc.code" :value="loc.code">{{ loc.name }}</option>
+        </select>
+        <span class="text-slate-500">{{ auth.session.value.user.name }}</span>
+        <button
+          type="button"
+          class="w-full rounded-lg border border-slate-300 px-3 py-1.5 font-semibold text-slate-700 hover:bg-slate-50"
+          @click="auth.logout()"
+        >
+          {{ $t("app.logout") }}
+        </button>
+      </div>
+    </div>
+
+    <main class="mx-auto flex w-full max-w-6xl flex-1 flex-col overflow-y-auto p-4 sm:p-6">
       <StockTable
         v-if="activeView === 'inventory'"
         @adjust="openAdjustModal"

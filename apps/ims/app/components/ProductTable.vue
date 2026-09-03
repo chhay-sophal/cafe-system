@@ -66,9 +66,9 @@ async function toggleAvailability(product: Product) {
 
 <template>
   <div class="flex h-full min-h-0 flex-col">
-    <div class="mb-4 flex items-center justify-between">
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
       <h2 class="text-sm font-semibold text-slate-700">{{ $t("productTable.heading") }}</h2>
-      <div class="flex gap-2">
+      <div class="flex flex-wrap gap-2">
         <button
           type="button"
           class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
