@@ -5,8 +5,8 @@ import { eq } from 'drizzle-orm';
 import { createApp } from './app.js';
 import { db } from './db/index.js';
 import {
-  categories, modifierGroups, modifiers, orderItemModifiers, orderItems, orders, payments, products, stockAdjustments,
-  storeSettings, users,
+  categories, inventoryItems, modifierGroups, modifiers, orderItemModifiers, orderItems, orders, payments, products,
+  stockAdjustments, storeSettings, users,
 } from './db/schema.js';
 import { hashPin, signToken } from './middleware/auth.js';
 
@@ -576,5 +576,58 @@ describe('category deletion', () => {
     await db.delete(categories).where(eq(categories.id, catA)).run();
     await db.delete(categories).where(eq(categories.id, catC)).run();
     await db.delete(categories).where(eq(categories.id, catD)).run();
+  });
+});
+
+describe('inventory item deletion', () => {
+  beforeEach(async () => {
+    await db.delete(payments).run();
+    await db.delete(orderItemModifiers).run();
+    await db.delete(orderItems).run();
+    await db.delete(orders).run();
+    await db.delete(stockAdjustments).run();
+    await db.delete(users).run();
+  });
+
+  async function managerToken() {
+    const pinHash = await hashPin('9999');
+    await db.insert(users).values({ id: 'manager-1', name: 'Manager', pinHash, role: 'MANAGER', isActive: true }).run();
+    return signToken({ id: 'manager-1', name: 'Manager', role: 'MANAGER' });
+  }
+
+  // Turso enforces foreign keys (unlike the on-prem better-sqlite3 setup,
+  // which silently orphaned these rows) - a real stock_adjustments row
+  // referencing this item must block deletion with a clear 409, not surface
+  // the underlying FK violation as a raw 500.
+  it('rejects deletion when the item has stock adjustment history', async () => {
+    const token = await managerToken();
+    const itemId = randomUUID();
+    await db.insert(inventoryItems).values({ id: itemId, name: 'Test Milk', unit: 'ml', reorderThreshold: 100, costPerUnit: 0.001 }).run();
+    await db.insert(stockAdjustments).values({
+      id: randomUUID(), inventoryItemId: itemId, userId: 'manager-1', quantityChanged: 1000, type: 'RESTOCK',
+    }).run();
+
+    const response = await request(app)
+      .delete(`/api/inventory/${itemId}`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(409);
+    expect(await db.select().from(inventoryItems).where(eq(inventoryItems.id, itemId)).get()).toBeDefined();
+
+    await db.delete(stockAdjustments).where(eq(stockAdjustments.inventoryItemId, itemId)).run();
+    await db.delete(inventoryItems).where(eq(inventoryItems.id, itemId)).run();
+  });
+
+  it('deletes an item with no adjustment or recipe history', async () => {
+    const token = await managerToken();
+    const itemId = randomUUID();
+    await db.insert(inventoryItems).values({ id: itemId, name: 'Test Sugar', unit: 'g', reorderThreshold: 100, costPerUnit: 0.001 }).run();
+
+    const response = await request(app)
+      .delete(`/api/inventory/${itemId}`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(200);
+    expect(await db.select().from(inventoryItems).where(eq(inventoryItems.id, itemId)).get()).toBeUndefined();
   });
 });

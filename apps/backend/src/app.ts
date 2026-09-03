@@ -868,6 +868,17 @@ function createApp() {
         });
       }
 
+      // Turso enforces foreign keys (unlike the old better-sqlite3 setup,
+      // which silently orphaned these rows) - stock_adjustments.inventoryItemId
+      // references this row, so a real audit history blocks deletion the
+      // same way linked recipes do, rather than surfacing as a raw 500.
+      const linkedAdjustments = await db.select().from(stockAdjustments).where(eq(stockAdjustments.inventoryItemId, id)).all();
+      if (linkedAdjustments.length > 0) {
+        return res.status(409).json({
+          error: `"${existing.name}" has ${linkedAdjustments.length} stock adjustment record(s) and cannot be deleted.`,
+        });
+      }
+
       await db.delete(inventoryItems).where(eq(inventoryItems.id, id)).run();
       res.json({ success: true });
     } catch (error) {
