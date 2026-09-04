@@ -57,14 +57,19 @@ function revokePreview() {
   }
 }
 
-function handleFileChange(event: Event) {
+async function handleFileChange(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0] ?? null;
-  selectedFile.value = file;
   revokePreview();
   imageLoadFailed.value = false;
-  if (file) {
-    previewObjectUrl.value = URL.createObjectURL(file);
+
+  if (!file) {
+    selectedFile.value = null;
+    return;
   }
+
+  const optimized = await resizeImageForUpload(file);
+  selectedFile.value = optimized;
+  previewObjectUrl.value = URL.createObjectURL(optimized);
 }
 
 watch(open, (isOpen) => {
