@@ -9,6 +9,32 @@ const auth = useAuth();
 const store = useInventoryStore();
 const settingsStore = useSettingsStore();
 
+// detectBrowserLanguage is off (see nuxt.config.ts), which also disables the
+// module's own cookie persistence - setLocale() would otherwise silently
+// forget the choice on every reload. Persist it ourselves instead, same
+// pattern as activeView below.
+const LOCALE_STORAGE_KEY = "ims.locale";
+type SupportedLocale = "en-US" | "km-KH";
+
+function loadStoredLocale(): SupportedLocale | null {
+  if (!import.meta.client) {
+    return null;
+  }
+  const stored = localStorage.getItem(LOCALE_STORAGE_KEY);
+  return stored === "en-US" || stored === "km-KH" ? stored : null;
+}
+
+const storedLocale = loadStoredLocale();
+if (storedLocale && storedLocale !== locale.value) {
+  setLocale(storedLocale);
+}
+
+watch(locale, (value) => {
+  if (import.meta.client) {
+    localStorage.setItem(LOCALE_STORAGE_KEY, value);
+  }
+});
+
 type ActiveView = "inventory" | "menu" | "recipes" | "analytics" | "staff" | "settings";
 
 const ACTIVE_VIEW_STORAGE_KEY = "ims.activeView";
