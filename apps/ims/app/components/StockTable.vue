@@ -26,9 +26,19 @@ const columnHelper = createColumnHelper<typeof features, InventoryItem>();
 
 const columns = columnHelper.columns([
   columnHelper.accessor("name", { header: () => t("stockTable.columns.item") }),
-  columnHelper.accessor("stockQuantity", { header: () => t("stockTable.columns.stock"), filterFn: "inNumberRange" }),
+  // Numbers stay out of the search box - as text, "5" would match a stock of
+  // 500 or a reorder level of 50. The filter panel's ranges cover them.
+  columnHelper.accessor("stockQuantity", {
+    header: () => t("stockTable.columns.stock"),
+    filterFn: "inNumberRange",
+    enableGlobalFilter: false,
+  }),
   columnHelper.accessor("unit", { header: () => t("stockTable.columns.unit"), filterFn: "equals" }),
-  columnHelper.accessor("reorderThreshold", { header: () => t("stockTable.columns.reorderAt"), filterFn: "inNumberRange" }),
+  columnHelper.accessor("reorderThreshold", {
+    header: () => t("stockTable.columns.reorderAt"),
+    filterFn: "inNumberRange",
+    enableGlobalFilter: false,
+  }),
   // Accessors (for sorting/filtering) but rendered via slots and kept out of
   // the search box - matching "true" or a timestamp would just be noise.
   columnHelper.accessor("isLowStock", {
@@ -59,7 +69,7 @@ const cellClass = {
   actions: "px-4 py-3 text-right",
 };
 
-const table = useTable({ features, columns, data: items });
+const table = useTable({ features, columns, data: items, globalFilterFn: "includesDisplayText" });
 
 const filters = computed<TableFilterDef[]>(() => [
   { type: "numberRange", columnId: "stockQuantity", label: t("stockTable.columns.stock") },

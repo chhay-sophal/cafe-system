@@ -50,7 +50,9 @@ const isOpen = ref(false);
 const rootEl = ref<HTMLElement | null>(null);
 
 function handleSearchInput() {
-  (props.table as unknown as GlobalFilterable).setGlobalFilter(search.value);
+  // Trimmed so stray spaces don't stop a match (and a spaces-only search
+  // clears the filter instead of matching nothing).
+  (props.table as unknown as GlobalFilterable).setGlobalFilter(search.value.trim());
 }
 
 function setColumnFilter(columnId: string, value: unknown) {
