@@ -194,7 +194,12 @@
     "item": "Item",
     "category": "Category",
     "basePrice": "Base Price",
-    "available": "Available"
+    "available": "Available",
+    "searchPlaceholder": "Search menu items...",
+    "basePriceUsd": "Base Price (USD)",
+    "availableYes": "Available",
+    "availableNo": "Unavailable",
+    "noMatches": "No menu items match your search or filters."
   },
   "recipe": {
     "deleteHeading": "Delete Recipe",

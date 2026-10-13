@@ -4,6 +4,7 @@ import { Pencil, Trash2 } from "@lucide/vue";
 import { storeToRefs } from "pinia";
 import { createColumnHelper, tableFeatures, useTable } from "@tanstack/vue-table";
 import type { Product } from "~/types/catalog";
+import type { TableFilterDef } from "~/types/table";
 
 const emit = defineEmits<{
   create: [];
@@ -40,7 +41,7 @@ const categoryNameById = computed(() => {
 
 const { formatMain, formatSecondary } = useCurrency();
 
-const features = tableFeatures({ ...sortingFeatures });
+const features = tableFeatures({ ...sortingFeatures, ...filteringFeatures });
 const columnHelper = createColumnHelper<typeof features, Product>();
 
 const columns = columnHelper.columns([
@@ -48,13 +49,26 @@ const columns = columnHelper.columns([
   columnHelper.accessor("name", { header: () => t("productTable.item") }),
   // Rendered via slots: the category name and price display depend on other
   // store state (categories, currency settings), not just the row itself. The
-  // accessors are what sorting compares.
+  // accessors are what sorting, filtering and search compare - the category
+  // accessor already yields the displayed name, so search matches it as is.
   columnHelper.accessor((product) => categoryNameById.value.get(product.categoryId) ?? "", {
     id: "category",
     header: () => t("productTable.category"),
+    filterFn: "equals",
   }),
-  columnHelper.accessor("basePrice", { header: () => t("productTable.basePrice") }),
-  columnHelper.accessor("isAvailable", { id: "available", header: () => t("productTable.available") }),
+  // Kept out of the search box: as text, "4" would match any price with a 4
+  // in it. The filter panel's price range covers it instead.
+  columnHelper.accessor("basePrice", {
+    header: () => t("productTable.basePrice"),
+    filterFn: "inNumberRange",
+    enableGlobalFilter: false,
+  }),
+  columnHelper.accessor("isAvailable", {
+    id: "available",
+    header: () => t("productTable.available"),
+    filterFn: "equals",
+    enableGlobalFilter: false,
+  }),
   columnHelper.display({ id: "actions", header: "" }),
 ]);
 
@@ -64,7 +78,32 @@ const cellClass = {
   actions: "px-4 py-3 text-right",
 };
 
-const table = useTable({ features, columns, data: products });
+const table = useTable({ features, columns, data: products, globalFilterFn: "includesDisplayText" });
+
+const filters = computed<TableFilterDef[]>(() => [
+  {
+    type: "select",
+    columnId: "category",
+    label: t("productTable.category"),
+    options: store.categories.map((category) => ({ value: category.name, label: category.name })),
+  },
+  // Prices are stored and entered in USD (see ProductFormModal), whatever the
+  // display currency - so the range is in USD too, and says so.
+  { type: "numberRange", columnId: "basePrice", label: t("productTable.basePriceUsd") },
+  {
+    type: "select",
+    columnId: "available",
+    label: t("productTable.available"),
+    options: [
+      { value: true, label: t("productTable.availableYes") },
+      { value: false, label: t("productTable.availableNo") },
+    ],
+  },
+]);
+
+// "No menu items yet" would be wrong when there are items but the search or
+// filters hide them all.
+const emptyText = computed(() => (products.value.length > 0 ? t("productTable.noMatches") : t("productTable.empty")));
 
 async function toggleAvailability(product: Product) {
   const token = auth.session.value?.token;
@@ -97,9 +136,9 @@ async function toggleAvailability(product: Product) {
 
 <template>
   <div class="flex h-full min-h-0 flex-col">
-    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-      <h2 class="text-sm font-semibold text-slate-700">{{ $t("productTable.heading") }}</h2>
-      <div class="flex flex-wrap gap-2">
+    <div class="mb-4 flex flex-wrap items-center gap-3">
+      <TableFilters :table="table" :search-placeholder="$t('productTable.searchPlaceholder')" :filters="filters" />
+      <div class="ml-auto flex flex-wrap gap-2">
         <button
           type="button"
           class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
@@ -124,7 +163,7 @@ async function toggleAvailability(product: Product) {
     </p>
 
     <div v-else class="min-h-0 flex-1 overflow-auto rounded-lg border border-slate-200">
-      <DataTable :table="table" :empty-text="$t('productTable.empty')" :cell-class="cellClass">
+      <DataTable :table="table" :empty-text="emptyText" :cell-class="cellClass">
         <template #cell-image="{ item }">
           <img
             v-if="resolveImageUrl(item.imageUrl) && !failedImageUrls.has(resolveImageUrl(item.imageUrl)!)"

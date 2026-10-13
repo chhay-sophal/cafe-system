@@ -194,7 +194,12 @@
     "item": "ធាតុ",
     "category": "ប្រភេទ",
     "basePrice": "តម្លៃមូលដ្ឋាន",
-    "available": "មានលក់"
+    "available": "មានលក់",
+    "searchPlaceholder": "ស្វែងរកមុខទំនិញ...",
+    "basePriceUsd": "តម្លៃគោល (ដុល្លារ)",
+    "availableYes": "មាន",
+    "availableNo": "មិនមាន",
+    "noMatches": "គ្មានមុខទំនិញត្រូវនឹងការស្វែងរក ឬតម្រងរបស់អ្នកទេ។"
   },
   "recipe": {
     "deleteHeading": "លុបរូបមន្ត",
