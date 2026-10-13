@@ -32,10 +32,19 @@ interface ColumnFilterable {
 }
 
 const search = ref("");
+
 // Per column id: the chosen option's index for a select ("" = any), or the
 // [min, max] / [from, to] input strings for a range ("" = open-ended).
-const selectValues = reactive<Record<string, string>>({});
-const rangeValues = reactive<Record<string, [string, string]>>({});
+interface FilterState {
+  select: Record<string, string>;
+  range: Record<string, [string, string]>;
+}
+
+// The panel edits `draft`; only Apply copies it into `applied` and onto the
+// table. Reopening the panel starts from `applied` again, so edits left
+// without pressing Apply are discarded.
+const applied = reactive<FilterState>({ select: {}, range: {} });
+const draft = reactive<FilterState>({ select: {}, range: {} });
 
 const isOpen = ref(false);
 const rootEl = ref<HTMLElement | null>(null);
@@ -49,46 +58,68 @@ function setColumnFilter(columnId: string, value: unknown) {
   column?.setFilterValue(value);
 }
 
-function rangeOf(columnId: string): [string, string] {
-  return rangeValues[columnId] ?? ["", ""];
+function copyState(from: FilterState, to: FilterState) {
+  to.select = { ...from.select };
+  to.range = Object.fromEntries(Object.entries(from.range).map(([id, range]) => [id, [...range]]));
 }
 
-function handleSelectChange(filter: Extract<TableFilterDef, { type: "select" }>, index: string) {
-  selectValues[filter.columnId] = index;
-  setColumnFilter(filter.columnId, index === "" ? undefined : filter.options[Number(index)]?.value);
+function rangeOf(state: FilterState, columnId: string): [string, string] {
+  return state.range[columnId] ?? ["", ""];
+}
+
+function handleSelectChange(filter: TableFilterDef, index: string) {
+  draft.select[filter.columnId] = index;
 }
 
 function handleRangeChange(filter: TableFilterDef, end: 0 | 1, value: string) {
-  const next: [string, string] = [...rangeOf(filter.columnId)];
+  const next: [string, string] = [...rangeOf(draft, filter.columnId)];
   next[end] = value;
-  rangeValues[filter.columnId] = next;
-
-  if (!next[0] && !next[1]) {
-    setColumnFilter(filter.columnId, undefined);
-  } else if (filter.type === "numberRange") {
-    // null = open-ended, which inNumberRange reads as -Infinity / Infinity.
-    setColumnFilter(filter.columnId, next.map((v) => (v === "" ? null : Number(v))));
-  } else {
-    setColumnFilter(filter.columnId, next.map((v) => v || null));
-  }
+  draft.range[filter.columnId] = next;
 }
 
-function isActive(filter: TableFilterDef) {
+// The table filter value a filter's state translates to; undefined = none.
+function filterValueOf(state: FilterState, filter: TableFilterDef): unknown {
   if (filter.type === "select") {
-    return Boolean(selectValues[filter.columnId]);
+    const index = state.select[filter.columnId] ?? "";
+    return index === "" ? undefined : filter.options[Number(index)]?.value;
   }
-  const [from, to] = rangeOf(filter.columnId);
-  return Boolean(from || to);
+
+  const range = rangeOf(state, filter.columnId);
+  if (!range[0] && !range[1]) {
+    return undefined;
+  }
+  // null = open-ended: inNumberRange reads it as -Infinity / Infinity, and
+  // inDayRange skips that end of the comparison.
+  return filter.type === "numberRange"
+    ? range.map((v) => (v === "" ? null : Number(v)))
+    : range.map((v) => v || null);
 }
 
-const activeCount = computed(() => props.filters.filter(isActive).length);
+function countActive(state: FilterState) {
+  return props.filters.filter((filter) => filterValueOf(state, filter) !== undefined).length;
+}
+
+const activeCount = computed(() => countActive(applied));
+const draftCount = computed(() => countActive(draft));
+
+function togglePanel() {
+  if (!isOpen.value) {
+    copyState(applied, draft);
+  }
+  isOpen.value = !isOpen.value;
+}
 
 function clearAll() {
+  draft.select = {};
+  draft.range = {};
+}
+
+function apply() {
+  copyState(draft, applied);
   for (const filter of props.filters) {
-    delete selectValues[filter.columnId];
-    delete rangeValues[filter.columnId];
-    setColumnFilter(filter.columnId, undefined);
+    setColumnFilter(filter.columnId, filterValueOf(applied, filter));
   }
+  isOpen.value = false;
 }
 
 function handleDocumentClick(event: MouseEvent) {
@@ -136,7 +167,7 @@ const INPUT_CLASS =
       :aria-expanded="isOpen"
       class="relative inline-flex h-[38px] w-[38px] items-center justify-center rounded-lg border hover:bg-slate-100"
       :class="activeCount > 0 ? 'border-slate-500 text-slate-900' : 'border-slate-300 text-slate-600'"
-      @click="isOpen = !isOpen"
+      @click="togglePanel"
     >
       <Funnel class="h-4 w-4" aria-hidden="true" />
       <span
@@ -155,7 +186,7 @@ const INPUT_CLASS =
         <h3 class="text-sm font-semibold text-slate-900">{{ t("tableFilters.heading") }}</h3>
         <button
           type="button"
-          :disabled="activeCount === 0"
+          :disabled="draftCount === 0"
           class="text-xs font-semibold text-slate-600 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40"
           @click="clearAll"
         >
@@ -169,7 +200,7 @@ const INPUT_CLASS =
 
           <select
             v-if="filter.type === 'select'"
-            :value="selectValues[filter.columnId] ?? ''"
+            :value="draft.select[filter.columnId] ?? ''"
             :class="INPUT_CLASS"
             class="mt-1 w-full"
             @change="handleSelectChange(filter, ($event.target as HTMLSelectElement).value)"
@@ -181,7 +212,7 @@ const INPUT_CLASS =
           <div v-else class="mt-1 grid grid-cols-2 gap-2">
             <input
               :type="filter.type === 'numberRange' ? 'number' : 'date'"
-              :value="rangeOf(filter.columnId)[0]"
+              :value="rangeOf(draft, filter.columnId)[0]"
               :placeholder="filter.type === 'numberRange' ? t('tableFilters.min') : undefined"
               :aria-label="`${filter.label} - ${filter.type === 'numberRange' ? t('tableFilters.min') : t('tableFilters.from')}`"
               :class="INPUT_CLASS"
@@ -190,7 +221,7 @@ const INPUT_CLASS =
             />
             <input
               :type="filter.type === 'numberRange' ? 'number' : 'date'"
-              :value="rangeOf(filter.columnId)[1]"
+              :value="rangeOf(draft, filter.columnId)[1]"
               :placeholder="filter.type === 'numberRange' ? t('tableFilters.max') : undefined"
               :aria-label="`${filter.label} - ${filter.type === 'numberRange' ? t('tableFilters.max') : t('tableFilters.to')}`"
               :class="INPUT_CLASS"
@@ -199,6 +230,16 @@ const INPUT_CLASS =
             />
           </div>
         </div>
+      </div>
+
+      <div class="mt-4 flex justify-end border-t border-slate-100 pt-3">
+        <button
+          type="button"
+          class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+          @click="apply"
+        >
+          {{ t("tableFilters.apply") }}
+        </button>
       </div>
     </div>
   </div>

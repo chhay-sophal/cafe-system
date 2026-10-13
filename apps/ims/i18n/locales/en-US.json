@@ -27,7 +27,8 @@
     "min": "Min",
     "max": "Max",
     "from": "From",
-    "to": "To"
+    "to": "To",
+    "apply": "Apply"
   },
   "app": {
     "title": "Inventory Manager",
