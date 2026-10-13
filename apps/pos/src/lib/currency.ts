@@ -1,14 +1,17 @@
 import type { MainCurrency } from "../types/settings";
 
 export const usdFormatter = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
-export const rielFormatter = new Intl.NumberFormat("km-KH", { style: "currency", currency: "KHR", maximumFractionDigits: 0 });
+// Riel is formatted as a plain number with the ៛ sign appended by hand: the
+// km-KH currency style depends on the webview's locale data, and WebView2
+// falls back to the "KHR" code instead of the symbol.
+export const rielFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 
 export function formatUsd(value: number): string {
   return usdFormatter.format(value);
 }
 
 export function formatRiel(value: number): string {
-  return rielFormatter.format(value);
+  return `${rielFormatter.format(value)}៛`;
 }
 
 export function round2(value: number): number {
