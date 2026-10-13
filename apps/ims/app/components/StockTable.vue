@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { Pencil, Trash2, Warehouse } from "@lucide/vue";
 import { storeToRefs } from "pinia";
 import {
   columnFilteringFeature,
@@ -30,6 +31,7 @@ const unitFilter = ref("");
 const togglingIds = ref<Set<string>>(new Set());
 
 const features = tableFeatures({
+  ...sortingFeatures,
   columnFilteringFeature,
   globalFilteringFeature,
   filteredRowModel: createFilteredRowModel(),
@@ -43,9 +45,11 @@ const columns = columnHelper.columns([
   columnHelper.accessor("stockQuantity", { header: () => t("stockTable.columns.stock") }),
   columnHelper.accessor("unit", { header: () => t("stockTable.columns.unit"), filterFn: "equalsString" }),
   columnHelper.accessor("reorderThreshold", { header: () => t("stockTable.columns.reorderAt") }),
-  columnHelper.display({ id: "status", header: () => t("stockTable.columns.status") }),
-  columnHelper.display({ id: "active", header: () => t("stockTable.columns.active") }),
-  columnHelper.display({ id: "updated", header: () => t("stockTable.columns.updated") }),
+  // Accessors (for sorting) but rendered via slots and kept out of the
+  // search box - matching "true" or a timestamp would just be noise.
+  columnHelper.accessor("isLowStock", { id: "status", header: () => t("stockTable.columns.status"), enableGlobalFilter: false }),
+  columnHelper.accessor("isActive", { id: "active", header: () => t("stockTable.columns.active"), enableGlobalFilter: false }),
+  columnHelper.accessor("updatedAt", { id: "updated", header: () => t("stockTable.columns.updated"), enableGlobalFilter: false }),
   columnHelper.display({ id: "actions", header: "" }),
 ]);
 
@@ -183,27 +187,9 @@ function formatUpdatedAt(value: string | null): string {
 
         <template #cell-actions="{ item }">
           <div class="flex justify-end gap-2">
-            <button
-              type="button"
-              class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-              @click="emit('adjust', item)"
-            >
-              {{ $t("stockTable.adjust") }}
-            </button>
-            <button
-              type="button"
-              class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-              @click="emit('edit', item)"
-            >
-              {{ $t("common.edit") }}
-            </button>
-            <button
-              type="button"
-              class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
-              @click="emit('delete', item)"
-            >
-              {{ $t("common.delete") }}
-            </button>
+            <IconButton :icon="Warehouse" :label="$t('stockTable.adjust')" @click="emit('adjust', item)" />
+            <IconButton :icon="Pencil" :label="$t('common.edit')" @click="emit('edit', item)" />
+            <IconButton :icon="Trash2" :label="$t('common.delete')" variant="danger" @click="emit('delete', item)" />
           </div>
         </template>
       </DataTable>

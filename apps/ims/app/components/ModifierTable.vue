@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
+import { Pencil, Trash2 } from "@lucide/vue";
 import { storeToRefs } from "pinia";
 import { createColumnHelper, tableFeatures, useTable } from "@tanstack/vue-table";
 import type { ModifierGroup } from "~/types/catalog";
@@ -15,11 +16,11 @@ const store = useCatalogStore();
 const { modifierGroups } = storeToRefs(store);
 const { formatMain } = useCurrency();
 
-const features = tableFeatures({});
+const features = tableFeatures({ ...sortingFeatures });
 const columnHelper = createColumnHelper<typeof features, ModifierGroup>();
 
 const columns = columnHelper.columns([
-  columnHelper.display({ id: "group", header: () => t("modifierTable.group") }),
+  columnHelper.accessor("name", { id: "group", header: () => t("modifierTable.group") }),
   columnHelper.display({ id: "options", header: () => t("modifierTable.options") }),
   columnHelper.display({ id: "products", header: () => t("modifierTable.products") }),
   columnHelper.display({ id: "actions", header: "" }),
@@ -108,20 +109,8 @@ function linkedProductNames(group: ModifierGroup) {
 
         <template #cell-actions="{ item }">
           <div class="flex justify-end gap-2">
-            <button
-              type="button"
-              class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-              @click="emit('edit', item)"
-            >
-              {{ $t("common.edit") }}
-            </button>
-            <button
-              type="button"
-              class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
-              @click="emit('delete', item)"
-            >
-              {{ $t("common.delete") }}
-            </button>
+            <IconButton :icon="Pencil" :label="$t('common.edit')" @click="emit('edit', item)" />
+            <IconButton :icon="Trash2" :label="$t('common.delete')" variant="danger" @click="emit('delete', item)" />
           </div>
         </template>
       </DataTable>

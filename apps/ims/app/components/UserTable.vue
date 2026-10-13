@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted } from "vue";
+import { Pencil } from "@lucide/vue";
 import { storeToRefs } from "pinia";
 import { createColumnHelper, tableFeatures, useTable } from "@tanstack/vue-table";
 import type { StaffUser } from "~/types/user";
@@ -14,7 +15,7 @@ const auth = useAuth();
 const store = useUserStore();
 const { items } = storeToRefs(store);
 
-const features = tableFeatures({});
+const features = tableFeatures({ ...sortingFeatures });
 const columnHelper = createColumnHelper<typeof features, StaffUser>();
 
 const columns = columnHelper.columns([
@@ -23,7 +24,7 @@ const columns = columnHelper.columns([
     header: () => t("staff.table.role"),
     cell: ({ getValue }) => t(`staff.roles.${getValue()}`),
   }),
-  columnHelper.display({ id: "status", header: () => t("staff.table.status") }),
+  columnHelper.accessor("isActive", { id: "status", header: () => t("staff.table.status") }),
   columnHelper.accessor("createdAt", {
     header: () => t("staff.table.created"),
     cell: ({ getValue }) => formatCreatedAt(getValue()),
@@ -98,13 +99,7 @@ function formatCreatedAt(value: string | null): string {
         </template>
 
         <template #cell-actions="{ item }">
-          <button
-            type="button"
-            class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-            @click="emit('edit', item)"
-          >
-            {{ $t("common.edit") }}
-          </button>
+          <IconButton :icon="Pencil" :label="$t('common.edit')" @click="emit('edit', item)" />
         </template>
       </DataTable>
     </div>

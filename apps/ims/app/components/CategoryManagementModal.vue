@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import { Pencil, Trash2 } from "@lucide/vue";
 import type { Category } from "~/types/catalog";
 
 const open = defineModel<boolean>("open", { default: false });
@@ -158,20 +159,8 @@ async function saveEdit() {
           <div v-else class="flex items-center justify-between">
             <span class="text-sm text-slate-700">{{ category.name }}</span>
             <div class="flex gap-2">
-              <button
-                type="button"
-                class="rounded-lg border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                @click="startEdit(category)"
-              >
-                {{ $t("common.edit") }}
-              </button>
-              <button
-                type="button"
-                class="rounded-lg border border-red-200 px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
-                @click="startDelete(category)"
-              >
-                {{ $t("common.delete") }}
-              </button>
+              <IconButton :icon="Pencil" :label="$t('common.edit')" @click="startEdit(category)" />
+              <IconButton :icon="Trash2" :label="$t('common.delete')" variant="danger" @click="startDelete(category)" />
             </div>
           </div>
         </div>

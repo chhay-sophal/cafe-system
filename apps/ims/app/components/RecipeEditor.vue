@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { Pencil, Plus, Trash2 } from "@lucide/vue";
 import { storeToRefs } from "pinia";
 import { createColumnHelper, tableFeatures, useTable } from "@tanstack/vue-table";
 import type { InventoryItem } from "~/types/inventory";
@@ -29,7 +30,7 @@ const deletingProduct = ref<Product | null>(null);
 const inventoryItems = computed<InventoryItem[]>(() => inventoryStore.items);
 
 const { products } = storeToRefs(catalogStore);
-const recipeTableFeatures = tableFeatures({});
+const recipeTableFeatures = tableFeatures({ ...sortingFeatures });
 const recipeColumnHelper = createColumnHelper<typeof recipeTableFeatures, Product>();
 
 const recipeColumns = recipeColumnHelper.columns([
@@ -269,29 +270,10 @@ onMounted(async () => {
 
           <template #cell-actions="{ item }">
             <div class="flex justify-end gap-2">
-              <button
-                v-if="!recipeStore.hasProductRecipe(item.id)"
-                type="button"
-                class="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700"
-                @click="startEditingProduct(item.id)"
-              >
-                {{ $t("recipe.createRecipe") }}
-              </button>
+              <IconButton v-if="!recipeStore.hasProductRecipe(item.id)" :icon="Plus" :label="$t('recipe.createRecipe')" variant="primary" @click="startEditingProduct(item.id)" />
               <template v-else>
-                <button
-                  type="button"
-                  class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                  @click="startEditingProduct(item.id)"
-                >
-                  {{ $t("common.edit") }}
-                </button>
-                <button
-                  type="button"
-                  class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
-                  @click="openDeleteModal(item)"
-                >
-                  {{ $t("common.delete") }}
-                </button>
+                <IconButton :icon="Pencil" :label="$t('common.edit')" @click="startEditingProduct(item.id)" />
+                <IconButton :icon="Trash2" :label="$t('common.delete')" variant="danger" @click="openDeleteModal(item)" />
               </template>
             </div>
           </template>

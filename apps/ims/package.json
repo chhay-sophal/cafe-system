@@ -12,6 +12,7 @@
     "typecheck": "nuxt typecheck"
   },
   "dependencies": {
+    "@lucide/vue": "^1.55.0",
     "@nuxtjs/i18n": "^10.6.0",
     "@pinia/nuxt": "^1.0.1",
     "@tanstack/vue-table": "^9.1.2",

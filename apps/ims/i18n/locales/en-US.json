@@ -14,7 +14,10 @@
     "viewChart": "View chart",
     "viewTable": "View table",
     "selectEllipsis": "Select...",
-    "dash": "-"
+    "dash": "-",
+    "sort": "Sort",
+    "sortedAscending": "Sorted ascending",
+    "sortedDescending": "Sorted descending"
   },
   "app": {
     "title": "Inventory Manager",

@@ -14,7 +14,10 @@
     "viewChart": "មើលក្រាហ្វិក",
     "viewTable": "មើលតារាង",
     "selectEllipsis": "ជ្រើសរើស...",
-    "dash": "-"
+    "dash": "-",
+    "sort": "តម្រៀប",
+    "sortedAscending": "តម្រៀបពីតូចទៅធំ",
+    "sortedDescending": "តម្រៀបពីធំទៅតូច"
   },
   "app": {
     "title": "ប្រព័ន្ធគ្រប់គ្រងសារពើភ័ណ្ឌ",

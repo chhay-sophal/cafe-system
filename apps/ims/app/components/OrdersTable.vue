@@ -11,7 +11,7 @@ const ordersStore = useOrdersStore();
 const { orders } = storeToRefs(ordersStore);
 const { formatMain, formatSecondary } = useCurrency();
 
-const features = tableFeatures({});
+const features = tableFeatures({ ...sortingFeatures });
 const columnHelper = createColumnHelper<typeof features, OrderSummary>();
 
 const columns = columnHelper.columns([
