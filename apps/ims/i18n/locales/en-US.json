@@ -351,6 +351,9 @@
       "total": "Total",
       "tendered": "Tendered",
       "change": "Change"
-    }
+    },
+    "searchPlaceholder": "Search order #, cashier, payment...",
+    "totalUsd": "Total (USD)",
+    "noMatches": "No orders match your search or filters."
   }
 }

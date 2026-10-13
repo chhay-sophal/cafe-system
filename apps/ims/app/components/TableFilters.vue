@@ -33,10 +33,12 @@ interface ColumnFilterable {
 
 const search = ref("");
 
-// Per column id: the chosen option's index for a select ("" = any), or the
-// [min, max] / [from, to] input strings for a range ("" = open-ended).
+// Per column id: the chosen option's value for a select (absent = any), or
+// the [min, max] / [from, to] input strings for a range ("" = open-ended).
+// Select choices are kept by value, not list position, because option lists
+// can change underneath (e.g. the cashiers in a newly picked date range).
 interface FilterState {
-  select: Record<string, string>;
+  select: Record<string, { value: unknown }>;
   range: Record<string, [string, string]>;
 }
 
@@ -70,7 +72,23 @@ function rangeOf(state: FilterState, columnId: string): [string, string] {
 }
 
 function handleSelectChange(filter: TableFilterDef, index: string) {
-  draft.select[filter.columnId] = index;
+  const option = filter.type === "select" && index !== "" ? filter.options[Number(index)] : undefined;
+  if (option) {
+    draft.select[filter.columnId] = { value: option.value };
+  } else {
+    delete draft.select[filter.columnId];
+  }
+}
+
+// The <select>'s position for the draft choice; "" (Any) when nothing is
+// chosen or the chosen value is no longer among the options.
+function selectIndexOf(filter: TableFilterDef): string {
+  const chosen = draft.select[filter.columnId];
+  if (filter.type !== "select" || !chosen) {
+    return "";
+  }
+  const index = filter.options.findIndex((option) => option.value === chosen.value);
+  return index === -1 ? "" : String(index);
 }
 
 function handleRangeChange(filter: TableFilterDef, end: 0 | 1, value: string) {
@@ -114,8 +132,7 @@ function snapRangeEnd(filter: TableFilterDef, end: 0 | 1) {
 // The table filter value a filter's state translates to; undefined = none.
 function filterValueOf(state: FilterState, filter: TableFilterDef): unknown {
   if (filter.type === "select") {
-    const index = state.select[filter.columnId] ?? "";
-    return index === "" ? undefined : filter.options[Number(index)]?.value;
+    return state.select[filter.columnId]?.value;
   }
 
   const range = rangeOf(state, filter.columnId);
@@ -237,7 +254,7 @@ const INPUT_CLASS =
 
           <select
             v-if="filter.type === 'select'"
-            :value="draft.select[filter.columnId] ?? ''"
+            :value="selectIndexOf(filter)"
             :class="INPUT_CLASS"
             class="mt-1 w-full"
             @change="handleSelectChange(filter, ($event.target as HTMLSelectElement).value)"

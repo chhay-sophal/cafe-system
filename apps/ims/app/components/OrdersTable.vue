@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onMounted, watch } from "vue";
+import { computed, onMounted, watch } from "vue";
 import { storeToRefs } from "pinia";
 import { createColumnHelper, tableFeatures, useTable } from "@tanstack/vue-table";
-import type { OrderSummary } from "~/types/orders";
+import type { OrderSummary, PaymentMethod } from "~/types/orders";
+import type { TableFilterDef } from "~/types/table";
 
 const { t } = useI18n();
 const auth = useAuth();
@@ -11,7 +12,7 @@ const ordersStore = useOrdersStore();
 const { orders } = storeToRefs(ordersStore);
 const { formatMain, formatSecondary } = useCurrency();
 
-const features = tableFeatures({ ...sortingFeatures });
+const features = tableFeatures({ ...sortingFeatures, ...filteringFeatures });
 const columnHelper = createColumnHelper<typeof features, OrderSummary>();
 
 const columns = columnHelper.columns([
@@ -19,24 +20,39 @@ const columns = columnHelper.columns([
     header: () => t("orders.columns.orderNumber"),
     cell: ({ getValue }) => `#${getValue()}`,
   }),
+  // The page's date range already narrows orders by date, and numbers as
+  // search text match too loosely ("2" in any total) - so search covers the
+  // order number, cashier and payment method only; the filter panel has
+  // ranges for items and total.
   columnHelper.accessor("createdAt", {
     header: () => t("orders.columns.dateTime"),
     cell: ({ getValue }) => formatDateTime(getValue()),
+    enableGlobalFilter: false,
   }),
   columnHelper.accessor("cashierName", {
     header: () => t("orders.columns.cashier"),
     cell: ({ getValue }) => getValue() ?? t("common.dash"),
+    filterFn: "equals",
   }),
-  columnHelper.accessor("itemCount", { header: () => t("orders.columns.items") }),
+  columnHelper.accessor("itemCount", {
+    header: () => t("orders.columns.items"),
+    filterFn: "inNumberRange",
+    enableGlobalFilter: false,
+  }),
   columnHelper.accessor("paymentMethod", {
     header: () => t("orders.columns.payment"),
     cell: ({ getValue }) => {
       const method = getValue();
       return method ? t(`paymentBreakdown.methods.${method}`) : t("common.dash");
     },
+    filterFn: "equals",
   }),
   // Rendered via slot - shows the total in both currencies.
-  columnHelper.accessor("totalAmount", { header: () => t("orders.columns.total") }),
+  columnHelper.accessor("totalAmount", {
+    header: () => t("orders.columns.total"),
+    filterFn: "inNumberRange",
+    enableGlobalFilter: false,
+  }),
 ]);
 
 const cellClass = {
@@ -48,7 +64,36 @@ const headerClass = {
   totalAmount: "px-4 py-3 text-right font-semibold text-slate-600",
 };
 
-const table = useTable({ features, columns, data: orders });
+const table = useTable({ features, columns, data: orders, globalFilterFn: "includesDisplayText" });
+
+const PAYMENT_METHODS: PaymentMethod[] = ["CASH", "CARD", "QR_CODE"];
+
+const filters = computed<TableFilterDef[]>(() => [
+  {
+    type: "select",
+    columnId: "cashierName",
+    label: t("orders.columns.cashier"),
+    // Only cashiers who appear in the loaded period - the list follows the
+    // page's date range.
+    options: [...new Set(orders.value.flatMap((order) => (order.cashierName ? [order.cashierName] : [])))]
+      .sort()
+      .map((name) => ({ value: name, label: name })),
+  },
+  {
+    type: "select",
+    columnId: "paymentMethod",
+    label: t("orders.columns.payment"),
+    options: PAYMENT_METHODS.map((method) => ({ value: method, label: t(`paymentBreakdown.methods.${method}`) })),
+  },
+  { type: "numberRange", columnId: "itemCount", label: t("orders.columns.items") },
+  // Totals are stored in USD whatever the display currency (see
+  // useCurrency), so the range is in USD and says so.
+  { type: "numberRange", columnId: "totalAmount", label: t("orders.totalUsd") },
+]);
+
+// "No orders in this period" would be wrong when the period has orders but
+// the search or filters hide them all.
+const emptyText = computed(() => (orders.value.length > 0 ? t("orders.noMatches") : t("orders.empty")));
 
 function loadOrders() {
   const token = auth.session.value?.token;
@@ -76,7 +121,10 @@ function openDetail(order: OrderSummary) {
 
 <template>
   <div class="mt-6">
-    <h3 class="mb-3 text-sm font-semibold text-slate-700">{{ t("orders.heading") }}</h3>
+    <div class="mb-3 flex flex-wrap items-center gap-3">
+      <h3 class="text-sm font-semibold text-slate-700">{{ t("orders.heading") }}</h3>
+      <TableFilters :table="table" :search-placeholder="t('orders.searchPlaceholder')" :filters="filters" />
+    </div>
 
     <p v-if="ordersStore.error" class="rounded-lg bg-red-50 p-4 text-sm font-medium text-red-700">{{ ordersStore.error }}</p>
 
@@ -91,7 +139,7 @@ function openDetail(order: OrderSummary) {
     >
       <DataTable
         :table="table"
-        :empty-text="t('orders.empty')"
+        :empty-text="emptyText"
         :cell-class="cellClass"
         :header-class="headerClass"
         :row-class="() => 'cursor-pointer hover:bg-slate-50'"
