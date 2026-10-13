@@ -13,6 +13,7 @@ import {
   useTable,
 } from "@tanstack/vue-table";
 import type { InventoryItem } from "~/types/inventory";
+import type { TableSelectFilter } from "~/types/table";
 
 const emit = defineEmits<{
   adjust: [item: InventoryItem];
@@ -26,8 +27,6 @@ const auth = useAuth();
 const store = useInventoryStore();
 const { items, isLoading, error } = storeToRefs(store);
 
-const search = ref("");
-const unitFilter = ref("");
 const togglingIds = ref<Set<string>>(new Set());
 
 const features = tableFeatures({
@@ -62,15 +61,13 @@ const cellClass = {
 
 const table = useTable({ features, columns, data: items });
 
-function handleSearchInput() {
-  table.setGlobalFilter(search.value);
-}
-
-function handleUnitFilterChange() {
-  table.getColumn("unit")?.setFilterValue(unitFilter.value || undefined);
-}
-
-const units = computed(() => store.units);
+const filters = computed<TableSelectFilter[]>(() => [
+  {
+    columnId: "unit",
+    allLabel: t("stockTable.allUnits"),
+    options: store.units.map((unit) => ({ value: unit, label: unit })),
+  },
+]);
 
 async function toggleActive(item: InventoryItem) {
   const token = auth.session.value?.token;
@@ -110,22 +107,7 @@ function formatUpdatedAt(value: string | null): string {
 <template>
   <div class="flex h-full min-h-0 flex-col">
     <div class="mb-4 flex flex-wrap items-center gap-3">
-      <input
-        v-model="search"
-        type="search"
-        :placeholder="$t('stockTable.searchPlaceholder')"
-        class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 sm:w-64"
-        @input="handleSearchInput"
-      />
-
-      <select
-        v-model="unitFilter"
-        class="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
-        @change="handleUnitFilterChange"
-      >
-        <option value="">{{ $t("stockTable.allUnits") }}</option>
-        <option v-for="unit in units" :key="unit" :value="unit">{{ unit }}</option>
-      </select>
+      <TableFilters :table="table" :search-placeholder="$t('stockTable.searchPlaceholder')" :filters="filters" />
 
       <span v-if="store.lowStockCount > 0" class="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
         {{ $t("stockTable.lowStockBadge", { count: store.lowStockCount }) }}
