@@ -23,12 +23,13 @@ pub fn run() {
             // Pick any monitor that isn't the one the cashier window is
             // currently on - a genuine second screen facing the customer.
             // Single-monitor setups: no match, no customer window, and the
-            // cashier screen behaves exactly as before.
-            let customer_monitor = monitors.iter().find(|monitor| {
-                main_monitor
-                    .as_ref()
-                    .map(|main| monitor.position() != main.position())
-                    .unwrap_or(true)
+            // cashier screen behaves exactly as before. If the cashier's
+            // monitor can't be determined, skip the customer window rather
+            // than risk opening it fullscreen over the cashier screen.
+            let customer_monitor = main_monitor.as_ref().and_then(|main| {
+                monitors
+                    .iter()
+                    .find(|monitor| monitor.position() != main.position())
             });
 
             if let Some(monitor) = customer_monitor {
