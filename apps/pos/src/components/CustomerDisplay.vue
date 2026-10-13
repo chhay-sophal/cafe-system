@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   onCartUpdate,
+  onLocaleChange,
   onSaleCompleted,
   requestSync,
   type CartUpdatePayload,
@@ -13,7 +14,7 @@ import { formatMain, formatRiel, formatSecondary, formatUsd } from "../lib/curre
 
 type Mode = "idle" | "building" | "completed";
 
-const { t } = useI18n({ useScope: "global" });
+const { t, locale } = useI18n({ useScope: "global" });
 const { exchangeRateRielPerUsd, mainCurrency, refreshExchangeRate } = useExchangeRate();
 
 const mode = ref<Mode>("idle");
@@ -22,6 +23,7 @@ const completedSnapshot = ref<SaleCompletedPayload | null>(null);
 
 let unlistenCartUpdate: (() => void) | undefined;
 let unlistenSaleCompleted: (() => void) | undefined;
+let unlistenLocaleChange: (() => void) | undefined;
 
 function handleCartUpdate(payload: CartUpdatePayload) {
   if (payload.items.length === 0) {
@@ -68,6 +70,11 @@ onMounted(async () => {
   refreshExchangeRate();
   unlistenCartUpdate = await onCartUpdate(handleCartUpdate);
   unlistenSaleCompleted = await onSaleCompleted(handleSaleCompleted);
+  // Only switches the in-memory locale - the cashier window already saved
+  // the choice to the shared localStorage.
+  unlistenLocaleChange = await onLocaleChange((newLocale) => {
+    locale.value = newLocale;
+  });
   // Catches up a freshly (re)opened window to whatever the cashier's
   // cart already holds, instead of starting blank.
   requestSync();
@@ -76,6 +83,7 @@ onMounted(async () => {
 onUnmounted(() => {
   unlistenCartUpdate?.();
   unlistenSaleCompleted?.();
+  unlistenLocaleChange?.();
 });
 </script>
 

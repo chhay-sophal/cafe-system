@@ -131,6 +131,20 @@
     "voidError": "Failed to void order.",
     "voidedReason": "Void reason: {reason}"
   },
+  "settings": {
+    "heading": "Settings",
+    "sections": {
+      "general": "General",
+      "printer": "Printer"
+    },
+    "general": {
+      "language": "Language",
+      "languageHint": "Language used on this register's screens and receipts."
+    },
+    "printer": {
+      "hint": "Receipts print here automatically after each sale. Saved on this register only."
+    }
+  },
   "customerDisplay": {
     "idleTitle": "Welcome",
     "columns": {

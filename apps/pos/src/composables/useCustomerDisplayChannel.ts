@@ -8,6 +8,9 @@ import type { PaymentMethod } from "../types/order";
 const CART_UPDATE_EVENT = "customer-display:cart-update";
 const SALE_COMPLETED_EVENT = "customer-display:sale-completed";
 const REQUEST_SYNC_EVENT = "customer-display:request-sync";
+const LOCALE_CHANGE_EVENT = "customer-display:locale-change";
+
+export type DisplayLocale = "en-US" | "km-KH";
 
 const MAIN_WINDOW_LABEL = "main";
 
@@ -50,6 +53,12 @@ export function publishSaleCompleted(payload: SaleCompletedPayload): void {
   silently(emit(SALE_COMPLETED_EVENT, payload));
 }
 
+// The display picks up the saved locale from localStorage when it opens;
+// this covers changes made while it's already open.
+export function publishLocaleChange(locale: DisplayLocale): void {
+  silently(emit(LOCALE_CHANGE_EVENT, locale));
+}
+
 export function requestSync(): void {
   silently(emitTo(MAIN_WINDOW_LABEL, REQUEST_SYNC_EVENT));
 }
@@ -60,6 +69,10 @@ export function onCartUpdate(handler: (payload: CartUpdatePayload) => void): Pro
 
 export function onSaleCompleted(handler: (payload: SaleCompletedPayload) => void): Promise<UnlistenFn> {
   return listen<SaleCompletedPayload>(SALE_COMPLETED_EVENT, (event) => handler(event.payload));
+}
+
+export function onLocaleChange(handler: (locale: DisplayLocale) => void): Promise<UnlistenFn> {
+  return listen<DisplayLocale>(LOCALE_CHANGE_EVENT, (event) => handler(event.payload));
 }
 
 export function onRequestSync(handler: () => void): Promise<UnlistenFn> {

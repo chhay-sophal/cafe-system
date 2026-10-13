@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { setLocale } from "./i18n";
 import CartSidebar from "./components/CartSidebar.vue";
 import CategoryTabs from "./components/CategoryTabs.vue";
 import CheckoutModal from "./components/CheckoutModal.vue";
@@ -10,14 +9,20 @@ import ModifierModal from "./components/ModifierModal.vue";
 import NetworkStatusBar from "./components/NetworkStatusBar.vue";
 import ProductGrid from "./components/ProductGrid.vue";
 import SalesHistory from "./components/SalesHistory.vue";
+import SettingsView from "./components/SettingsView.vue";
 import { checkForUpdateAndInstall } from "./composables/useAppUpdater";
 import { useAuth } from "./composables/useAuth";
 import { useCart } from "./composables/useCart";
-import { onRequestSync, publishCartUpdate, type CartUpdatePayload } from "./composables/useCustomerDisplayChannel";
+import {
+  onRequestSync,
+  publishCartUpdate,
+  publishLocaleChange,
+  type CartUpdatePayload,
+  type DisplayLocale,
+} from "./composables/useCustomerDisplayChannel";
 import { useExchangeRate } from "./composables/useExchangeRate";
 import { useNetworkStatus } from "./composables/useNetworkStatus";
 import { useOfflineQueue } from "./composables/useOfflineQueue";
-import { useReceiptPrinter } from "./composables/useReceiptPrinter";
 import { fetchCategories, fetchProductModifiers, fetchProducts } from "./lib/api";
 import type { Category, Product } from "./types/catalog";
 import type { CartModifier, ModifierGroup } from "./types/cart";
@@ -34,22 +39,13 @@ const errorMessage = ref<string | null>(null);
 const activeModalProduct = ref<Product | null>(null);
 const activeModalGroups = ref<ModifierGroup[]>([]);
 const isCheckoutOpen = ref(false);
-const activeView = ref<"register" | "salesHistory">("register");
+const activeView = ref<"register" | "salesHistory" | "settings">("register");
 
 const auth = useAuth();
 const cart = useCart();
 const network = useNetworkStatus();
 const offlineQueue = useOfflineQueue();
 const exchangeRate = useExchangeRate();
-const receiptPrinter = useReceiptPrinter();
-
-// Keep a saved printer selectable even while Windows doesn't list it (e.g.
-// unplugged), instead of the dropdown silently showing "No printer".
-const printerOptions = computed(() => {
-  const saved = receiptPrinter.printerName.value;
-  const listed = receiptPrinter.availablePrinters.value;
-  return saved && !listed.includes(saved) ? [saved, ...listed] : listed;
-});
 
 // Mirrored to the customer-facing display over Tauri's event bus (see
 // composables/useCustomerDisplayChannel.ts) - the second window has no
@@ -71,6 +67,9 @@ const cartUpdatePayload = computed<CartUpdatePayload>(() => ({
 }));
 
 watch(cartUpdatePayload, publishCartUpdate, { immediate: true });
+
+// Language changes (Settings → General) reach the customer display live.
+watch(locale, (newLocale) => publishLocaleChange(newLocale as DisplayLocale));
 
 let unlistenRequestSync: (() => void) | undefined;
 
@@ -134,7 +133,6 @@ onMounted(async () => {
   // Cold start, before login and before any order is in progress - the
   // safe moment for a silent self-update-and-relaunch.
   checkForUpdateAndInstall();
-  receiptPrinter.refreshPrinters();
 
   try {
     const [categoryList, productList] = await Promise.all([
@@ -205,6 +203,14 @@ onUnmounted(() => {
           >
             {{ t("salesHistory.heading") }}
           </button>
+          <button
+            type="button"
+            class="pos-header__tab"
+            :class="{ 'pos-header__tab--active': activeView === 'settings' }"
+            @click="activeView = 'settings'"
+          >
+            {{ t("settings.heading") }}
+          </button>
         </nav>
       </div>
       <div class="pos-header__account">
@@ -220,24 +226,6 @@ onUnmounted(() => {
         >
           {{ network.isOnline.value ? t("app.online") : t("app.offline") }}
         </span>
-        <select
-          :value="locale"
-          class="pos-header__locale"
-          @change="setLocale(($event.target as HTMLSelectElement).value as 'en-US' | 'km-KH')"
-        >
-          <option value="en-US">English</option>
-          <option value="km-KH">ខ្មែរ</option>
-        </select>
-        <select
-          :value="receiptPrinter.printerName.value ?? ''"
-          class="pos-header__locale pos-header__printer"
-          :aria-label="t('receipt.printerAria')"
-          @focus="receiptPrinter.refreshPrinters()"
-          @change="receiptPrinter.setPrinter(($event.target as HTMLSelectElement).value || null)"
-        >
-          <option value="">{{ t("receipt.noPrinterOption") }}</option>
-          <option v-for="name in printerOptions" :key="name" :value="name">{{ name }}</option>
-        </select>
         <span class="pos-header__cashier">{{ auth.session.value.user.name }}</span>
         <button type="button" class="pos-header__logout" @click="auth.logout()">{{ t("app.logout") }}</button>
       </div>
@@ -246,6 +234,7 @@ onUnmounted(() => {
     <NetworkStatusBar />
 
     <SalesHistory v-if="activeView === 'salesHistory'" :token="auth.session.value.token" />
+    <SettingsView v-if="activeView === 'settings'" />
 
     <!-- v-show, not v-if: the cart and catalog must survive a trip to the
          Sales History tab mid-order. -->
@@ -360,19 +349,6 @@ onUnmounted(() => {
 
 .pos-header__cashier {
   color: #cccccc;
-}
-
-.pos-header__locale {
-  border: 2px solid #444444;
-  background: #1a1a1a;
-  color: #ffffff;
-  border-radius: 8px;
-  padding: 0.3rem 0.5rem;
-  font-size: 0.85rem;
-}
-
-.pos-header__printer {
-  max-width: 12rem;
 }
 
 .pos-header__pending-badge {
