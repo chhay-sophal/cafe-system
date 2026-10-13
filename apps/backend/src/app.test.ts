@@ -9,13 +9,21 @@ import {
   stockAdjustments, storeSettings, users,
 } from './db/schema.js';
 import { hashPin, signToken } from './middleware/auth.js';
+import { env } from './env.js';
+import { TEST_DATABASE_URL } from '../test/test-database.js';
+
+// The suites below delete orders, users etc. - refuse to run against anything
+// but the throwaway test database (e.g. if run outside vitest.config.ts).
+if (env.TURSO_DATABASE_URL !== TEST_DATABASE_URL) {
+  throw new Error(`Refusing to run: tests must use ${TEST_DATABASE_URL}, not ${env.TURSO_DATABASE_URL}`);
+}
 
 const app = createApp();
 
 describe('backend auth and validation', () => {
   beforeEach(async () => {
-    // This suite runs against the real dev database (no test-DB isolation),
-    // so users must be cleared in FK-dependency order - any leftover orders
+    // The test database is shared across suites within a run, so users must
+    // be cleared in FK-dependency order - any leftover orders
     // or stock adjustments referencing a user otherwise abort the delete
     // with a foreign key constraint failure.
     await db.delete(payments).run();
