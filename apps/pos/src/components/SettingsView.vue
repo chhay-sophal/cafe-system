@@ -2,9 +2,10 @@
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { setLocale } from "../i18n";
+import { useKhqrBanks } from "../composables/useKhqrBanks";
 import { useReceiptPrinter } from "../composables/useReceiptPrinter";
 
-type SectionId = "general" | "printer";
+type SectionId = "general" | "printer" | "khqr";
 type Locale = "en-US" | "km-KH";
 
 const { t, locale } = useI18n({ useScope: "global" });
@@ -13,6 +14,7 @@ const { t, locale } = useI18n({ useScope: "global" });
 const sections = computed<Array<{ id: SectionId; label: string }>>(() => [
   { id: "general", label: t("settings.sections.general") },
   { id: "printer", label: t("settings.sections.printer") },
+  { id: "khqr", label: t("settings.sections.khqr") },
 ]);
 
 // Language names are shown in their own script, not translated, so a
@@ -35,6 +37,48 @@ const printerOptions = computed(() => {
 });
 
 onMounted(receiptPrinter.refreshPrinters);
+
+const khqrBanks = useKhqrBanks();
+const newBankName = ref("");
+const newBankQrFile = ref<File | null>(null);
+// Bumped after each add to remount (and so clear) the file input, which
+// can't be reset through v-model.
+const qrInputKey = ref(0);
+const isAddingBank = ref(false);
+const bankError = ref<string | null>(null);
+const pendingRemoveBankId = ref<string | null>(null);
+
+const canAddBank = computed(() => newBankName.value.trim() !== "" && newBankQrFile.value !== null && !isAddingBank.value);
+
+function handleQrFileChange(event: Event) {
+  newBankQrFile.value = (event.target as HTMLInputElement).files?.[0] ?? null;
+}
+
+async function handleAddBank() {
+  if (!canAddBank.value || !newBankQrFile.value) {
+    return;
+  }
+
+  isAddingBank.value = true;
+  bankError.value = null;
+  try {
+    await khqrBanks.addBank(newBankName.value, newBankQrFile.value);
+    newBankName.value = "";
+    newBankQrFile.value = null;
+    qrInputKey.value += 1;
+  } catch (error) {
+    // Unreadable file, or localStorage full.
+    console.error("Failed to add bank:", error);
+    bankError.value = t("settings.khqr.addError");
+  } finally {
+    isAddingBank.value = false;
+  }
+}
+
+function handleRemoveBank(id: string) {
+  khqrBanks.removeBank(id);
+  pendingRemoveBankId.value = null;
+}
 </script>
 
 <template>
@@ -102,6 +146,54 @@ onMounted(receiptPrinter.refreshPrinters);
             </button>
           </div>
         </div>
+      </template>
+
+      <template v-else-if="activeSection === 'khqr'">
+        <h3 class="settings__panel-heading">{{ t("settings.sections.khqr") }}</h3>
+        <p class="settings__intro">{{ t("settings.khqr.intro") }}</p>
+
+        <p v-if="khqrBanks.banks.value.length === 0" class="settings__empty">{{ t("settings.khqr.empty") }}</p>
+        <ul v-else class="bank-list">
+          <li v-for="bank in khqrBanks.banks.value" :key="bank.id" class="bank-list__item">
+            <img :src="bank.qrImage" :alt="t('settings.khqr.qrAlt', { name: bank.name })" class="bank-list__qr" />
+            <span class="bank-list__name">{{ bank.name }}</span>
+            <div class="settings-field__control">
+              <template v-if="pendingRemoveBankId === bank.id">
+                <button type="button" class="settings-choice__option" @click="pendingRemoveBankId = null">
+                  {{ t("common.cancel") }}
+                </button>
+                <button type="button" class="settings-danger" @click="handleRemoveBank(bank.id)">
+                  {{ t("settings.khqr.confirmRemove") }}
+                </button>
+              </template>
+              <button v-else type="button" class="settings-choice__option" @click="pendingRemoveBankId = bank.id">
+                {{ t("settings.khqr.remove") }}
+              </button>
+            </div>
+          </li>
+        </ul>
+
+        <form class="bank-form" @submit.prevent="handleAddBank">
+          <span class="settings-field__label">{{ t("settings.khqr.addHeading") }}</span>
+          <label class="bank-form__field">
+            <span class="settings-field__hint">{{ t("settings.khqr.bankName") }}</span>
+            <input
+              v-model="newBankName"
+              type="text"
+              maxlength="40"
+              class="settings-input"
+              :placeholder="t('settings.khqr.bankNamePlaceholder')"
+            />
+          </label>
+          <label class="bank-form__field">
+            <span class="settings-field__hint">{{ t("settings.khqr.qrImage") }}</span>
+            <input :key="qrInputKey" type="file" accept="image/*" class="bank-form__file" @change="handleQrFileChange" />
+          </label>
+          <p v-if="bankError" class="settings__error">{{ bankError }}</p>
+          <button type="submit" class="settings-primary" :disabled="!canAddBank">
+            {{ isAddingBank ? t("settings.khqr.adding") : t("settings.khqr.add") }}
+          </button>
+        </form>
       </template>
     </div>
   </section>
@@ -197,6 +289,110 @@ onMounted(receiptPrinter.refreshPrinters);
   gap: 0.5rem;
 }
 
+.settings__intro,
+.settings__empty {
+  margin: 0;
+  color: #777777;
+  font-size: 0.9rem;
+}
+
+.settings__error {
+  margin: 0;
+  color: #c0392b;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.bank-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.bank-list__item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1.25rem 0.75rem 0.75rem;
+  border-radius: 14px;
+  background: #ffffff;
+  border: 2px solid #e2e2e2;
+}
+
+.bank-list__qr {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.bank-list__name {
+  flex: 1;
+  font-weight: 700;
+}
+
+.bank-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-radius: 14px;
+  background: #ffffff;
+  border: 2px dashed #dcdcdc;
+}
+
+.bank-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.bank-form__file {
+  font-size: 0.95rem;
+}
+
+.settings-input {
+  min-height: 44px;
+  min-width: 280px;
+  padding: 0 0.75rem;
+  border-radius: 10px;
+  border: 2px solid #dcdcdc;
+  background: #ffffff;
+  color: #1a1a1a;
+  font-size: 1rem;
+}
+
+.settings-primary,
+.settings-danger {
+  min-height: 44px;
+  padding: 0 1.25rem;
+  border-radius: 10px;
+  border: none;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.settings-primary {
+  background: #111111;
+  color: #ffffff;
+}
+
+.settings-primary:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.settings-danger {
+  background: #c0392b;
+  color: #ffffff;
+}
+
 .settings-select {
   min-height: 44px;
   min-width: 220px;
@@ -243,9 +439,22 @@ onMounted(receiptPrinter.refreshPrinters);
     color: #111111;
   }
 
-  .settings-field {
+  .settings-field,
+  .bank-list__item,
+  .bank-form {
     background: #242424;
     border-color: #3a3a3a;
+  }
+
+  .settings-input {
+    background: #2e2e2e;
+    border-color: #3a3a3a;
+    color: #f6f6f6;
+  }
+
+  .settings-primary {
+    background: #f6f6f6;
+    color: #111111;
   }
 
   .settings-choice__option,

@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { HttpError, submitOrder } from "../lib/api";
 import { computeChange, formatMain, formatRiel, formatSecondary, formatUsd, round2 } from "../lib/currency";
 import { useAuth } from "../composables/useAuth";
 import { useExchangeRate } from "../composables/useExchangeRate";
-import { publishSaleCompleted } from "../composables/useCustomerDisplayChannel";
+import { publishPaymentQr, publishSaleCompleted } from "../composables/useCustomerDisplayChannel";
+import { useKhqrBanks } from "../composables/useKhqrBanks";
 import { useNetworkStatus } from "../composables/useNetworkStatus";
 import { useOfflineQueue } from "../composables/useOfflineQueue";
 import { useReceiptPrinter } from "../composables/useReceiptPrinter";
@@ -77,7 +78,15 @@ const changeSplit = computed(() =>
 
 const amountShort = computed(() => Math.max(0, round2(props.totalAmount - tenderedTotalUsd.value)));
 const isInsufficient = computed(() => isCash.value && round2(tenderedTotalUsd.value) < round2(props.totalAmount));
-const canComplete = computed(() => !isInsufficient.value);
+const khqrBanks = useKhqrBanks();
+const selectedBankId = ref<string | null>(null);
+const selectedBank = computed(() => khqrBanks.banks.value.find((bank) => bank.id === selectedBankId.value) ?? null);
+const isQrPayment = computed(() => paymentMethod.value === "QR_CODE");
+// With banks set up, Mobile Pay needs one picked so the customer has a QR
+// to scan. With none set up, it works as before (customer scans elsewhere).
+const isMissingBank = computed(() => isQrPayment.value && khqrBanks.banks.value.length > 0 && !selectedBank.value);
+
+const canComplete = computed(() => !isInsufficient.value && !isMissingBank.value);
 
 const successLabel = computed(() => {
   if (isQueuedOffline.value) {
@@ -128,7 +137,20 @@ function selectPaymentMethod(method: PaymentMethod) {
   paymentMethod.value = method;
   amountTenderedUsd.value = method === "CASH" ? 0 : props.totalAmount;
   amountTenderedRiel.value = 0;
+  // A single bank is the only possible choice - save the cashier a tap.
+  const onlyBank = khqrBanks.banks.value.length === 1 ? khqrBanks.banks.value[0] : null;
+  selectedBankId.value = method === "QR_CODE" && onlyBank ? onlyBank.id : null;
 }
+
+// The customer display shows the chosen bank's KHQR while payment is in
+// progress, and drops it once the sale succeeds or checkout is closed.
+watch([selectedBank, isQrPayment, phase], () => {
+  const bank = selectedBank.value;
+  const showQr = bank && isQrPayment.value && phase.value !== "success";
+  publishPaymentQr(showQr ? { bankName: bank.name, qrImage: bank.qrImage } : null);
+});
+
+onUnmounted(() => publishPaymentQr(null));
 
 function addFastCashUsd(amount: number) {
   amountTenderedUsd.value = round2(amountTenderedUsd.value + amount);
@@ -400,6 +422,23 @@ function handleDone() {
           </button>
         </div>
 
+        <div v-if="isQrPayment" class="qr-banks">
+          <span class="qr-banks__label">{{ t("checkout.chooseBank") }}</span>
+          <p v-if="khqrBanks.banks.value.length === 0" class="qr-banks__empty">{{ t("checkout.noBanks") }}</p>
+          <div v-else class="qr-banks__options">
+            <button
+              v-for="bank in khqrBanks.banks.value"
+              :key="bank.id"
+              type="button"
+              class="payment-method"
+              :class="{ 'payment-method--active': selectedBankId === bank.id }"
+              @click="selectedBankId = bank.id"
+            >
+              {{ bank.name }}
+            </button>
+          </div>
+        </div>
+
         <template v-if="isCash">
           <div class="tender-sections">
             <div class="tender-section" :style="{ order: isMainKhr ? 2 : 1 }">
@@ -627,6 +666,30 @@ function handleDone() {
   background: #111111;
   border-color: #111111;
   color: #ffffff;
+}
+
+.qr-banks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.qr-banks__label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #777777;
+}
+
+.qr-banks__options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.5rem;
+}
+
+.qr-banks__empty {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #888888;
 }
 
 .tender-sections {

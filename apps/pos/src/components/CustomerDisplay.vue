@@ -4,9 +4,11 @@ import { useI18n } from "vue-i18n";
 import {
   onCartUpdate,
   onLocaleChange,
+  onPaymentQr,
   onSaleCompleted,
   requestSync,
   type CartUpdatePayload,
+  type PaymentQrPayload,
   type SaleCompletedPayload,
 } from "../composables/useCustomerDisplayChannel";
 import { useExchangeRate } from "../composables/useExchangeRate";
@@ -20,10 +22,12 @@ const { exchangeRateRielPerUsd, mainCurrency, refreshExchangeRate } = useExchang
 const mode = ref<Mode>("idle");
 const cartSnapshot = ref<CartUpdatePayload | null>(null);
 const completedSnapshot = ref<SaleCompletedPayload | null>(null);
+const paymentQr = ref<PaymentQrPayload | null>(null);
 
 let unlistenCartUpdate: (() => void) | undefined;
 let unlistenSaleCompleted: (() => void) | undefined;
 let unlistenLocaleChange: (() => void) | undefined;
+let unlistenPaymentQr: (() => void) | undefined;
 
 function handleCartUpdate(payload: CartUpdatePayload) {
   if (payload.items.length === 0) {
@@ -34,6 +38,7 @@ function handleCartUpdate(payload: CartUpdatePayload) {
     mode.value = "idle";
     cartSnapshot.value = null;
     completedSnapshot.value = null;
+    paymentQr.value = null;
     return;
   }
 
@@ -75,6 +80,9 @@ onMounted(async () => {
   unlistenLocaleChange = await onLocaleChange((newLocale) => {
     locale.value = newLocale;
   });
+  unlistenPaymentQr = await onPaymentQr((payload) => {
+    paymentQr.value = payload;
+  });
   // Catches up a freshly (re)opened window to whatever the cashier's
   // cart already holds, instead of starting blank.
   requestSync();
@@ -84,6 +92,7 @@ onUnmounted(() => {
   unlistenCartUpdate?.();
   unlistenSaleCompleted?.();
   unlistenLocaleChange?.();
+  unlistenPaymentQr?.();
 });
 </script>
 
@@ -115,61 +124,73 @@ onUnmounted(() => {
     </div>
 
     <div v-else-if="activeOrder" class="order">
-      <table class="order__table">
-        <thead>
-          <tr>
-            <th class="order__col-no">{{ t("customerDisplay.columns.no") }}</th>
-            <th>{{ t("customerDisplay.columns.item") }}</th>
-            <th class="order__col-number">{{ t("customerDisplay.columns.price") }}</th>
-            <th class="order__col-number">{{ t("customerDisplay.columns.amount") }}</th>
-            <th class="order__col-number">{{ t("customerDisplay.columns.total") }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(item, index) in activeOrder.items" :key="item.cartItemId">
-            <td class="order__col-no">{{ index + 1 }}</td>
-            <td>
-              <span class="order__item-name">{{ item.productName }}</span>
-              <ul v-if="item.modifierNames.length > 0" class="order__modifiers">
-                <li v-for="name in item.modifierNames" :key="name">{{ name }}</li>
-              </ul>
-            </td>
-            <td class="order__col-number">{{ formatMainAmount(item.unitPrice) }}</td>
-            <td class="order__col-number">{{ item.quantity }}</td>
-            <td class="order__col-number">{{ formatMainAmount(item.lineTotal) }}</td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="order__main">
+        <table class="order__table">
+          <thead>
+            <tr>
+              <th class="order__col-no">{{ t("customerDisplay.columns.no") }}</th>
+              <th>{{ t("customerDisplay.columns.item") }}</th>
+              <th class="order__col-number">{{ t("customerDisplay.columns.price") }}</th>
+              <th class="order__col-number">{{ t("customerDisplay.columns.amount") }}</th>
+              <th class="order__col-number">{{ t("customerDisplay.columns.total") }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(item, index) in activeOrder.items" :key="item.cartItemId">
+              <td class="order__col-no">{{ index + 1 }}</td>
+              <td>
+                <span class="order__item-name">{{ item.productName }}</span>
+                <ul v-if="item.modifierNames.length > 0" class="order__modifiers">
+                  <li v-for="name in item.modifierNames" :key="name">{{ name }}</li>
+                </ul>
+              </td>
+              <td class="order__col-number">{{ formatMainAmount(item.unitPrice) }}</td>
+              <td class="order__col-number">{{ item.quantity }}</td>
+              <td class="order__col-number">{{ formatMainAmount(item.lineTotal) }}</td>
+            </tr>
+          </tbody>
+        </table>
 
-      <div class="order__summary">
-        <div v-if="activeOrder.discountAmount > 0" class="order__summary-row">
-          <span>{{ t("customerDisplay.columns.discount") }}</span>
-          <span>-{{ formatMainAmount(activeOrder.discountAmount) }}</span>
+        <div class="order__summary">
+          <div v-if="activeOrder.discountAmount > 0" class="order__summary-row">
+            <span>{{ t("customerDisplay.columns.discount") }}</span>
+            <span>-{{ formatMainAmount(activeOrder.discountAmount) }}</span>
+          </div>
+
+          <div class="order__summary-row order__summary-row--total">
+            <span>{{ t("customerDisplay.columns.grandTotal") }}</span>
+            <span>
+              {{ formatMainAmount(activeOrder.totalAmount) }}
+              <span class="order__summary-secondary">{{ formatSecondaryAmount(activeOrder.totalAmount) }}</span>
+            </span>
+          </div>
+
+          <template v-if="mode === 'completed' && completedSnapshot">
+            <div v-if="completedSnapshot.paymentMethod === 'CASH'" class="order__summary-row">
+              <span>{{ t("customerDisplay.columns.tender") }}</span>
+              <span>{{ formatTenderOrChange(completedSnapshot.amountTenderedUsd, completedSnapshot.amountTenderedRiel) }}</span>
+            </div>
+            <div v-if="completedSnapshot.paymentMethod === 'CASH'" class="order__summary-row">
+              <span>{{ t("customerDisplay.columns.change") }}</span>
+              <span>{{ formatTenderOrChange(completedSnapshot.changeGivenUsd, completedSnapshot.changeGivenRiel) }}</span>
+            </div>
+            <div v-else class="order__summary-row">
+              <span>{{ t("customerDisplay.columns.paymentMethod") }}</span>
+              <span>{{ t(`checkout.methods.${completedSnapshot.paymentMethod}`) }}</span>
+            </div>
+          </template>
         </div>
-
-        <div class="order__summary-row order__summary-row--total">
-          <span>{{ t("customerDisplay.columns.grandTotal") }}</span>
-          <span>
-            {{ formatMainAmount(activeOrder.totalAmount) }}
-            <span class="order__summary-secondary">{{ formatSecondaryAmount(activeOrder.totalAmount) }}</span>
-          </span>
-        </div>
-
-        <template v-if="mode === 'completed' && completedSnapshot">
-          <div v-if="completedSnapshot.paymentMethod === 'CASH'" class="order__summary-row">
-            <span>{{ t("customerDisplay.columns.tender") }}</span>
-            <span>{{ formatTenderOrChange(completedSnapshot.amountTenderedUsd, completedSnapshot.amountTenderedRiel) }}</span>
-          </div>
-          <div v-if="completedSnapshot.paymentMethod === 'CASH'" class="order__summary-row">
-            <span>{{ t("customerDisplay.columns.change") }}</span>
-            <span>{{ formatTenderOrChange(completedSnapshot.changeGivenUsd, completedSnapshot.changeGivenRiel) }}</span>
-          </div>
-          <div v-else class="order__summary-row">
-            <span>{{ t("customerDisplay.columns.paymentMethod") }}</span>
-            <span>{{ t(`checkout.methods.${completedSnapshot.paymentMethod}`) }}</span>
-          </div>
-        </template>
       </div>
+
+      <aside v-if="paymentQr && mode !== 'completed'" class="qr-panel">
+        <p class="qr-panel__title">{{ t("customerDisplay.scanToPay") }}</p>
+        <img :src="paymentQr.qrImage" :alt="paymentQr.bankName" class="qr-panel__image" />
+        <p class="qr-panel__bank">{{ paymentQr.bankName }}</p>
+        <p class="qr-panel__amount">
+          {{ formatMainAmount(activeOrder.totalAmount) }}
+          <span class="qr-panel__amount-secondary">{{ formatSecondaryAmount(activeOrder.totalAmount) }}</span>
+        </p>
+      </aside>
     </div>
   </div>
 </template>
@@ -219,10 +240,72 @@ onUnmounted(() => {
   flex: 1;
   min-height: 0;
   display: flex;
-  flex-direction: column;
+  gap: 2rem;
   padding: 2rem;
+}
+
+.order__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
   gap: 1.5rem;
   overflow-y: auto;
+}
+
+.qr-panel {
+  flex-shrink: 0;
+  width: 380px;
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.5rem;
+  border-radius: 20px;
+  background: #ffffff;
+  border: 2px solid #e2e2e2;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+}
+
+.qr-panel__title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #111111;
+}
+
+/* Kept on a white card in both themes - scanners need dark-on-light. Banks'
+   KHQR images are often a branded card rather than a bare square, so the
+   image keeps its own proportions. */
+.qr-panel__image {
+  width: 100%;
+  max-height: 55vh;
+  object-fit: contain;
+  background: #ffffff;
+}
+
+.qr-panel__bank {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #444444;
+}
+
+.qr-panel__amount {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 2rem;
+  font-weight: 800;
+  color: #111111;
+}
+
+.qr-panel__amount-secondary {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #999999;
 }
 
 .order__table {

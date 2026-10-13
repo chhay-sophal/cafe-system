@@ -9,6 +9,7 @@ const CART_UPDATE_EVENT = "customer-display:cart-update";
 const SALE_COMPLETED_EVENT = "customer-display:sale-completed";
 const REQUEST_SYNC_EVENT = "customer-display:request-sync";
 const LOCALE_CHANGE_EVENT = "customer-display:locale-change";
+const PAYMENT_QR_EVENT = "customer-display:payment-qr";
 
 export type DisplayLocale = "en-US" | "km-KH";
 
@@ -37,6 +38,13 @@ export interface SaleCompletedPayload extends CartUpdatePayload {
   changeGivenRiel: number;
 }
 
+// The KHQR the customer should scan, shown beside the order while the
+// cashier has Mobile Pay + a bank selected at checkout. null hides it.
+export interface PaymentQrPayload {
+  bankName: string;
+  qrImage: string;
+}
+
 // Fire-and-forget: outside a real Tauri window (e.g. plain `vite dev` in a
 // browser tab for quick UI iteration) there's no IPC bridge and these
 // reject - swallow that rather than let it surface as an unhandled
@@ -59,6 +67,10 @@ export function publishLocaleChange(locale: DisplayLocale): void {
   silently(emit(LOCALE_CHANGE_EVENT, locale));
 }
 
+export function publishPaymentQr(payload: PaymentQrPayload | null): void {
+  silently(emit(PAYMENT_QR_EVENT, payload));
+}
+
 export function requestSync(): void {
   silently(emitTo(MAIN_WINDOW_LABEL, REQUEST_SYNC_EVENT));
 }
@@ -73,6 +85,10 @@ export function onSaleCompleted(handler: (payload: SaleCompletedPayload) => void
 
 export function onLocaleChange(handler: (locale: DisplayLocale) => void): Promise<UnlistenFn> {
   return listen<DisplayLocale>(LOCALE_CHANGE_EVENT, (event) => handler(event.payload));
+}
+
+export function onPaymentQr(handler: (payload: PaymentQrPayload | null) => void): Promise<UnlistenFn> {
+  return listen<PaymentQrPayload | null>(PAYMENT_QR_EVENT, (event) => handler(event.payload));
 }
 
 export function onRequestSync(handler: () => void): Promise<UnlistenFn> {
