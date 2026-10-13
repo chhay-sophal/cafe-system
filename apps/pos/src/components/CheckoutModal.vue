@@ -3,10 +3,13 @@ import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { HttpError, submitOrder } from "../lib/api";
 import { computeChange, formatMain, formatRiel, formatSecondary, formatUsd, round2 } from "../lib/currency";
+import { useAuth } from "../composables/useAuth";
 import { useExchangeRate } from "../composables/useExchangeRate";
 import { publishSaleCompleted } from "../composables/useCustomerDisplayChannel";
 import { useNetworkStatus } from "../composables/useNetworkStatus";
 import { useOfflineQueue } from "../composables/useOfflineQueue";
+import { useReceiptPrinter } from "../composables/useReceiptPrinter";
+import type { ReceiptBlock } from "../lib/receipt";
 import type { CartLineItem } from "../types/cart";
 import type { OrderPayload, OrderResult, PaymentMethod } from "../types/order";
 
@@ -25,6 +28,7 @@ const emit = defineEmits<{
 }>();
 
 type Phase = "payment" | "submitting" | "success" | "error";
+type PrintStatus = "idle" | "printing" | "printed" | "failed" | "noPrinter";
 
 const { t } = useI18n({ useScope: "global" });
 
@@ -40,6 +44,8 @@ const FAST_CASH_RIEL_AMOUNTS = [1000, 2000, 5000, 10000, 20000, 50000, 100000];
 const network = useNetworkStatus();
 const offlineQueue = useOfflineQueue();
 const { exchangeRateRielPerUsd, mainCurrency } = useExchangeRate();
+const auth = useAuth();
+const receiptPrinter = useReceiptPrinter();
 
 const phase = ref<Phase>("payment");
 const paymentMethod = ref<PaymentMethod>("CASH");
@@ -48,6 +54,11 @@ const amountTenderedRiel = ref(0);
 const errorMessage = ref<string | null>(null);
 const orderResult = ref<OrderResult | null>(null);
 const isQueuedOffline = ref(false);
+const printStatus = ref<PrintStatus>("idle");
+const printError = ref<string | null>(null);
+// Snapshotted when the sale succeeds, so a reprint still has the sale's
+// items even after the cart behind `props.items` has moved on.
+let receiptBlocks: ReceiptBlock[] = [];
 
 const isCash = computed(() => paymentMethod.value === "CASH");
 
@@ -77,16 +88,19 @@ const successLabel = computed(() => {
 
 // Offline orders have no server-confirmed change/total yet, so fall back to
 // the client-side calculation until the sync engine reconciles them.
-const successDisplay = computed(() => {
-  if (isCash.value) {
-    const split = isQueuedOffline.value || !orderResult.value
-      ? changeSplit.value
-      : { usd: orderResult.value.changeGivenUsd, riel: orderResult.value.changeGivenRiel };
-    return formatChangeAmount(split.usd, split.riel);
-  }
-  const total = isQueuedOffline.value ? props.totalAmount : orderResult.value?.totalAmount ?? props.totalAmount;
-  return format(total);
-});
+const finalChange = computed(() =>
+  isQueuedOffline.value || !orderResult.value
+    ? changeSplit.value
+    : { usd: orderResult.value.changeGivenUsd, riel: orderResult.value.changeGivenRiel },
+);
+
+const finalTotal = computed(() =>
+  isQueuedOffline.value ? props.totalAmount : orderResult.value?.totalAmount ?? props.totalAmount,
+);
+
+const successDisplay = computed(() =>
+  isCash.value ? formatChangeAmount(finalChange.value.usd, finalChange.value.riel) : format(finalTotal.value),
+);
 
 function format(value: number): string {
   return formatMain(value, mainCurrency.value, exchangeRateRielPerUsd.value);
@@ -211,18 +225,107 @@ async function handleComplete() {
   }
 }
 
+// Fixed-width numeric date - receipts shouldn't depend on the webview's
+// locale data, which is incomplete for km-KH (see lib/currency.ts).
+function formatReceiptDate(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function buildReceiptBlocks(): ReceiptBlock[] {
+  const subtotal = isQueuedOffline.value ? props.subtotal : orderResult.value?.subtotal ?? props.subtotal;
+  const orderLabel = isQueuedOffline.value
+    ? t("receipt.pendingSync")
+    : t("checkout.orderNumber", { number: orderResult.value?.orderNumber });
+
+  const blocks: ReceiptBlock[] = [
+    { type: "text", text: t("app.title"), align: "center", size: "large", bold: true },
+    { type: "text", text: formatReceiptDate(new Date()), align: "center", size: "small" },
+    { type: "text", text: orderLabel, align: "center", bold: true },
+  ];
+
+  const cashierName = auth.session.value?.user.name;
+  if (cashierName) {
+    blocks.push({ type: "text", text: t("receipt.cashier", { name: cashierName }), align: "center", size: "small" });
+  }
+
+  blocks.push({ type: "divider" });
+
+  for (const item of props.items) {
+    const unitPrice = item.unitBasePrice + item.modifiers.reduce((sum, modifier) => sum + modifier.priceExtra, 0);
+    blocks.push({ type: "row", left: `${item.quantity} x ${item.productName}`, right: format(unitPrice * item.quantity) });
+    for (const modifier of item.modifiers) {
+      blocks.push({ type: "text", text: `+ ${modifier.name}`, size: "small", indent: 24 });
+    }
+  }
+
+  blocks.push({ type: "divider" });
+  blocks.push({ type: "row", left: t("cart.subtotal"), right: format(subtotal) });
+  if (props.taxAmount > 0) {
+    blocks.push({ type: "row", left: t("cart.tax"), right: format(props.taxAmount) });
+  }
+  if (props.discountAmount > 0) {
+    blocks.push({ type: "row", left: t("cart.discount"), right: `-${format(props.discountAmount)}` });
+  }
+  blocks.push({ type: "row", left: t("cart.total"), right: format(finalTotal.value), size: "large", bold: true });
+  blocks.push({ type: "row", left: "", right: formatSecondaryAmount(finalTotal.value), size: "small" });
+
+  blocks.push({ type: "divider" });
+  blocks.push({ type: "row", left: t("receipt.payment"), right: t(`checkout.methods.${paymentMethod.value}`) });
+  if (isCash.value) {
+    if (amountTenderedUsd.value > 0) {
+      blocks.push({ type: "row", left: t("receipt.tendered"), right: formatUsd(amountTenderedUsd.value) });
+    }
+    if (amountTenderedRiel.value > 0) {
+      blocks.push({ type: "row", left: t("receipt.tendered"), right: formatRiel(amountTenderedRiel.value) });
+    }
+    blocks.push({
+      type: "row",
+      left: t("checkout.changeDueLabel"),
+      right: formatChangeAmount(finalChange.value.usd, finalChange.value.riel),
+      bold: true,
+    });
+  }
+
+  blocks.push({ type: "spacer", height: 12 });
+  blocks.push({ type: "text", text: t("receipt.thankYou"), align: "center" });
+  return blocks;
+}
+
+// Never blocks the sale - it has already gone through by the time this
+// runs. A failure only shows on the success screen with a reprint option.
+async function printSaleReceipt() {
+  if (!receiptPrinter.printerName.value) {
+    printStatus.value = "noPrinter";
+    return;
+  }
+
+  printStatus.value = "printing";
+  printError.value = null;
+  try {
+    await receiptPrinter.printReceipt(receiptBlocks);
+    printStatus.value = "printed";
+  } catch (error) {
+    // Rust command errors arrive as plain strings, not Error objects.
+    printError.value = error instanceof Error ? error.message : String(error);
+    printStatus.value = "failed";
+  }
+}
+
 // Publishes the finished sale to the customer-facing display once, at the
 // exact moment the sale actually succeeds (online or queued offline) -
 // matches successDisplay's own preference for the server-confirmed change
-// amounts over the locally-computed ones when both are available.
+// amounts over the locally-computed ones when both are available. The
+// receipt prints at the same moment.
 watch(phase, (newPhase) => {
   if (newPhase !== "success") {
     return;
   }
 
-  const change = isQueuedOffline.value || !orderResult.value
-    ? changeSplit.value
-    : { usd: orderResult.value.changeGivenUsd, riel: orderResult.value.changeGivenRiel };
+  receiptBlocks = buildReceiptBlocks();
+  printSaleReceipt();
+
+  const change = finalChange.value;
 
   publishSaleCompleted({
     items: props.items.map((item) => {
@@ -381,7 +484,23 @@ function handleDone() {
         <p class="checkout-success__amount">{{ successDisplay }}</p>
         <p v-if="isQueuedOffline" class="checkout-success__order">{{ t("checkout.savedOffline") }}</p>
         <p v-else class="checkout-success__order">{{ t("checkout.orderNumber", { number: orderResult?.orderNumber }) }}</p>
-        <button type="button" class="checkout-modal__complete" @click="handleDone">{{ t("common.done") }}</button>
+        <p v-if="printStatus === 'printing'" class="checkout-print">{{ t("receipt.printing") }}</p>
+        <p v-else-if="printStatus === 'printed'" class="checkout-print">{{ t("receipt.printed") }}</p>
+        <p v-else-if="printStatus === 'noPrinter'" class="checkout-print checkout-print--warning">{{ t("receipt.noPrinter") }}</p>
+        <p v-else-if="printStatus === 'failed'" class="checkout-print checkout-print--warning">
+          {{ t("receipt.failed", { error: printError }) }}
+        </p>
+        <div class="checkout-error__actions">
+          <button
+            v-if="printStatus === 'printed' || printStatus === 'failed'"
+            type="button"
+            class="checkout-modal__cancel"
+            @click="printSaleReceipt"
+          >
+            {{ t("receipt.reprint") }}
+          </button>
+          <button type="button" class="checkout-modal__complete" @click="handleDone">{{ t("common.done") }}</button>
+        </div>
       </div>
 
       <div v-else class="checkout-modal__body checkout-modal__body--centered">
@@ -668,6 +787,17 @@ function handleDone() {
   margin: 0 0 1.5rem;
   color: #888888;
   font-size: 0.9rem;
+}
+
+.checkout-print {
+  margin: -0.75rem 0 1.25rem;
+  color: #888888;
+  font-size: 0.85rem;
+}
+
+.checkout-print--warning {
+  color: #c0392b;
+  font-weight: 600;
 }
 
 @media (prefers-color-scheme: dark) {

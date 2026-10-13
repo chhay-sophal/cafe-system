@@ -80,6 +80,20 @@
     "loading": "Loading menu...",
     "empty": "No items in this category."
   },
+  "receipt": {
+    "printerAria": "Receipt printer",
+    "noPrinterOption": "No printer",
+    "printing": "Printing receipt...",
+    "printed": "Receipt printed",
+    "noPrinter": "No receipt printer selected",
+    "failed": "Receipt not printed: {error}",
+    "reprint": "Reprint",
+    "pendingSync": "Order pending sync",
+    "cashier": "Cashier: {name}",
+    "payment": "Payment",
+    "tendered": "Tendered",
+    "thankYou": "Thank you!"
+  },
   "customerDisplay": {
     "idleTitle": "Welcome",
     "columns": {

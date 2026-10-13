@@ -1,3 +1,5 @@
+mod printer;
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -54,7 +56,11 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![greet])
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            printer::list_printers,
+            printer::print_raw
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
