@@ -308,7 +308,9 @@
       "status": "Status",
       "created": "Created",
       "active": "Active",
-      "deactivated": "Deactivated"
+      "deactivated": "Deactivated",
+      "searchPlaceholder": "Search name or role...",
+      "noMatches": "No staff accounts match your search or filters."
     }
   },
   "settings": {
