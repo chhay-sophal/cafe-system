@@ -1,6 +1,6 @@
 import type { AuthSession } from "~/types/auth";
 import type {
-  Category, CategoryPayload, ImageUploadResult, ModifierGroup, Product, ProductPayload,
+  Category, CategoryPayload, ImageUploadResult, ModifierGroup, ModifierGroupPayload, Product, ProductPayload,
 } from "~/types/catalog";
 import type { InventoryItem, InventoryItemPayload, StockAdjustmentPayload } from "~/types/inventory";
 import type { OrderDetail, OrderSummary } from "~/types/orders";
@@ -141,6 +141,18 @@ export function useApi() {
     return getJson<ModifierGroup[]>("/api/modifiers");
   }
 
+  function createModifierGroup(payload: ModifierGroupPayload, token: string): Promise<ModifierGroup> {
+    return sendJson<ModifierGroup>("POST", "/api/modifiers", payload, token);
+  }
+
+  function updateModifierGroup(id: string, payload: ModifierGroupPayload, token: string): Promise<ModifierGroup> {
+    return sendJson<ModifierGroup>("PUT", `/api/modifiers/${id}`, payload, token);
+  }
+
+  function deleteModifierGroup(id: string, token: string): Promise<{ success: boolean }> {
+    return deleteJson<{ success: boolean }>(`/api/modifiers/${id}`, token);
+  }
+
   function createCategory(payload: CategoryPayload, token: string): Promise<Category> {
     return sendJson<Category>("POST", "/api/categories", payload, token);
   }
@@ -239,6 +251,9 @@ export function useApi() {
     fetchCategories,
     fetchProducts,
     fetchModifiers,
+    createModifierGroup,
+    updateModifierGroup,
+    deleteModifierGroup,
     fetchRecipe,
     saveRecipe,
     fetchRecipeSummary,

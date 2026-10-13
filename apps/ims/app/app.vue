@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import type { Product } from "~/types/catalog";
+import type { ModifierGroup, Product } from "~/types/catalog";
 import type { InventoryItem } from "~/types/inventory";
 import type { StaffUser } from "~/types/user";
 
@@ -35,10 +35,10 @@ watch(locale, (value) => {
   }
 });
 
-type ActiveView = "inventory" | "menu" | "recipes" | "analytics" | "staff" | "settings";
+type ActiveView = "inventory" | "menu" | "modifiers" | "recipes" | "analytics" | "staff" | "settings";
 
 const ACTIVE_VIEW_STORAGE_KEY = "ims.activeView";
-const ACTIVE_VIEWS: ActiveView[] = ["inventory", "menu", "recipes", "analytics", "staff", "settings"];
+const ACTIVE_VIEWS: ActiveView[] = ["inventory", "menu", "modifiers", "recipes", "analytics", "staff", "settings"];
 
 function loadStoredActiveView(): ActiveView {
   if (!import.meta.client) {
@@ -72,6 +72,11 @@ const isProductDeleteOpen = ref(false);
 const deletingProduct = ref<Product | null>(null);
 const isCategoryModalOpen = ref(false);
 
+const isModifierModalOpen = ref(false);
+const editingModifierGroup = ref<ModifierGroup | null>(null);
+const isModifierDeleteOpen = ref(false);
+const deletingModifierGroup = ref<ModifierGroup | null>(null);
+
 const isAdmin = computed(() => auth.session.value?.user.role === "ADMIN");
 
 const isDrawerOpen = ref(false);
@@ -82,6 +87,7 @@ const navItems = computed<Array<{ key: ActiveView; label: string }>>(() => {
   const items: Array<{ key: ActiveView; label: string }> = [
     { key: "inventory", label: t("app.nav.stock") },
     { key: "menu", label: t("app.nav.menu") },
+    { key: "modifiers", label: t("app.nav.modifiers") },
     { key: "recipes", label: t("app.nav.recipes") },
     { key: "analytics", label: t("app.nav.analytics") },
   ];
@@ -140,6 +146,21 @@ function openEditProductModal(product: Product) {
 function openProductDeleteDialog(product: Product) {
   deletingProduct.value = product;
   isProductDeleteOpen.value = true;
+}
+
+function openCreateModifierModal() {
+  editingModifierGroup.value = null;
+  isModifierModalOpen.value = true;
+}
+
+function openEditModifierModal(group: ModifierGroup) {
+  editingModifierGroup.value = group;
+  isModifierModalOpen.value = true;
+}
+
+function openModifierDeleteDialog(group: ModifierGroup) {
+  deletingModifierGroup.value = group;
+  isModifierDeleteOpen.value = true;
 }
 
 // A restored tab can outlive the session that set it - e.g. an admin left
@@ -287,6 +308,12 @@ watch(
         @delete="openProductDeleteDialog"
         @manage-categories="isCategoryModalOpen = true"
       />
+      <ModifierTable
+        v-else-if="activeView === 'modifiers'"
+        @create="openCreateModifierModal"
+        @edit="openEditModifierModal"
+        @delete="openModifierDeleteDialog"
+      />
       <RecipeEditor v-else-if="activeView === 'recipes'" />
       <UserTable v-else-if="activeView === 'staff' && isAdmin" @create="openCreateUserModal" @edit="openEditUserModal" />
       <SettingsPanel v-else-if="activeView === 'settings' && isAdmin" />
@@ -300,5 +327,7 @@ watch(
     <ProductFormModal v-model:open="isProductModalOpen" :product="editingProduct" />
     <ProductDeleteConfirmModal v-model:open="isProductDeleteOpen" :product="deletingProduct" />
     <CategoryManagementModal v-model:open="isCategoryModalOpen" />
+    <ModifierGroupModal v-model:open="isModifierModalOpen" :group="editingModifierGroup" />
+    <ModifierDeleteConfirmModal v-model:open="isModifierDeleteOpen" :group="deletingModifierGroup" />
   </div>
 </template>

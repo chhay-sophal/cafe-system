@@ -46,4 +46,14 @@ export interface ModifierGroup {
   minSelection: number | null;
   maxSelection: number | null;
   options: ModifierOption[];
+  productIds: string[];
+}
+
+export interface ModifierGroupPayload {
+  name: string;
+  minSelection: number;
+  maxSelection: number;
+  // An option with an id is updated in place; one without is created.
+  options: Array<{ id?: string; name: string; priceExtra: number }>;
+  productIds: string[];
 }

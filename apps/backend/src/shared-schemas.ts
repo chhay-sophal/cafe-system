@@ -5,6 +5,7 @@ export {
   inventoryItemSchema,
   mainCurrencySchema,
   managerApprovalSchema,
+  modifierGroupSchema,
   orderSchema,
   pinLoginSchema,
   productSchema,

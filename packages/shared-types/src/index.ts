@@ -85,6 +85,25 @@ export const productSchema = z.object({
   isAvailable: z.boolean().optional().default(true),
 });
 
+// A group is saved as a whole: options carrying an `id` are updated in place
+// (keeping their recipe links and order history), options without one are
+// created, and existing options left out of the list are removed.
+export const modifierGroupSchema = z.object({
+  name: z.string().trim().min(1, 'Name is required'),
+  minSelection: z.number().int().min(0),
+  maxSelection: z.number().int().min(1),
+  options: z.array(z.object({
+    id: z.string().min(1).optional(),
+    name: z.string().trim().min(1, 'Option name is required'),
+    priceExtra: z.number().nonnegative(),
+  })).min(1, 'Add at least one option'),
+  productIds: z.array(z.string().min(1)).optional().default([]),
+}).refine((data) => data.minSelection <= data.maxSelection, {
+  message: 'Minimum selection cannot exceed maximum selection',
+}).refine((data) => data.minSelection <= data.options.length, {
+  message: 'Minimum selection cannot exceed the number of options',
+});
+
 export const recipeUpdateSchema = z.object({
   productId: z.string().min(1).optional(),
   modifierId: z.string().min(1).optional(),

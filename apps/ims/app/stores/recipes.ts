@@ -1,10 +1,8 @@
 import { defineStore } from "pinia";
-import type { ModifierGroup } from "~/types/catalog";
 import type { RecipeIngredientRecord, RecipeTarget, RecipeUpdatePayload } from "~/types/recipe";
 
 export const useRecipeStore = defineStore("recipes", {
   state: () => ({
-    modifierGroups: [] as ModifierGroup[],
     productRecipeCounts: {} as Record<string, number>,
     modifierRecipeCounts: {} as Record<string, number>,
     isLoadingCatalog: false,
@@ -19,24 +17,22 @@ export const useRecipeStore = defineStore("recipes", {
 
   actions: {
     async fetchCatalog() {
-      // Categories/products live in useCatalogStore - it's the single source
-      // of truth shared with the Menu tab, so a product created/edited/deleted
-      // there is reflected here immediately via the same reactive state,
-      // with no separate copy to go stale until a refresh.
+      // Categories/products/modifier groups live in useCatalogStore - it's the
+      // single source of truth shared with the Menu and Modifiers tabs, so
+      // anything created/edited/deleted there is reflected here immediately
+      // via the same reactive state, with no separate copy to go stale.
       const catalogStore = useCatalogStore();
-      const { fetchModifiers, fetchRecipeSummary } = useApi();
+      const { fetchRecipeSummary } = useApi();
 
       this.isLoadingCatalog = true;
       this.catalogError = null;
 
       try {
-        const [modifierGroups, summary] = await Promise.all([
-          fetchModifiers(),
+        const [summary] = await Promise.all([
           fetchRecipeSummary(),
           catalogStore.hasLoadedOnce ? Promise.resolve(undefined) : catalogStore.fetchCatalog(),
         ] as const);
 
-        this.modifierGroups = modifierGroups;
         this.productRecipeCounts = Object.fromEntries(summary.products.map((entry) => [entry.id, entry.ingredientCount]));
         this.modifierRecipeCounts = Object.fromEntries(summary.modifiers.map((entry) => [entry.id, entry.ingredientCount]));
         this.hasLoadedCatalog = true;

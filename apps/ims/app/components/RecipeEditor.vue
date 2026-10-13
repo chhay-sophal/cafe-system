@@ -39,7 +39,7 @@ const productsByCategory = computed(() => {
 });
 
 const modifierOptionChoices = computed(() =>
-  recipeStore.modifierGroups.flatMap((group) =>
+  catalogStore.modifierGroups.flatMap((group) =>
     group.options.map((option) => ({ id: option.id, label: `${group.name}: ${option.name}` })),
   ),
 );

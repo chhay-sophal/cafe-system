@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 import { createApp } from './app.js';
 import { db } from './db/index.js';
 import {
-  categories, inventoryItems, modifierGroups, modifiers, orderItemModifiers, orderItems, orders, payments, products,
+  categories, inventoryItems, modifierGroups, modifiers, orderItemModifiers, orderItems, orders, payments, productModifiers, products,
   stockAdjustments, storeSettings, users,
 } from './db/schema.js';
 import { hashPin, signToken } from './middleware/auth.js';
@@ -629,5 +629,154 @@ describe('inventory item deletion', () => {
 
     expect(response.status).toBe(200);
     expect(await db.select().from(inventoryItems).where(eq(inventoryItems.id, itemId)).get()).toBeUndefined();
+  });
+});
+
+describe('modifier group management', () => {
+  beforeEach(async () => {
+    await db.delete(payments).run();
+    await db.delete(orderItemModifiers).run();
+    await db.delete(orderItems).run();
+    await db.delete(orders).run();
+    await db.delete(stockAdjustments).run();
+    await db.delete(users).run();
+  });
+
+  async function managerToken() {
+    const pinHash = await hashPin('9999');
+    await db.insert(users).values({ id: 'manager-1', name: 'Manager', pinHash, role: 'MANAGER', isActive: true }).run();
+    return signToken({ id: 'manager-1', name: 'Manager', role: 'MANAGER' });
+  }
+
+  async function testProduct() {
+    const categoryId = randomUUID();
+    const productId = randomUUID();
+    await db.insert(categories).values({ id: categoryId, name: 'Test Modifier Drinks', sortOrder: 1000 }).run();
+    await db.insert(products).values({ id: productId, categoryId, name: 'Test Latte', basePrice: 4 }).run();
+    return { categoryId, productId };
+  }
+
+  async function cleanup(groupId: string, fixture: { categoryId: string; productId: string }) {
+    await db.delete(productModifiers).where(eq(productModifiers.groupId, groupId)).run();
+    await db.delete(modifiers).where(eq(modifiers.groupId, groupId)).run();
+    await db.delete(modifierGroups).where(eq(modifierGroups.id, groupId)).run();
+    await db.delete(products).where(eq(products.id, fixture.productId)).run();
+    await db.delete(categories).where(eq(categories.id, fixture.categoryId)).run();
+  }
+
+  it('rejects a group whose minimum selection exceeds its maximum', async () => {
+    const token = await managerToken();
+
+    const response = await request(app)
+      .post('/api/modifiers')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Sweetness', minSelection: 2, maxSelection: 1, options: [{ name: 'Less', priceExtra: 0 }, { name: 'More', priceExtra: 0 }] });
+
+    expect(response.status).toBe(400);
+  });
+
+  it('creates a group with options and product links, then updates it in place', async () => {
+    const token = await managerToken();
+    const fixture = await testProduct();
+
+    const createResponse = await request(app)
+      .post('/api/modifiers')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        name: 'Test Milk',
+        minSelection: 0,
+        maxSelection: 1,
+        options: [{ name: 'Oat Milk', priceExtra: 0.5 }, { name: 'Soy Milk', priceExtra: 0.5 }],
+        productIds: [fixture.productId],
+      });
+
+    expect(createResponse.status).toBe(201);
+    const group = createResponse.body;
+    expect(group.options).toHaveLength(2);
+    expect(group.productIds).toEqual([fixture.productId]);
+
+    const oat = group.options.find((o: { name: string }) => o.name === 'Oat Milk');
+    const updateResponse = await request(app)
+      .put(`/api/modifiers/${group.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        name: 'Test Milk Choice',
+        minSelection: 1,
+        maxSelection: 1,
+        options: [{ id: oat.id, name: 'Oat Milk', priceExtra: 0.75 }, { name: 'Almond Milk', priceExtra: 0.75 }],
+        productIds: [],
+      });
+
+    expect(updateResponse.status).toBe(200);
+    expect(updateResponse.body.name).toBe('Test Milk Choice');
+    expect(updateResponse.body.productIds).toEqual([]);
+    expect(updateResponse.body.options.map((o: { name: string }) => o.name).sort()).toEqual(['Almond Milk', 'Oat Milk']);
+    // The kept option keeps its id, so its recipe links and order history survive.
+    expect(updateResponse.body.options.find((o: { id: string }) => o.id === oat.id).priceExtra).toBe(0.75);
+
+    await cleanup(group.id, fixture);
+  });
+
+  it('refuses to remove an option or delete a group that has order history', async () => {
+    const token = await managerToken();
+    const fixture = await testProduct();
+    const groupId = randomUUID();
+    const optionId = randomUUID();
+    await db.insert(modifierGroups).values({ id: groupId, name: 'Test Syrup', minSelection: 0, maxSelection: 1 }).run();
+    await db.insert(modifiers).values({ id: optionId, groupId, name: 'Vanilla', priceExtra: 0.5 }).run();
+
+    const orderResponse = await request(app)
+      .post('/api/orders')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        items: [{
+          productId: fixture.productId,
+          productName: 'Test Latte',
+          quantity: 1,
+          unitPrice: 4,
+          selectedModifiers: [{ id: optionId, name: 'Vanilla', priceExtra: 0.5 }],
+        }],
+        paymentMethod: 'CASH',
+        amountTenderedUsd: 10,
+        amountTenderedRiel: 0,
+      });
+    expect(orderResponse.status).toBe(201);
+
+    const updateResponse = await request(app)
+      .put(`/api/modifiers/${groupId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Test Syrup', minSelection: 0, maxSelection: 1, options: [{ name: 'Caramel', priceExtra: 0.5 }] });
+    expect(updateResponse.status).toBe(409);
+
+    const deleteResponse = await request(app)
+      .delete(`/api/modifiers/${groupId}`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(deleteResponse.status).toBe(409);
+    expect(await db.select().from(modifiers).where(eq(modifiers.id, optionId)).get()).toBeDefined();
+
+    await db.delete(payments).run();
+    await db.delete(orderItemModifiers).run();
+    await db.delete(orderItems).run();
+    await db.delete(orders).run();
+    await cleanup(groupId, fixture);
+  });
+
+  it('deletes a group with no order history along with its options and product links', async () => {
+    const token = await managerToken();
+    const fixture = await testProduct();
+    const groupId = randomUUID();
+    await db.insert(modifierGroups).values({ id: groupId, name: 'Test Size', minSelection: 1, maxSelection: 1 }).run();
+    await db.insert(modifiers).values({ id: randomUUID(), groupId, name: 'Large', priceExtra: 1 }).run();
+    await db.insert(productModifiers).values({ productId: fixture.productId, groupId }).run();
+
+    const response = await request(app)
+      .delete(`/api/modifiers/${groupId}`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(200);
+    expect(await db.select().from(modifierGroups).where(eq(modifierGroups.id, groupId)).get()).toBeUndefined();
+    expect(await db.select().from(productModifiers).where(eq(productModifiers.groupId, groupId)).all()).toEqual([]);
+
+    await cleanup(groupId, fixture);
   });
 });

@@ -20,6 +20,7 @@ import {
   inventoryItemSchema,
   mainCurrencySchema,
   managerApprovalSchema,
+  modifierGroupSchema,
   orderSchema,
   pinLoginSchema,
   productSchema,
@@ -473,17 +474,174 @@ function createApp() {
     }
   });
 
+  async function loadModifierGroup(id: string) {
+    const group = await db.select().from(modifierGroups).where(eq(modifierGroups.id, id)).get();
+    if (!group) {
+      return null;
+    }
+    const options = await db.select().from(modifiers).where(eq(modifiers.groupId, id)).all();
+    const links = await db.select().from(productModifiers).where(eq(productModifiers.groupId, id)).all();
+    return { ...group, options, productIds: links.map((link) => link.productId) };
+  }
+
+  // Returns the ids from the list that don't match a real product, so a
+  // stale product picker gets a clear 400 instead of a raw FK failure.
+  async function findUnknownProductIds(productIds: string[]) {
+    if (productIds.length === 0) {
+      return [];
+    }
+    const found = await db.select({ id: products.id }).from(products).where(inArray(products.id, productIds)).all();
+    const foundIds = new Set(found.map((row) => row.id));
+    return productIds.filter((id) => !foundIds.has(id));
+  }
+
   app.get('/api/modifiers', async (_req, res) => {
     try {
       const groups = await db.select().from(modifierGroups).all();
-      const result = await Promise.all(groups.map(async (group) => {
-        const options = await db.select().from(modifiers).where(eq(modifiers.groupId, group.id)).all();
-        return { ...group, options };
-      }));
+      const result = await Promise.all(groups.map((group) => loadModifierGroup(group.id)));
 
       res.json(result);
     } catch (error) {
       res.status(500).json({ error: 'Failed to fetch modifiers' });
+    }
+  });
+
+  app.post('/api/modifiers', authenticate, requireRole(['MANAGER', 'ADMIN']), validateBody(modifierGroupSchema), async (req, res) => {
+    const { name, minSelection, maxSelection, options, productIds } = req.body;
+
+    try {
+      const uniqueProductIds: string[] = [...new Set<string>(productIds)];
+      if ((await findUnknownProductIds(uniqueProductIds)).length > 0) {
+        return res.status(400).json({ error: 'One or more selected products do not exist' });
+      }
+
+      const id = randomUUID();
+      await db.transaction(async (tx) => {
+        await tx.insert(modifierGroups).values({ id, name, minSelection, maxSelection }).run();
+        for (const option of options) {
+          await tx.insert(modifiers).values({ id: randomUUID(), groupId: id, name: option.name, priceExtra: option.priceExtra }).run();
+        }
+        for (const productId of uniqueProductIds) {
+          await tx.insert(productModifiers).values({ productId, groupId: id }).run();
+        }
+      });
+
+      res.status(201).json(await loadModifierGroup(id));
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to create modifier group' });
+    }
+  });
+
+  app.put('/api/modifiers/:id', authenticate, requireRole(['MANAGER', 'ADMIN']), validateBody(modifierGroupSchema), async (req, res) => {
+    const id = String(req.params.id);
+    const { name, minSelection, maxSelection, options, productIds } = req.body as {
+      name: string;
+      minSelection: number;
+      maxSelection: number;
+      options: Array<{ id?: string; name: string; priceExtra: number }>;
+      productIds: string[];
+    };
+
+    try {
+      const existing = await db.select().from(modifierGroups).where(eq(modifierGroups.id, id)).get();
+      if (!existing) {
+        return res.status(404).json({ error: 'Modifier group not found' });
+      }
+
+      const existingOptions = await db.select().from(modifiers).where(eq(modifiers.groupId, id)).all();
+      const existingOptionIds = new Set(existingOptions.map((option) => option.id));
+
+      if (options.some((option) => option.id && !existingOptionIds.has(option.id))) {
+        return res.status(400).json({ error: 'An option does not belong to this modifier group' });
+      }
+
+      const keptOptionIds = new Set(options.flatMap((option) => (option.id ? [option.id] : [])));
+      const removedOptions = existingOptions.filter((option) => !keptOptionIds.has(option.id));
+
+      // order_item_modifiers.modifier_id is a real FK, so an option that has
+      // been sold can't be deleted - same rule as products with order history.
+      if (removedOptions.length > 0) {
+        const soldOptionIds = new Set((await db.select({ modifierId: orderItemModifiers.modifierId })
+          .from(orderItemModifiers)
+          .where(inArray(orderItemModifiers.modifierId, removedOptions.map((option) => option.id)))
+          .all()).map((row) => row.modifierId));
+        const soldNames = removedOptions.filter((option) => soldOptionIds.has(option.id)).map((option) => option.name);
+        if (soldNames.length > 0) {
+          return res.status(409).json({
+            error: `${soldNames.map((n) => `"${n}"`).join(', ')} has order history and cannot be removed. Rename it instead.`,
+          });
+        }
+      }
+
+      const uniqueProductIds = [...new Set(productIds)];
+      if ((await findUnknownProductIds(uniqueProductIds)).length > 0) {
+        return res.status(400).json({ error: 'One or more selected products do not exist' });
+      }
+
+      await db.transaction(async (tx) => {
+        await tx.update(modifierGroups).set({ name, minSelection, maxSelection }).where(eq(modifierGroups.id, id)).run();
+
+        for (const option of removedOptions) {
+          await tx.delete(recipes).where(eq(recipes.modifierId, option.id)).run();
+          await tx.delete(modifiers).where(eq(modifiers.id, option.id)).run();
+        }
+
+        for (const option of options) {
+          if (option.id) {
+            await tx.update(modifiers).set({ name: option.name, priceExtra: option.priceExtra }).where(eq(modifiers.id, option.id)).run();
+          } else {
+            await tx.insert(modifiers).values({ id: randomUUID(), groupId: id, name: option.name, priceExtra: option.priceExtra }).run();
+          }
+        }
+
+        await tx.delete(productModifiers).where(eq(productModifiers.groupId, id)).run();
+        for (const productId of uniqueProductIds) {
+          await tx.insert(productModifiers).values({ productId, groupId: id }).run();
+        }
+      });
+
+      res.json(await loadModifierGroup(id));
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to update modifier group' });
+    }
+  });
+
+  app.delete('/api/modifiers/:id', authenticate, requireRole(['MANAGER', 'ADMIN']), async (req, res) => {
+    const id = String(req.params.id);
+
+    try {
+      const existing = await db.select().from(modifierGroups).where(eq(modifierGroups.id, id)).get();
+      if (!existing) {
+        return res.status(404).json({ error: 'Modifier group not found' });
+      }
+
+      const optionIds = (await db.select({ id: modifiers.id }).from(modifiers).where(eq(modifiers.groupId, id)).all())
+        .map((option) => option.id);
+
+      if (optionIds.length > 0) {
+        const soldLines = await db.select({ id: orderItemModifiers.id })
+          .from(orderItemModifiers)
+          .where(inArray(orderItemModifiers.modifierId, optionIds))
+          .all();
+        if (soldLines.length > 0) {
+          return res.status(409).json({
+            error: `"${existing.name}" has ${soldLines.length} historical order line(s) and cannot be deleted. Unlink it from all products instead.`,
+          });
+        }
+      }
+
+      await db.transaction(async (tx) => {
+        if (optionIds.length > 0) {
+          await tx.delete(recipes).where(inArray(recipes.modifierId, optionIds)).run();
+        }
+        await tx.delete(productModifiers).where(eq(productModifiers.groupId, id)).run();
+        await tx.delete(modifiers).where(eq(modifiers.groupId, id)).run();
+        await tx.delete(modifierGroups).where(eq(modifierGroups.id, id)).run();
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to delete modifier group' });
     }
   });
 
