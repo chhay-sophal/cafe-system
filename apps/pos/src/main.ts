@@ -3,6 +3,7 @@ import { createApp } from "vue";
 import App from "./App.vue";
 import CustomerDisplay from "./components/CustomerDisplay.vue";
 import { i18n } from "./i18n";
+import "./styles/global.css";
 
 // One frontend bundle, two windows: the cashier ("main") mounts the full
 // register UI, the customer-facing screen ("customer-display", created at
