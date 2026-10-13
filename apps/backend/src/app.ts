@@ -799,9 +799,13 @@ function createApp() {
     const endDate = (req.query.endDate as string) || startDate;
     // Same store-local day boundary logic as the daily-summary report.
     const localCreatedAt = sql`datetime(${orders.createdAt}, ${STORE_UTC_OFFSET_SQL_MODIFIER})`;
+    // `mine=true` narrows the list to the caller's own sales - the POS's
+    // Sales History tab, where a cashier reviews only their own shift.
+    const onlyMineUserId = req.query.mine === 'true' ? req.user?.id : undefined;
     const dateCondition = and(
       gte(localCreatedAt, `${startDate} 00:00:00`),
       lte(localCreatedAt, `${endDate} 23:59:59`),
+      onlyMineUserId ? eq(orders.userId, onlyMineUserId) : undefined,
     );
 
     try {

@@ -13,7 +13,8 @@
     "pendingBadge": "{count} pending",
     "online": "Online",
     "offline": "Offline",
-    "loadError": "Failed to load menu."
+    "loadError": "Failed to load menu.",
+    "register": "Register"
   },
   "login": {
     "subtitle": "Enter your PIN to start a shift",
@@ -93,6 +94,42 @@
     "payment": "Payment",
     "tendered": "Tendered",
     "thankYou": "Thank you!"
+  },
+  "salesHistory": {
+    "heading": "Sales History",
+    "refresh": "Refresh",
+    "orders": "Orders today",
+    "totalSales": "Total sales",
+    "loading": "Loading sales...",
+    "loadError": "Failed to load sales.",
+    "empty": "No sales yet today.",
+    "pendingNote": "{count} offline order(s) not synced yet - they will appear here once synced.",
+    "columns": {
+      "time": "Time",
+      "order": "Order",
+      "items": "Items",
+      "payment": "Payment",
+      "total": "Total",
+      "status": "Status"
+    },
+    "status": {
+      "COMPLETED": "Completed",
+      "VOIDED": "Voided",
+      "REFUNDED": "Refunded"
+    }
+  },
+  "orderDetail": {
+    "dialogAriaLabel": "Order details",
+    "loading": "Loading order...",
+    "loadError": "Failed to load order.",
+    "voidOrder": "Void Order",
+    "voidConfirmTitle": "Void this order? This cannot be undone.",
+    "voidReason": "Reason",
+    "voidReasonPlaceholder": "e.g. Wrong item, customer cancelled",
+    "confirmVoid": "Confirm Void",
+    "voiding": "Voiding...",
+    "voidError": "Failed to void order.",
+    "voidUnavailable": "Voiding orders is not available yet."
   },
   "customerDisplay": {
     "idleTitle": "Welcome",

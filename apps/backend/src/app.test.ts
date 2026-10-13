@@ -443,6 +443,37 @@ describe('order list and detail', () => {
     expect(detailResponse.body.payment).toMatchObject({ paymentMethod: 'CASH', amountTenderedUsd: 10 });
   });
 
+  it('narrows the list to the caller\'s own orders with mine=true', async () => {
+    const token = await cashierToken();
+    const pinHash = await hashPin('5678');
+    await db.insert(users).values({ id: 'cashier-2', name: 'Other Cashier', pinHash, role: 'CASHIER', isActive: true }).run();
+    const otherToken = signToken({ id: 'cashier-2', name: 'Other Cashier', role: 'CASHIER' });
+    const productId = await testProductId();
+
+    for (const bearer of [token, otherToken]) {
+      const createResponse = await request(app)
+        .post('/api/orders')
+        .set('Authorization', `Bearer ${bearer}`)
+        .send({
+          items: [{ productId, productName: 'Latte', quantity: 1, unitPrice: 4 }],
+          paymentMethod: 'CARD',
+        });
+      expect(createResponse.status).toBe(201);
+    }
+
+    const allResponse = await request(app)
+      .get('/api/orders')
+      .set('Authorization', `Bearer ${token}`);
+    expect(allResponse.body).toHaveLength(2);
+
+    const mineResponse = await request(app)
+      .get('/api/orders?mine=true')
+      .set('Authorization', `Bearer ${token}`);
+    expect(mineResponse.status).toBe(200);
+    expect(mineResponse.body).toHaveLength(1);
+    expect(mineResponse.body[0].cashierName).toBe('Cashier');
+  });
+
   it('returns 404 for an unknown order id', async () => {
     const token = await cashierToken();
 

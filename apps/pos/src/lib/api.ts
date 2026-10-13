@@ -2,7 +2,7 @@ import { t } from "../i18n";
 import type { AuthSession } from "../types/auth";
 import type { Category, Product } from "../types/catalog";
 import type { ModifierGroup } from "../types/cart";
-import type { OrderPayload, OrderResult } from "../types/order";
+import type { OrderDetail, OrderListRow, OrderPayload, OrderResult } from "../types/order";
 import type { StoreSettings } from "../types/settings";
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
@@ -39,8 +39,13 @@ async function fetchWithTimeout(input: string, init: RequestInit): Promise<Respo
   }
 }
 
-async function getJson<T>(path: string): Promise<T> {
-  const response = await fetchWithTimeout(`${API_BASE_URL}${path}`, {});
+async function getJson<T>(path: string, token?: string): Promise<T> {
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetchWithTimeout(`${API_BASE_URL}${path}`, { headers });
 
   if (!response.ok) {
     throw new HttpError(await parseErrorMessage(response), response.status);
@@ -86,6 +91,22 @@ export function login(pin: string): Promise<AuthSession> {
 
 export function submitOrder(payload: OrderPayload, token: string): Promise<OrderResult> {
   return postJson<OrderResult>("/api/orders", payload, token);
+}
+
+// No date params - the backend defaults to the store's local "today".
+export function fetchMyOrdersToday(token: string): Promise<OrderListRow[]> {
+  return getJson<OrderListRow[]>("/api/orders?mine=true", token);
+}
+
+export function fetchOrderDetail(orderId: string, token: string): Promise<OrderDetail> {
+  return getJson<OrderDetail>(`/api/orders/${encodeURIComponent(orderId)}`, token);
+}
+
+// TODO: the backend has no void endpoint yet. Once it exists, replace this
+// with a postJson call (e.g. POST /api/orders/:id/void with { reason }) -
+// the Sales History UI already calls this and handles success/failure.
+export async function voidOrder(_orderId: string, _reason: string, _token: string): Promise<void> {
+  throw new Error(t("orderDetail.voidUnavailable"));
 }
 
 export function fetchExchangeRate(): Promise<StoreSettings> {

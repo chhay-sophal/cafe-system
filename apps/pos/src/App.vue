@@ -9,6 +9,7 @@ import LoginScreen from "./components/LoginScreen.vue";
 import ModifierModal from "./components/ModifierModal.vue";
 import NetworkStatusBar from "./components/NetworkStatusBar.vue";
 import ProductGrid from "./components/ProductGrid.vue";
+import SalesHistory from "./components/SalesHistory.vue";
 import { checkForUpdateAndInstall } from "./composables/useAppUpdater";
 import { useAuth } from "./composables/useAuth";
 import { useCart } from "./composables/useCart";
@@ -33,6 +34,7 @@ const errorMessage = ref<string | null>(null);
 const activeModalProduct = ref<Product | null>(null);
 const activeModalGroups = ref<ModifierGroup[]>([]);
 const isCheckoutOpen = ref(false);
+const activeView = ref<"register" | "salesHistory">("register");
 
 const auth = useAuth();
 const cart = useCart();
@@ -184,7 +186,27 @@ onUnmounted(() => {
 
   <main v-else class="pos-screen">
     <header class="pos-header">
-      <h1 class="pos-header__title">{{ t("app.title") }}</h1>
+      <div class="pos-header__nav">
+        <h1 class="pos-header__title">{{ t("app.title") }}</h1>
+        <nav class="pos-header__tabs">
+          <button
+            type="button"
+            class="pos-header__tab"
+            :class="{ 'pos-header__tab--active': activeView === 'register' }"
+            @click="activeView = 'register'"
+          >
+            {{ t("app.register") }}
+          </button>
+          <button
+            type="button"
+            class="pos-header__tab"
+            :class="{ 'pos-header__tab--active': activeView === 'salesHistory' }"
+            @click="activeView = 'salesHistory'"
+          >
+            {{ t("salesHistory.heading") }}
+          </button>
+        </nav>
+      </div>
       <div class="pos-header__account">
         <span
           v-if="offlineQueue.pendingCount.value > 0"
@@ -223,7 +245,11 @@ onUnmounted(() => {
 
     <NetworkStatusBar />
 
-    <div class="pos-body">
+    <SalesHistory v-if="activeView === 'salesHistory'" :token="auth.session.value.token" />
+
+    <!-- v-show, not v-if: the cart and catalog must survive a trip to the
+         Sales History tab mid-order. -->
+    <div v-show="activeView === 'register'" class="pos-body">
       <div class="pos-catalog">
         <CategoryTabs
           :categories="categories"
@@ -296,6 +322,33 @@ onUnmounted(() => {
   font-size: 1.25rem;
   font-weight: 700;
   margin: 0;
+}
+
+.pos-header__nav {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.pos-header__tabs {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.pos-header__tab {
+  border: none;
+  background: transparent;
+  color: #aaaaaa;
+  border-radius: 8px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pos-header__tab--active {
+  background: #ffffff;
+  color: #111111;
 }
 
 .pos-header__account {
