@@ -195,7 +195,7 @@ const INPUT_CLASS =
       </div>
 
       <div class="max-h-[60vh] space-y-3 overflow-y-auto">
-        <div v-for="filter in filters" :key="filter.columnId">
+        <div v-for="filter in filters" :key="filter.columnId" class="px-0.5">
           <label class="block text-xs font-medium text-slate-600">{{ filter.label }}</label>
 
           <select
