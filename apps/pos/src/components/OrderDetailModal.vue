@@ -124,6 +124,10 @@ onMounted(loadOrder);
           </span>
         </div>
 
+        <p v-if="order.voidReason" class="order-modal__void-reason">
+          {{ t("orderDetail.voidedReason", { reason: order.voidReason }) }}
+        </p>
+
         <ul class="order-items">
           <li v-for="item in order.items" :key="item.id" class="order-items__row">
             <div class="order-items__main">
@@ -281,6 +285,15 @@ onMounted(loadOrder);
   margin: 0;
   color: #c0392b;
   font-weight: 600;
+}
+
+.order-modal__void-reason {
+  margin: 0;
+  padding: 0.6rem 0.9rem;
+  border-radius: 10px;
+  background: #fdecea;
+  color: #c0392b;
+  font-size: 0.9rem;
 }
 
 .order-meta {

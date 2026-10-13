@@ -78,6 +78,7 @@ export interface OrderDetail {
   discountAmount: number;
   totalAmount: number;
   cashierName: string | null;
+  voidReason: string | null;
   items: OrderDetailItem[];
   payment: OrderDetailPayment | null;
 }

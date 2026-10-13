@@ -28,6 +28,10 @@ export const orderSchema = z.object({
   discountAmount: z.number().nonnegative().optional(),
 });
 
+export const voidOrderSchema = z.object({
+  reason: z.string().trim().min(1, 'A reason is required').max(200),
+});
+
 export const exchangeRateSchema = z.object({
   exchangeRateRielPerUsd: z.number().positive(),
 });

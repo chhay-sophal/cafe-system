@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 import { createApp } from './app.js';
 import { db } from './db/index.js';
 import {
-  categories, inventoryItems, modifierGroups, modifiers, orderItemModifiers, orderItems, orders, payments, productModifiers, products,
+  categories, inventoryItems, modifierGroups, modifiers, orderItemModifiers, orderItems, orders, payments, productModifiers, products, recipes,
   stockAdjustments, storeSettings, users,
 } from './db/schema.js';
 import { hashPin, signToken } from './middleware/auth.js';
@@ -809,5 +809,111 @@ describe('modifier group management', () => {
     expect(await db.select().from(productModifiers).where(eq(productModifiers.groupId, groupId)).all()).toEqual([]);
 
     await cleanup(groupId, fixture);
+  });
+});
+
+describe('order void', () => {
+  beforeEach(async () => {
+    await db.delete(payments).run();
+    await db.delete(orderItemModifiers).run();
+    await db.delete(orderItems).run();
+    await db.delete(orders).run();
+    await db.delete(stockAdjustments).run();
+    await db.delete(users).run();
+  });
+
+  async function userToken(id: string, role: 'CASHIER' | 'MANAGER') {
+    const pinHash = await hashPin(id);
+    await db.insert(users).values({ id, name: id, pinHash, role, isActive: true }).run();
+    return signToken({ id, name: id, role });
+  }
+
+  // A product whose recipe uses 18g of a fresh inventory item, so the test
+  // can check the exact stock deducted by a sale and returned by its void.
+  async function productWithRecipe() {
+    const categoryId = randomUUID();
+    const productId = randomUUID();
+    const inventoryItemId = randomUUID();
+    await db.insert(categories).values({ id: categoryId, name: 'Void Test Category' }).run();
+    await db.insert(products).values({ id: productId, categoryId, name: 'Void Test Espresso', basePrice: 2 }).run();
+    await db.insert(inventoryItems).values({ id: inventoryItemId, name: 'Void Test Beans', unit: 'g', stockQuantity: 1000 }).run();
+    await db.insert(recipes).values({ id: randomUUID(), productId, inventoryItemId, quantityRequired: 18 }).run();
+    return { productId, inventoryItemId };
+  }
+
+  async function placeOrder(token: string, productId: string) {
+    const response = await request(app)
+      .post('/api/orders')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ items: [{ productId, productName: 'Espresso', quantity: 2, unitPrice: 2 }], paymentMethod: 'CARD' });
+    expect(response.status).toBe(201);
+    return response.body.orderId as string;
+  }
+
+  async function stockOf(inventoryItemId: string) {
+    const row = await db.select().from(inventoryItems).where(eq(inventoryItems.id, inventoryItemId)).get();
+    return row?.stockQuantity;
+  }
+
+  it('voids the cashier\'s own order, records the reason, and returns the deducted stock', async () => {
+    const token = await userToken('cashier-void', 'CASHIER');
+    const { productId, inventoryItemId } = await productWithRecipe();
+    const orderId = await placeOrder(token, productId);
+    expect(await stockOf(inventoryItemId)).toBe(1000 - 36);
+
+    const response = await request(app)
+      .post(`/api/orders/${orderId}/void`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ reason: 'Wrong item' });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ success: true, status: 'VOIDED' });
+    expect(await stockOf(inventoryItemId)).toBe(1000);
+
+    const order = await db.select().from(orders).where(eq(orders.id, orderId)).get();
+    expect(order).toMatchObject({ status: 'VOIDED', voidedBy: 'cashier-void', voidReason: 'Wrong item' });
+    expect(order?.voidedAt).toBeTruthy();
+  });
+
+  it('refuses to void the same order twice and does not restock again', async () => {
+    const token = await userToken('cashier-void', 'CASHIER');
+    const { productId, inventoryItemId } = await productWithRecipe();
+    const orderId = await placeOrder(token, productId);
+
+    const first = await request(app).post(`/api/orders/${orderId}/void`).set('Authorization', `Bearer ${token}`).send({ reason: 'Mistake' });
+    expect(first.status).toBe(200);
+
+    const second = await request(app).post(`/api/orders/${orderId}/void`).set('Authorization', `Bearer ${token}`).send({ reason: 'Mistake' });
+    expect(second.status).toBe(409);
+    expect(await stockOf(inventoryItemId)).toBe(1000);
+  });
+
+  it('stops a cashier voiding another cashier\'s order, but lets a manager', async () => {
+    const ownerToken = await userToken('cashier-owner', 'CASHIER');
+    const otherToken = await userToken('cashier-other', 'CASHIER');
+    const managerToken = await userToken('manager-void', 'MANAGER');
+    const { productId } = await productWithRecipe();
+    const orderId = await placeOrder(ownerToken, productId);
+
+    const forbidden = await request(app).post(`/api/orders/${orderId}/void`).set('Authorization', `Bearer ${otherToken}`).send({ reason: 'Not mine' });
+    expect(forbidden.status).toBe(403);
+
+    const allowed = await request(app).post(`/api/orders/${orderId}/void`).set('Authorization', `Bearer ${managerToken}`).send({ reason: 'Customer complaint' });
+    expect(allowed.status).toBe(200);
+  });
+
+  it('requires a reason, authentication, and an existing order', async () => {
+    const token = await userToken('cashier-void', 'CASHIER');
+    const { productId } = await productWithRecipe();
+    const orderId = await placeOrder(token, productId);
+
+    const noReason = await request(app).post(`/api/orders/${orderId}/void`).set('Authorization', `Bearer ${token}`).send({ reason: '  ' });
+    expect(noReason.status).toBe(400);
+
+    const noAuth = await request(app).post(`/api/orders/${orderId}/void`).send({ reason: 'Mistake' });
+    expect(noAuth.status).toBe(401);
+
+    const missing = await request(app).post('/api/orders/does-not-exist/void').set('Authorization', `Bearer ${token}`).send({ reason: 'Mistake' });
+    expect(missing.status).toBe(404);
   });
 });

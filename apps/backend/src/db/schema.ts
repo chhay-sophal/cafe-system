@@ -109,6 +109,10 @@ export const orders = sqliteTable('orders', {
   discountAmount: real('discount_amount').notNull().default(0),
   totalAmount: real('total_amount').notNull(),
   status: text('status', { enum: ['COMPLETED', 'VOIDED', 'REFUNDED'] }).notNull().default('COMPLETED'),
+  // Audit trail for status VOIDED - who voided it, when, and why.
+  voidedAt: text('voided_at'),
+  voidedBy: text('voided_by').references(() => users.id),
+  voidReason: text('void_reason'),
   createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
 }, (table) => ({
   createdAtIndex: index('idx_orders_created_at').on(table.createdAt),

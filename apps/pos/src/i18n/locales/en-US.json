@@ -129,7 +129,7 @@
     "confirmVoid": "Confirm Void",
     "voiding": "Voiding...",
     "voidError": "Failed to void order.",
-    "voidUnavailable": "Voiding orders is not available yet."
+    "voidedReason": "Void reason: {reason}"
   },
   "customerDisplay": {
     "idleTitle": "Welcome",

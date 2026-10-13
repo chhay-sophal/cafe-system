@@ -13,4 +13,5 @@ export {
   taxSettingSchema,
   userCreateSchema,
   userUpdateSchema,
+  voidOrderSchema,
 } from '../../../packages/shared-types/src/index.js';

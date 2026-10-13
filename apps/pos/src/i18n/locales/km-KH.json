@@ -129,7 +129,7 @@
     "confirmVoid": "បញ្ជាក់ការលុបចោល",
     "voiding": "កំពុងលុបចោល...",
     "voidError": "បរាជ័យក្នុងការលុបចោលការកម្ម៉ង់។",
-    "voidUnavailable": "មុខងារលុបចោលការកម្ម៉ង់មិនទាន់មាននៅឡើយទេ។"
+    "voidedReason": "មូលហេតុលុបចោល៖ {reason}"
   },
   "customerDisplay": {
     "idleTitle": "សូមស្វាគមន៍",

@@ -28,6 +28,7 @@ import {
   taxSettingSchema,
   userCreateSchema,
   userUpdateSchema,
+  voidOrderSchema,
 } from './shared-schemas.js';
 
 const DEFAULT_EXCHANGE_RATE_RIEL_PER_USD = 4100;
@@ -851,6 +852,7 @@ function createApp() {
         discountAmount: orders.discountAmount,
         totalAmount: orders.totalAmount,
         cashierName: users.name,
+        voidReason: orders.voidReason,
       })
         .from(orders)
         .leftJoin(users, eq(orders.userId, users.id))
@@ -899,6 +901,94 @@ function createApp() {
     } catch (error) {
       console.error('Fetch order detail error:', error);
       res.status(500).json({ error: 'Failed to fetch order detail' });
+    }
+  });
+
+  // Cashiers may void only their own sales from the current store day (a
+  // mistaken ring-up, a customer who changed their mind); managers and
+  // admins may void any order. Voiding keeps the order and its payment rows
+  // for the audit trail, flips the status, and returns the recipe stock the
+  // sale deducted.
+  app.post('/api/orders/:id/void', authenticate, validateBody(voidOrderSchema), async (req, res) => {
+    const id = String(req.params.id);
+    const { reason } = req.body;
+    const actingUser = req.user;
+
+    if (!actingUser) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    try {
+      const order = await db.select({
+        userId: orders.userId,
+        status: orders.status,
+        localDate: sql<string>`date(${orders.createdAt}, ${STORE_UTC_OFFSET_SQL_MODIFIER})`,
+      }).from(orders).where(eq(orders.id, id)).get();
+
+      if (!order) {
+        return res.status(404).json({ error: 'Order not found' });
+      }
+
+      const isManager = actingUser.role === 'MANAGER' || actingUser.role === 'ADMIN';
+      if (!isManager && (order.userId !== actingUser.id || order.localDate !== storeTodayDateString())) {
+        return res.status(403).json({ error: 'You can only void your own orders from today' });
+      }
+
+      if (order.status !== 'COMPLETED') {
+        return res.status(409).json({ error: 'Only completed orders can be voided' });
+      }
+
+      const items = await db.select({ id: orderItems.id, productId: orderItems.productId, quantity: orderItems.quantity })
+        .from(orderItems).where(eq(orderItems.orderId, id)).all();
+      const itemModifiers = items.length
+        ? await db.select({ orderItemId: orderItemModifiers.orderItemId, modifierId: orderItemModifiers.modifierId })
+          .from(orderItemModifiers).where(inArray(orderItemModifiers.orderItemId, items.map((item) => item.id))).all()
+        : [];
+
+      const wasVoided = await db.transaction(async (tx) => {
+        // Conditional on status so two simultaneous voids can't both
+        // restock - only the one that actually flips the status proceeds.
+        const update = await tx.update(orders)
+          .set({ status: 'VOIDED', voidedAt: sql`CURRENT_TIMESTAMP`, voidedBy: actingUser.id, voidReason: reason })
+          .where(and(eq(orders.id, id), eq(orders.status, 'COMPLETED')))
+          .run();
+        if (update.rowsAffected === 0) {
+          return false;
+        }
+
+        // Mirrors the deduction in POST /api/orders. Uses the recipes as they
+        // are now, not as they were at sale time (recipes aren't snapshotted
+        // per order) - normally the same, since voids happen the same day.
+        const restock = async (recipeRows: Array<{ inventoryItemId: string; quantityRequired: number }>, quantity: number) => {
+          for (const recipe of recipeRows) {
+            await tx.update(inventoryItems)
+              .set({
+                stockQuantity: sql`${inventoryItems.stockQuantity} + ${recipe.quantityRequired * quantity}`,
+                updatedAt: sql`CURRENT_TIMESTAMP`,
+              })
+              .where(eq(inventoryItems.id, recipe.inventoryItemId))
+              .run();
+          }
+        };
+
+        for (const item of items) {
+          await restock(await tx.select().from(recipes).where(eq(recipes.productId, item.productId)).all(), item.quantity);
+          for (const modifier of itemModifiers.filter((m) => m.orderItemId === item.id)) {
+            await restock(await tx.select().from(recipes).where(eq(recipes.modifierId, modifier.modifierId)).all(), item.quantity);
+          }
+        }
+
+        return true;
+      });
+
+      if (!wasVoided) {
+        return res.status(409).json({ error: 'Only completed orders can be voided' });
+      }
+
+      res.json({ success: true, orderId: id, status: 'VOIDED' });
+    } catch (error) {
+      console.error('Void order error:', error);
+      res.status(500).json({ error: 'Failed to void order' });
     }
   });
 

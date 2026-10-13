@@ -102,11 +102,8 @@ export function fetchOrderDetail(orderId: string, token: string): Promise<OrderD
   return getJson<OrderDetail>(`/api/orders/${encodeURIComponent(orderId)}`, token);
 }
 
-// TODO: the backend has no void endpoint yet. Once it exists, replace this
-// with a postJson call (e.g. POST /api/orders/:id/void with { reason }) -
-// the Sales History UI already calls this and handles success/failure.
-export async function voidOrder(_orderId: string, _reason: string, _token: string): Promise<void> {
-  throw new Error(t("orderDetail.voidUnavailable"));
+export async function voidOrder(orderId: string, reason: string, token: string): Promise<void> {
+  await postJson(`/api/orders/${encodeURIComponent(orderId)}/void`, { reason }, token);
 }
 
 export function fetchExchangeRate(): Promise<StoreSettings> {
