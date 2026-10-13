@@ -77,6 +77,38 @@ function handleRangeChange(filter: TableFilterDef, end: 0 | 1, value: string) {
   draft.range[filter.columnId] = next;
 }
 
+// True when `low` is above `high`. Both ends must be filled in; dates compare
+// correctly as text since <input type="date"> always gives "YYYY-MM-DD".
+function isAbove(filter: TableFilterDef, low: string, high: string) {
+  if (!low || !high) {
+    return false;
+  }
+  return filter.type === "numberRange" ? Number(low) > Number(high) : low > high;
+}
+
+function isReversed(filter: TableFilterDef) {
+  if (filter.type === "select") {
+    return false;
+  }
+  const [low, high] = rangeOf(draft, filter.columnId);
+  return isAbove(filter, low, high);
+}
+
+const hasReversedRange = computed(() => props.filters.some(isReversed));
+
+// The inputs' min/max only bound the spinner/date picker, not typed text -
+// so once a typed value is committed (blur/Enter), pull it back to the other
+// end's value if it crossed over. Done on change rather than on every
+// keystroke so typing "15" towards a max of 20 isn't clamped at "1".
+function snapRangeEnd(filter: TableFilterDef, end: 0 | 1) {
+  const next: [string, string] = [...rangeOf(draft, filter.columnId)];
+  const [low, high] = next;
+  if (isAbove(filter, low, high)) {
+    next[end] = next[end === 0 ? 1 : 0];
+    draft.range[filter.columnId] = next;
+  }
+}
+
 // The table filter value a filter's state translates to; undefined = none.
 function filterValueOf(state: FilterState, filter: TableFilterDef): unknown {
   if (filter.type === "select") {
@@ -115,6 +147,9 @@ function clearAll() {
 }
 
 function apply() {
+  if (hasReversedRange.value) {
+    return;
+  }
   copyState(draft, applied);
   for (const filter of props.filters) {
     setColumnFilter(filter.columnId, filterValueOf(applied, filter));
@@ -209,33 +244,43 @@ const INPUT_CLASS =
             <option v-for="(option, index) in filter.options" :key="index" :value="String(index)">{{ option.label }}</option>
           </select>
 
+          <!-- Each end bounds the other (min/max work for both number and
+               date inputs), so the spinners/date pickers can't cross over. -->
           <div v-else class="mt-1 grid grid-cols-2 gap-2">
             <input
               :type="filter.type === 'numberRange' ? 'number' : 'date'"
               :value="rangeOf(draft, filter.columnId)[0]"
+              :max="rangeOf(draft, filter.columnId)[1] || undefined"
               :placeholder="filter.type === 'numberRange' ? t('tableFilters.min') : undefined"
               :aria-label="`${filter.label} - ${filter.type === 'numberRange' ? t('tableFilters.min') : t('tableFilters.from')}`"
               :class="INPUT_CLASS"
               class="w-full min-w-0"
               @input="handleRangeChange(filter, 0, ($event.target as HTMLInputElement).value)"
+              @change="snapRangeEnd(filter, 0)"
             />
             <input
               :type="filter.type === 'numberRange' ? 'number' : 'date'"
               :value="rangeOf(draft, filter.columnId)[1]"
+              :min="rangeOf(draft, filter.columnId)[0] || undefined"
               :placeholder="filter.type === 'numberRange' ? t('tableFilters.max') : undefined"
               :aria-label="`${filter.label} - ${filter.type === 'numberRange' ? t('tableFilters.max') : t('tableFilters.to')}`"
               :class="INPUT_CLASS"
               class="w-full min-w-0"
               @input="handleRangeChange(filter, 1, ($event.target as HTMLInputElement).value)"
+              @change="snapRangeEnd(filter, 1)"
             />
           </div>
+          <p v-if="isReversed(filter)" class="mt-1 text-xs font-medium text-red-600">
+            {{ t("tableFilters.rangeReversed") }}
+          </p>
         </div>
       </div>
 
       <div class="mt-4 flex justify-end border-t border-slate-100 pt-3">
         <button
           type="button"
-          class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+          :disabled="hasReversedRange"
+          class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
           @click="apply"
         >
           {{ t("tableFilters.apply") }}

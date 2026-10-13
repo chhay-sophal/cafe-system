@@ -28,7 +28,8 @@
     "max": "Max",
     "from": "From",
     "to": "To",
-    "apply": "Apply"
+    "apply": "Apply",
+    "rangeReversed": "The first value must not be greater than the second."
   },
   "app": {
     "title": "Inventory Manager",
