@@ -70,11 +70,21 @@ const filterFn_includesDisplayText = constructFilterFn({
   autoRemove: (value) => value == null || String(value).trim() === "",
 });
 
+// Keeps rows whose array value (e.g. a list of linked ids) contains the
+// filter value - for a select filter over a list column.
+const filterFn_contains = constructFilterFn({
+  filter: (dataValue, filterValue) => Array.isArray(dataValue) && dataValue.includes(filterValue),
+  autoRemove: (value) => value === undefined || value === null || value === "",
+});
+
 // Spread into tableFeatures({...}) for TableFilters: the search box uses the
 // global filter - pass `globalFilterFn: "includesDisplayText"` to useTable to
 // search displayed text - and each TableFilterDef type needs its column to use
-// the matching filterFn here - "equals" for select, "inNumberRange" for
-// numberRange, "inDayRange" for dateRange (see StockTable.vue).
+// the matching filterFn here - "equals" for select ("contains" when the
+// column holds an array), "inNumberRange" for numberRange, "inDayRange" for
+// dateRange (see StockTable.vue). A filter can target a hidden column (add
+// columnVisibilityFeature) when there is nothing to show for it - see
+// ModifierTable.vue.
 export const filteringFeatures = {
   columnFilteringFeature,
   globalFilteringFeature,
@@ -83,6 +93,7 @@ export const filteringFeatures = {
     includesString: filterFn_includesString,
     includesDisplayText: filterFn_includesDisplayText,
     equals: filterFn_equals,
+    contains: filterFn_contains,
     equalsString: filterFn_equalsString,
     inNumberRange: filterFn_inNumberRange,
     inDayRange: filterFn_inDayRange,

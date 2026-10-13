@@ -2,8 +2,9 @@
 import { computed, onMounted } from "vue";
 import { Pencil, Trash2 } from "@lucide/vue";
 import { storeToRefs } from "pinia";
-import { createColumnHelper, tableFeatures, useTable } from "@tanstack/vue-table";
+import { columnVisibilityFeature, createColumnHelper, tableFeatures, useTable } from "@tanstack/vue-table";
 import type { ModifierGroup } from "~/types/catalog";
+import type { TableFilterDef } from "~/types/table";
 
 const emit = defineEmits<{
   create: [];
@@ -16,14 +17,48 @@ const store = useCatalogStore();
 const { modifierGroups } = storeToRefs(store);
 const { formatMain } = useCurrency();
 
-const features = tableFeatures({ ...sortingFeatures });
+// Defined before the columns: the products column's accessor reads it as
+// soon as the table builds its rows.
+const productNameById = computed(() => new Map(store.products.map((product) => [product.id, product.name])));
+
+const features = tableFeatures({ ...sortingFeatures, ...filteringFeatures, columnVisibilityFeature });
 const columnHelper = createColumnHelper<typeof features, ModifierGroup>();
 
 const columns = columnHelper.columns([
   columnHelper.accessor("name", { id: "group", header: () => t("modifierTable.group") }),
-  columnHelper.display({ id: "options", header: () => t("modifierTable.options") }),
-  columnHelper.display({ id: "products", header: () => t("modifierTable.products") }),
+  // Rendered via slots; the accessors give search the option and menu item
+  // names. Sorting a comma-joined list means nothing, so it's off.
+  columnHelper.accessor((group) => group.options.map((option) => option.name).join(", "), {
+    id: "options",
+    header: () => t("modifierTable.options"),
+    enableSorting: false,
+  }),
+  columnHelper.accessor((group) => linkedProductNames(group), {
+    id: "products",
+    header: () => t("modifierTable.products"),
+    enableSorting: false,
+  }),
   columnHelper.display({ id: "actions", header: "" }),
+  // Hidden, filter-only columns: the group cell's badge and the products
+  // cell already show this information.
+  columnHelper.accessor((group) => (group.minSelection ?? 0) > 0, {
+    id: "required",
+    filterFn: "equals",
+    enableGlobalFilter: false,
+    enableSorting: false,
+  }),
+  columnHelper.accessor("productIds", {
+    id: "menuItem",
+    filterFn: "contains",
+    enableGlobalFilter: false,
+    enableSorting: false,
+  }),
+  columnHelper.accessor((group) => group.productIds.length > 0, {
+    id: "linked",
+    filterFn: "equals",
+    enableGlobalFilter: false,
+    enableSorting: false,
+  }),
 ]);
 
 const cellClass = {
@@ -32,15 +67,52 @@ const cellClass = {
   actions: "px-4 py-3 text-right",
 };
 
-const table = useTable({ features, columns, data: modifierGroups });
+const table = useTable({
+  features,
+  columns,
+  data: modifierGroups,
+  globalFilterFn: "includesDisplayText",
+  initialState: { columnVisibility: { required: false, menuItem: false, linked: false } },
+});
+
+const filters = computed<TableFilterDef[]>(() => [
+  {
+    type: "select",
+    columnId: "required",
+    label: t("modifierTable.requirement"),
+    options: [
+      { value: true, label: t("modifierTable.required") },
+      { value: false, label: t("modifierTable.optional") },
+    ],
+  },
+  {
+    type: "select",
+    columnId: "menuItem",
+    label: t("modifierTable.menuItem"),
+    options: store.products.map((product) => ({ value: product.id, label: product.name })),
+  },
+  {
+    type: "select",
+    columnId: "linked",
+    label: t("modifierTable.linkedFilter"),
+    options: [
+      { value: true, label: t("modifierTable.linkedYes") },
+      { value: false, label: t("modifierTable.linkedNo") },
+    ],
+  },
+]);
+
+// "No modifier groups yet" would be wrong when groups exist but the search
+// or filters hide them all.
+const emptyText = computed(() =>
+  modifierGroups.value.length > 0 ? t("modifierTable.noMatches") : t("modifierTable.empty"),
+);
 
 onMounted(() => {
   if (!store.hasLoadedOnce) {
     store.fetchCatalog();
   }
 });
-
-const productNameById = computed(() => new Map(store.products.map((product) => [product.id, product.name])));
 
 function selectionRule(group: ModifierGroup) {
   const min = group.minSelection ?? 0;
@@ -61,11 +133,11 @@ function linkedProductNames(group: ModifierGroup) {
 
 <template>
   <div class="flex h-full min-h-0 flex-col">
-    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-      <h2 class="text-sm font-semibold text-slate-700">{{ $t("modifierTable.heading") }}</h2>
+    <div class="mb-4 flex flex-wrap items-center gap-3">
+      <TableFilters :table="table" :search-placeholder="$t('modifierTable.searchPlaceholder')" :filters="filters" />
       <button
         type="button"
-        class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+        class="ml-auto rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
         @click="emit('create')"
       >
         {{ $t("modifierTable.newButton") }}
@@ -79,7 +151,7 @@ function linkedProductNames(group: ModifierGroup) {
     </p>
 
     <div v-else class="min-h-0 flex-1 overflow-auto rounded-lg border border-slate-200">
-      <DataTable :table="table" :empty-text="$t('modifierTable.empty')" :cell-class="cellClass" :row-class="() => 'align-top'">
+      <DataTable :table="table" :empty-text="emptyText" :cell-class="cellClass" :row-class="() => 'align-top'">
         <template #cell-group="{ item }">
           <div class="font-medium text-slate-700">{{ item.name }}</div>
           <div class="mt-1 flex flex-wrap items-center gap-1.5 text-xs">

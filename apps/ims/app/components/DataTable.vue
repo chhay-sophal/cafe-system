@@ -3,7 +3,7 @@ import { computed } from "vue";
 import type { HTMLAttributes } from "vue";
 import { ChevronDown, ChevronUp, ChevronsUpDown } from "@lucide/vue";
 import { FlexRender } from "@tanstack/vue-table";
-import type { Column, Row, RowData, TableFeatures, VueTable } from "@tanstack/vue-table";
+import type { Cell, Column, Row, RowData, TableFeatures, VueTable } from "@tanstack/vue-table";
 
 const props = withDefaults(
   defineProps<{
@@ -33,7 +33,25 @@ const slots = defineSlots<{
 const DEFAULT_CELL_CLASS = "px-4 py-3 text-slate-700";
 const DEFAULT_HEADER_CLASS = "px-4 py-3 text-left font-semibold text-slate-600";
 
-const columnCount = computed(() => props.table.getAllLeafColumns().length);
+// Hidden columns (columnVisibilityFeature) are left out of the cells and
+// colspan; header groups already skip them. Tables without the feature lack
+// these methods, so every column counts as visible.
+interface VisibilityAwareTable {
+  getVisibleLeafColumns?: () => unknown[];
+}
+interface VisibilityAwareRow {
+  getVisibleCells?: () => Array<Cell<TFeatures, TData, unknown>>;
+}
+
+function visibleCells(row: Row<TFeatures, TData>) {
+  return (row as unknown as VisibilityAwareRow).getVisibleCells?.() ?? row.getAllCells();
+}
+
+const columnCount = computed(
+  () =>
+    (props.table as unknown as VisibilityAwareTable).getVisibleLeafColumns?.().length ??
+    props.table.getAllLeafColumns().length,
+);
 
 const { t } = useI18n();
 
@@ -105,7 +123,7 @@ function sortLabel(column: SortableColumn) {
         :class="rowClass?.(row)"
         @click="emit('rowClick', row.original)"
       >
-        <td v-for="cell in row.getAllCells()" :key="cell.id" :class="cellClass[cell.column.id] ?? DEFAULT_CELL_CLASS">
+        <td v-for="cell in visibleCells(row)" :key="cell.id" :class="cellClass[cell.column.id] ?? DEFAULT_CELL_CLASS">
           <slot v-if="slots[`cell-${cell.column.id}`]" :name="`cell-${cell.column.id}`" :item="row.original" :row="row" />
           <FlexRender v-else :cell="cell" />
         </td>

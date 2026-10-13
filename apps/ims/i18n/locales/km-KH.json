@@ -183,7 +183,14 @@
     "optional": "មិនបង្ខំ",
     "ruleExactly": "ជ្រើស {count}",
     "ruleUpTo": "ជ្រើសរហូតដល់ {count}",
-    "ruleRange": "ជ្រើស {min}-{max}"
+    "ruleRange": "ជ្រើស {min}-{max}",
+    "searchPlaceholder": "ស្វែងរកក្រុម ជម្រើស មុខទំនិញ...",
+    "requirement": "ការតម្រូវ",
+    "menuItem": "មុខទំនិញ",
+    "linkedFilter": "ភ្ជាប់ទៅមុខទំនិញ",
+    "linkedYes": "បានភ្ជាប់",
+    "linkedNo": "មិនទាន់ភ្ជាប់",
+    "noMatches": "គ្មានក្រុមជម្រើសបន្ថែមត្រូវនឹងការស្វែងរក ឬតម្រងរបស់អ្នកទេ។"
   },
   "productTable": {
     "heading": "ធាតុម៉ឺនុយ",

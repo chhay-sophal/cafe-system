@@ -183,7 +183,14 @@
     "optional": "Optional",
     "ruleExactly": "Choose {count}",
     "ruleUpTo": "Choose up to {count}",
-    "ruleRange": "Choose {min}-{max}"
+    "ruleRange": "Choose {min}-{max}",
+    "searchPlaceholder": "Search groups, options, items...",
+    "requirement": "Requirement",
+    "menuItem": "Menu item",
+    "linkedFilter": "Linked to menu items",
+    "linkedYes": "Linked",
+    "linkedNo": "Not linked",
+    "noMatches": "No modifier groups match your search or filters."
   },
   "productTable": {
     "heading": "Menu Items",
