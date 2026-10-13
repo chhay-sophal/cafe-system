@@ -2,7 +2,6 @@
 import { computed, ref } from "vue";
 import { storeToRefs } from "pinia";
 import {
-  FlexRender,
   columnFilteringFeature,
   createColumnHelper,
   createFilteredRowModel,
@@ -44,7 +43,18 @@ const columns = columnHelper.columns([
   columnHelper.accessor("stockQuantity", { header: () => t("stockTable.columns.stock") }),
   columnHelper.accessor("unit", { header: () => t("stockTable.columns.unit"), filterFn: "equalsString" }),
   columnHelper.accessor("reorderThreshold", { header: () => t("stockTable.columns.reorderAt") }),
+  columnHelper.display({ id: "status", header: () => t("stockTable.columns.status") }),
+  columnHelper.display({ id: "active", header: () => t("stockTable.columns.active") }),
+  columnHelper.display({ id: "updated", header: () => t("stockTable.columns.updated") }),
+  columnHelper.display({ id: "actions", header: "" }),
 ]);
+
+const cellClass = {
+  status: "px-4 py-3",
+  active: "px-4 py-3",
+  updated: "px-4 py-3 text-xs text-slate-400",
+  actions: "px-4 py-3 text-right",
+};
 
 const table = useTable({ features, columns, data: items });
 
@@ -131,101 +141,72 @@ function formatUpdatedAt(value: string | null): string {
     <p v-else-if="isLoading" class="p-6 text-center text-sm text-slate-500">{{ $t("stockTable.loading") }}</p>
 
     <div v-else class="min-h-0 flex-1 overflow-auto rounded-lg border border-slate-200">
-      <table class="min-w-full divide-y divide-slate-200 text-sm">
-        <thead class="sticky top-0 z-10 bg-slate-50">
-          <tr v-for="headerGroup in table.getHeaderGroups()" :key="headerGroup.id">
-            <th
-              v-for="header in headerGroup.headers"
-              :key="header.id"
-              class="px-4 py-3 text-left font-semibold text-slate-600"
-            >
-              <FlexRender v-if="!header.isPlaceholder" :header="header" />
-            </th>
-            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("stockTable.columns.status") }}</th>
-            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("stockTable.columns.active") }}</th>
-            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("stockTable.columns.updated") }}</th>
-            <th class="px-4 py-3" />
-          </tr>
-        </thead>
-
-        <tbody class="divide-y divide-slate-100 bg-white">
-          <tr v-if="table.getRowModel().rows.length === 0">
-            <td :colspan="columns.length + 4" class="px-4 py-8 text-center text-slate-400">
-              {{ $t("stockTable.empty") }}
-            </td>
-          </tr>
-
-          <tr
-            v-for="row in table.getRowModel().rows"
-            :key="row.id"
-            :class="[row.original.isLowStock ? 'bg-red-50/60' : '', !row.original.isActive ? 'opacity-50' : '']"
+      <DataTable
+        :table="table"
+        :empty-text="$t('stockTable.empty')"
+        :cell-class="cellClass"
+        :row-class="(row) => [row.original.isLowStock ? 'bg-red-50/60' : '', !row.original.isActive ? 'opacity-50' : '']"
+      >
+        <template #cell-status="{ item }">
+          <span
+            v-if="item.isLowStock"
+            class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700"
           >
-            <td v-for="cell in row.getAllCells()" :key="cell.id" class="px-4 py-3 text-slate-700">
-              <FlexRender :cell="cell" />
-            </td>
+            {{ $t("stockTable.lowStock") }}
+          </span>
+          <span
+            v-else
+            class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700"
+          >
+            {{ $t("stockTable.ok") }}
+          </span>
+        </template>
 
-            <td class="px-4 py-3">
-              <span
-                v-if="row.original.isLowStock"
-                class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700"
-              >
-                {{ $t("stockTable.lowStock") }}
-              </span>
-              <span
-                v-else
-                class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700"
-              >
-                {{ $t("stockTable.ok") }}
-              </span>
-            </td>
+        <template #cell-active="{ item }">
+          <button
+            type="button"
+            role="switch"
+            :aria-checked="item.isActive"
+            :disabled="togglingIds.has(item.id)"
+            class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50"
+            :class="item.isActive ? 'bg-emerald-500' : 'bg-slate-300'"
+            @click="toggleActive(item)"
+          >
+            <span
+              class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+              :class="item.isActive ? 'translate-x-6' : 'translate-x-1'"
+            />
+          </button>
+        </template>
 
-            <td class="px-4 py-3">
-              <button
-                type="button"
-                role="switch"
-                :aria-checked="row.original.isActive"
-                :disabled="togglingIds.has(row.original.id)"
-                class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50"
-                :class="row.original.isActive ? 'bg-emerald-500' : 'bg-slate-300'"
-                @click="toggleActive(row.original)"
-              >
-                <span
-                  class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
-                  :class="row.original.isActive ? 'translate-x-6' : 'translate-x-1'"
-                />
-              </button>
-            </td>
+        <template #cell-updated="{ item }">{{ formatUpdatedAt(item.updatedAt) }}</template>
 
-            <td class="px-4 py-3 text-xs text-slate-400">{{ formatUpdatedAt(row.original.updatedAt) }}</td>
-
-            <td class="px-4 py-3 text-right">
-              <div class="flex justify-end gap-2">
-                <button
-                  type="button"
-                  class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                  @click="emit('adjust', row.original)"
-                >
-                  {{ $t("stockTable.adjust") }}
-                </button>
-                <button
-                  type="button"
-                  class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                  @click="emit('edit', row.original)"
-                >
-                  {{ $t("common.edit") }}
-                </button>
-                <button
-                  type="button"
-                  class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
-                  @click="emit('delete', row.original)"
-                >
-                  {{ $t("common.delete") }}
-                </button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+        <template #cell-actions="{ item }">
+          <div class="flex justify-end gap-2">
+            <button
+              type="button"
+              class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+              @click="emit('adjust', item)"
+            >
+              {{ $t("stockTable.adjust") }}
+            </button>
+            <button
+              type="button"
+              class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+              @click="emit('edit', item)"
+            >
+              {{ $t("common.edit") }}
+            </button>
+            <button
+              type="button"
+              class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
+              @click="emit('delete', item)"
+            >
+              {{ $t("common.delete") }}
+            </button>
+          </div>
+        </template>
+      </DataTable>
     </div>
   </div>
 </template>

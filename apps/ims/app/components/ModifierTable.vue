@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
+import { storeToRefs } from "pinia";
+import { createColumnHelper, tableFeatures, useTable } from "@tanstack/vue-table";
 import type { ModifierGroup } from "~/types/catalog";
 
 const emit = defineEmits<{
@@ -10,7 +12,26 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 const store = useCatalogStore();
+const { modifierGroups } = storeToRefs(store);
 const { formatMain } = useCurrency();
+
+const features = tableFeatures({});
+const columnHelper = createColumnHelper<typeof features, ModifierGroup>();
+
+const columns = columnHelper.columns([
+  columnHelper.display({ id: "group", header: () => t("modifierTable.group") }),
+  columnHelper.display({ id: "options", header: () => t("modifierTable.options") }),
+  columnHelper.display({ id: "products", header: () => t("modifierTable.products") }),
+  columnHelper.display({ id: "actions", header: "" }),
+]);
+
+const cellClass = {
+  group: "px-4 py-3",
+  products: "max-w-xs px-4 py-3 text-slate-700",
+  actions: "px-4 py-3 text-right",
+};
+
+const table = useTable({ features, columns, data: modifierGroups });
 
 onMounted(() => {
   if (!store.hasLoadedOnce) {
@@ -57,67 +78,53 @@ function linkedProductNames(group: ModifierGroup) {
     </p>
 
     <div v-else class="min-h-0 flex-1 overflow-auto rounded-lg border border-slate-200">
-      <table class="min-w-full divide-y divide-slate-200 text-sm">
-        <thead class="sticky top-0 z-10 bg-slate-50">
-          <tr>
-            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("modifierTable.group") }}</th>
-            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("modifierTable.options") }}</th>
-            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("modifierTable.products") }}</th>
-            <th class="px-4 py-3" />
-          </tr>
-        </thead>
+      <DataTable :table="table" :empty-text="$t('modifierTable.empty')" :cell-class="cellClass" :row-class="() => 'align-top'">
+        <template #cell-group="{ item }">
+          <div class="font-medium text-slate-700">{{ item.name }}</div>
+          <div class="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+            <span
+              class="rounded-full px-2 py-0.5 font-semibold"
+              :class="(item.minSelection ?? 0) > 0 ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'"
+            >
+              {{ (item.minSelection ?? 0) > 0 ? $t("modifierTable.required") : $t("modifierTable.optional") }}
+            </span>
+            <span class="text-slate-500">{{ selectionRule(item) }}</span>
+          </div>
+        </template>
 
-        <tbody class="divide-y divide-slate-100 bg-white">
-          <tr v-if="store.modifierGroups.length === 0">
-            <td colspan="4" class="px-4 py-8 text-center text-slate-400">{{ $t("modifierTable.empty") }}</td>
-          </tr>
+        <template #cell-options="{ item }">
+          <ul class="space-y-0.5">
+            <li v-for="option in item.options" :key="option.id">
+              {{ option.name }}
+              <span v-if="option.priceExtra > 0" class="text-xs text-slate-500">+{{ formatMain(option.priceExtra) }}</span>
+            </li>
+          </ul>
+        </template>
 
-          <tr v-for="group in store.modifierGroups" :key="group.id" class="align-top">
-            <td class="px-4 py-3">
-              <div class="font-medium text-slate-700">{{ group.name }}</div>
-              <div class="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
-                <span
-                  class="rounded-full px-2 py-0.5 font-semibold"
-                  :class="(group.minSelection ?? 0) > 0 ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'"
-                >
-                  {{ (group.minSelection ?? 0) > 0 ? $t("modifierTable.required") : $t("modifierTable.optional") }}
-                </span>
-                <span class="text-slate-500">{{ selectionRule(group) }}</span>
-              </div>
-            </td>
-            <td class="px-4 py-3 text-slate-700">
-              <ul class="space-y-0.5">
-                <li v-for="option in group.options" :key="option.id">
-                  {{ option.name }}
-                  <span v-if="option.priceExtra > 0" class="text-xs text-slate-500">+{{ formatMain(option.priceExtra) }}</span>
-                </li>
-              </ul>
-            </td>
-            <td class="max-w-xs px-4 py-3 text-slate-700">
-              <span v-if="group.productIds.length === 0" class="text-slate-400">{{ $t("modifierTable.noProducts") }}</span>
-              <span v-else>{{ linkedProductNames(group) }}</span>
-            </td>
-            <td class="px-4 py-3 text-right">
-              <div class="flex justify-end gap-2">
-                <button
-                  type="button"
-                  class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                  @click="emit('edit', group)"
-                >
-                  {{ $t("common.edit") }}
-                </button>
-                <button
-                  type="button"
-                  class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
-                  @click="emit('delete', group)"
-                >
-                  {{ $t("common.delete") }}
-                </button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+        <template #cell-products="{ item }">
+          <span v-if="item.productIds.length === 0" class="text-slate-400">{{ $t("modifierTable.noProducts") }}</span>
+          <span v-else>{{ linkedProductNames(item) }}</span>
+        </template>
+
+        <template #cell-actions="{ item }">
+          <div class="flex justify-end gap-2">
+            <button
+              type="button"
+              class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+              @click="emit('edit', item)"
+            >
+              {{ $t("common.edit") }}
+            </button>
+            <button
+              type="button"
+              class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
+              @click="emit('delete', item)"
+            >
+              {{ $t("common.delete") }}
+            </button>
+          </div>
+        </template>
+      </DataTable>
     </div>
   </div>
 </template>

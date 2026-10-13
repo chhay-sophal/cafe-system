@@ -1,12 +1,54 @@
 <script setup lang="ts">
 import { onMounted, watch } from "vue";
+import { storeToRefs } from "pinia";
+import { createColumnHelper, tableFeatures, useTable } from "@tanstack/vue-table";
 import type { OrderSummary } from "~/types/orders";
 
 const { t } = useI18n();
 const auth = useAuth();
 const reportsStore = useReportsStore();
 const ordersStore = useOrdersStore();
+const { orders } = storeToRefs(ordersStore);
 const { formatMain, formatSecondary } = useCurrency();
+
+const features = tableFeatures({});
+const columnHelper = createColumnHelper<typeof features, OrderSummary>();
+
+const columns = columnHelper.columns([
+  columnHelper.accessor("orderNumber", {
+    header: () => t("orders.columns.orderNumber"),
+    cell: ({ getValue }) => `#${getValue()}`,
+  }),
+  columnHelper.accessor("createdAt", {
+    header: () => t("orders.columns.dateTime"),
+    cell: ({ getValue }) => formatDateTime(getValue()),
+  }),
+  columnHelper.accessor("cashierName", {
+    header: () => t("orders.columns.cashier"),
+    cell: ({ getValue }) => getValue() ?? t("common.dash"),
+  }),
+  columnHelper.accessor("itemCount", { header: () => t("orders.columns.items") }),
+  columnHelper.accessor("paymentMethod", {
+    header: () => t("orders.columns.payment"),
+    cell: ({ getValue }) => {
+      const method = getValue();
+      return method ? t(`paymentBreakdown.methods.${method}`) : t("common.dash");
+    },
+  }),
+  // Rendered via slot - shows the total in both currencies.
+  columnHelper.accessor("totalAmount", { header: () => t("orders.columns.total") }),
+]);
+
+const cellClass = {
+  orderNumber: "px-4 py-3 font-medium text-slate-900",
+  totalAmount: "px-4 py-3 text-right text-slate-700",
+};
+
+const headerClass = {
+  totalAmount: "px-4 py-3 text-right font-semibold text-slate-600",
+};
+
+const table = useTable({ features, columns, data: orders });
 
 function loadOrders() {
   const token = auth.session.value?.token;
@@ -47,43 +89,19 @@ function openDetail(order: OrderSummary) {
       class="overflow-x-auto rounded-lg border border-slate-200 transition-opacity duration-150"
       :class="{ 'opacity-50': ordersStore.isLoading && ordersStore.hasLoadedOnce }"
     >
-      <table class="min-w-full divide-y divide-slate-200 text-sm">
-        <thead class="bg-slate-50">
-          <tr>
-            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ t("orders.columns.orderNumber") }}</th>
-            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ t("orders.columns.dateTime") }}</th>
-            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ t("orders.columns.cashier") }}</th>
-            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ t("orders.columns.items") }}</th>
-            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ t("orders.columns.payment") }}</th>
-            <th class="px-4 py-3 text-right font-semibold text-slate-600">{{ t("orders.columns.total") }}</th>
-          </tr>
-        </thead>
-
-        <tbody class="divide-y divide-slate-100 bg-white">
-          <tr v-if="ordersStore.orders.length === 0">
-            <td colspan="6" class="px-4 py-8 text-center text-slate-400">{{ t("orders.empty") }}</td>
-          </tr>
-
-          <tr
-            v-for="order in ordersStore.orders"
-            :key="order.id"
-            class="cursor-pointer hover:bg-slate-50"
-            @click="openDetail(order)"
-          >
-            <td class="px-4 py-3 font-medium text-slate-900">#{{ order.orderNumber }}</td>
-            <td class="px-4 py-3 text-slate-700">{{ formatDateTime(order.createdAt) }}</td>
-            <td class="px-4 py-3 text-slate-700">{{ order.cashierName ?? t("common.dash") }}</td>
-            <td class="px-4 py-3 text-slate-700">{{ order.itemCount }}</td>
-            <td class="px-4 py-3 text-slate-700">
-              {{ order.paymentMethod ? t(`paymentBreakdown.methods.${order.paymentMethod}`) : t("common.dash") }}
-            </td>
-            <td class="px-4 py-3 text-right text-slate-700">
-              {{ formatMain(order.totalAmount) }}
-              <span class="block text-xs text-slate-400">{{ formatSecondary(order.totalAmount) }}</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <DataTable
+        :table="table"
+        :empty-text="t('orders.empty')"
+        :cell-class="cellClass"
+        :header-class="headerClass"
+        :row-class="() => 'cursor-pointer hover:bg-slate-50'"
+        @row-click="openDetail"
+      >
+        <template #cell-totalAmount="{ item }">
+          {{ formatMain(item.totalAmount) }}
+          <span class="block text-xs text-slate-400">{{ formatSecondary(item.totalAmount) }}</span>
+        </template>
+      </DataTable>
     </div>
 
     <OrderDetailModal />

@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { storeToRefs } from "pinia";
+import { createColumnHelper, tableFeatures, useTable } from "@tanstack/vue-table";
 import type { Product } from "~/types/catalog";
 
 const emit = defineEmits<{
@@ -9,8 +11,10 @@ const emit = defineEmits<{
   manageCategories: [];
 }>();
 
+const { t } = useI18n();
 const auth = useAuth();
 const store = useCatalogStore();
+const { products } = storeToRefs(store);
 
 const togglingIds = ref<Set<string>>(new Set());
 const failedImageUrls = ref<Set<string>>(new Set());
@@ -34,6 +38,28 @@ const categoryNameById = computed(() => {
 });
 
 const { formatMain, formatSecondary } = useCurrency();
+
+const features = tableFeatures({});
+const columnHelper = createColumnHelper<typeof features, Product>();
+
+const columns = columnHelper.columns([
+  columnHelper.display({ id: "image", header: () => t("productTable.image") }),
+  columnHelper.accessor("name", { header: () => t("productTable.item") }),
+  // Rendered via slots: the category name and price display depend on other
+  // store state (categories, currency settings), not just the row itself.
+  columnHelper.display({ id: "category", header: () => t("productTable.category") }),
+  columnHelper.display({ id: "basePrice", header: () => t("productTable.basePrice") }),
+  columnHelper.display({ id: "available", header: () => t("productTable.available") }),
+  columnHelper.display({ id: "actions", header: "" }),
+]);
+
+const cellClass = {
+  image: "px-4 py-3",
+  available: "px-4 py-3",
+  actions: "px-4 py-3 text-right",
+};
+
+const table = useTable({ features, columns, data: products });
 
 async function toggleAvailability(product: Product) {
   const token = auth.session.value?.token;
@@ -93,82 +119,68 @@ async function toggleAvailability(product: Product) {
     </p>
 
     <div v-else class="min-h-0 flex-1 overflow-auto rounded-lg border border-slate-200">
-      <table class="min-w-full divide-y divide-slate-200 text-sm">
-        <thead class="sticky top-0 z-10 bg-slate-50">
-          <tr>
-            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("productTable.image") }}</th>
-            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("productTable.item") }}</th>
-            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("productTable.category") }}</th>
-            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("productTable.basePrice") }}</th>
-            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("productTable.available") }}</th>
-            <th class="px-4 py-3" />
-          </tr>
-        </thead>
+      <DataTable :table="table" :empty-text="$t('productTable.empty')" :cell-class="cellClass">
+        <template #cell-image="{ item }">
+          <img
+            v-if="resolveImageUrl(item.imageUrl) && !failedImageUrls.has(resolveImageUrl(item.imageUrl)!)"
+            :src="resolveImageUrl(item.imageUrl)!"
+            :alt="item.name"
+            class="h-10 w-10 rounded-lg object-cover"
+            @error="markImageFailed(resolveImageUrl(item.imageUrl)!)"
+          />
+          <div
+            v-else
+            class="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-sm font-semibold text-slate-400"
+          >
+            {{ item.name.slice(0, 1) }}
+          </div>
+        </template>
 
-        <tbody class="divide-y divide-slate-100 bg-white">
-          <tr v-if="store.products.length === 0">
-            <td colspan="6" class="px-4 py-8 text-center text-slate-400">{{ $t("productTable.empty") }}</td>
-          </tr>
+        <template #cell-category="{ item }">
+          {{ categoryNameById.get(item.categoryId) ?? $t("common.dash") }}
+        </template>
 
-          <tr v-for="product in store.products" :key="product.id">
-            <td class="px-4 py-3">
-              <img
-                v-if="resolveImageUrl(product.imageUrl) && !failedImageUrls.has(resolveImageUrl(product.imageUrl)!)"
-                :src="resolveImageUrl(product.imageUrl)!"
-                :alt="product.name"
-                class="h-10 w-10 rounded-lg object-cover"
-                @error="markImageFailed(resolveImageUrl(product.imageUrl)!)"
-              />
-              <div
-                v-else
-                class="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-sm font-semibold text-slate-400"
-              >
-                {{ product.name.slice(0, 1) }}
-              </div>
-            </td>
-            <td class="px-4 py-3 text-slate-700">{{ product.name }}</td>
-            <td class="px-4 py-3 text-slate-700">{{ categoryNameById.get(product.categoryId) ?? $t("common.dash") }}</td>
-            <td class="px-4 py-3 text-slate-700">
-              {{ formatMain(product.basePrice) }}
-              <span class="ml-1 text-xs text-slate-400">({{ formatSecondary(product.basePrice) }})</span>
-            </td>
-            <td class="px-4 py-3">
-              <button
-                type="button"
-                role="switch"
-                :aria-checked="product.isAvailable"
-                :disabled="togglingIds.has(product.id)"
-                class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50"
-                :class="product.isAvailable ? 'bg-emerald-500' : 'bg-slate-300'"
-                @click="toggleAvailability(product)"
-              >
-                <span
-                  class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
-                  :class="product.isAvailable ? 'translate-x-6' : 'translate-x-1'"
-                />
-              </button>
-            </td>
-            <td class="px-4 py-3 text-right">
-              <div class="flex justify-end gap-2">
-                <button
-                  type="button"
-                  class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                  @click="emit('edit', product)"
-                >
-                  {{ $t("common.edit") }}
-                </button>
-                <button
-                  type="button"
-                  class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
-                  @click="emit('delete', product)"
-                >
-                  {{ $t("common.delete") }}
-                </button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+        <template #cell-basePrice="{ item }">
+          {{ formatMain(item.basePrice) }}
+          <span class="ml-1 text-xs text-slate-400">({{ formatSecondary(item.basePrice) }})</span>
+        </template>
+
+        <template #cell-available="{ item }">
+          <button
+            type="button"
+            role="switch"
+            :aria-checked="item.isAvailable"
+            :disabled="togglingIds.has(item.id)"
+            class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50"
+            :class="item.isAvailable ? 'bg-emerald-500' : 'bg-slate-300'"
+            @click="toggleAvailability(item)"
+          >
+            <span
+              class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+              :class="item.isAvailable ? 'translate-x-6' : 'translate-x-1'"
+            />
+          </button>
+        </template>
+
+        <template #cell-actions="{ item }">
+          <div class="flex justify-end gap-2">
+            <button
+              type="button"
+              class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+              @click="emit('edit', item)"
+            >
+              {{ $t("common.edit") }}
+            </button>
+            <button
+              type="button"
+              class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
+              @click="emit('delete', item)"
+            >
+              {{ $t("common.delete") }}
+            </button>
+          </div>
+        </template>
+      </DataTable>
     </div>
   </div>
 </template>

@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { storeToRefs } from "pinia";
+import { createColumnHelper, tableFeatures, useTable } from "@tanstack/vue-table";
 import type { InventoryItem } from "~/types/inventory";
 import type { Product } from "~/types/catalog";
 import type { RecipeIngredientDraft, RecipeTarget, RecipeTargetKind, RecipeUpdatePayload } from "~/types/recipe";
@@ -25,6 +27,23 @@ const isDeleteOpen = ref(false);
 const deletingProduct = ref<Product | null>(null);
 
 const inventoryItems = computed<InventoryItem[]>(() => inventoryStore.items);
+
+const { products } = storeToRefs(catalogStore);
+const recipeTableFeatures = tableFeatures({});
+const recipeColumnHelper = createColumnHelper<typeof recipeTableFeatures, Product>();
+
+const recipeColumns = recipeColumnHelper.columns([
+  recipeColumnHelper.accessor("name", { header: () => t("productTable.item") }),
+  recipeColumnHelper.display({ id: "status", header: () => t("recipe.recipeStatus") }),
+  recipeColumnHelper.display({ id: "actions", header: "" }),
+]);
+
+const recipeCellClass = {
+  status: "px-4 py-3",
+  actions: "px-4 py-3 text-right",
+};
+
+const recipeTable = useTable({ features: recipeTableFeatures, columns: recipeColumns, data: products });
 
 const productsByCategory = computed(() => {
   const grouped = new Map<string, Product[]>();
@@ -232,62 +251,51 @@ onMounted(async () => {
       </p>
 
       <div v-else class="max-h-[45vh] overflow-auto rounded-lg border border-slate-200">
-        <table class="min-w-full divide-y divide-slate-200 text-sm">
-          <thead class="sticky top-0 z-10 bg-slate-50">
-            <tr>
-              <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("productTable.item") }}</th>
-              <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("recipe.recipeStatus") }}</th>
-              <th class="px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-100 bg-white">
-            <tr v-for="product in catalogStore.products" :key="product.id">
-              <td class="px-4 py-3 text-slate-700">{{ product.name }}</td>
-              <td class="px-4 py-3">
-                <span
-                  v-if="recipeStore.hasProductRecipe(product.id)"
-                  class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700"
+        <DataTable :table="recipeTable" :empty-text="$t('productTable.empty')" :cell-class="recipeCellClass">
+          <template #cell-status="{ item }">
+            <span
+              v-if="recipeStore.hasProductRecipe(item.id)"
+              class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700"
+            >
+              {{ $t("recipe.ingredientCount", { count: recipeStore.productRecipeCounts[item.id] }) }}
+            </span>
+            <span
+              v-else
+              class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700"
+            >
+              {{ $t("recipe.notConfigured") }}
+            </span>
+          </template>
+
+          <template #cell-actions="{ item }">
+            <div class="flex justify-end gap-2">
+              <button
+                v-if="!recipeStore.hasProductRecipe(item.id)"
+                type="button"
+                class="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700"
+                @click="startEditingProduct(item.id)"
+              >
+                {{ $t("recipe.createRecipe") }}
+              </button>
+              <template v-else>
+                <button
+                  type="button"
+                  class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                  @click="startEditingProduct(item.id)"
                 >
-                  {{ $t("recipe.ingredientCount", { count: recipeStore.productRecipeCounts[product.id] }) }}
-                </span>
-                <span
-                  v-else
-                  class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700"
+                  {{ $t("common.edit") }}
+                </button>
+                <button
+                  type="button"
+                  class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
+                  @click="openDeleteModal(item)"
                 >
-                  {{ $t("recipe.notConfigured") }}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-right">
-                <div class="flex justify-end gap-2">
-                  <button
-                    v-if="!recipeStore.hasProductRecipe(product.id)"
-                    type="button"
-                    class="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700"
-                    @click="startEditingProduct(product.id)"
-                  >
-                    {{ $t("recipe.createRecipe") }}
-                  </button>
-                  <template v-else>
-                    <button
-                      type="button"
-                      class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                      @click="startEditingProduct(product.id)"
-                    >
-                      {{ $t("common.edit") }}
-                    </button>
-                    <button
-                      type="button"
-                      class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
-                      @click="openDeleteModal(product)"
-                    >
-                      {{ $t("common.delete") }}
-                    </button>
-                  </template>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+                  {{ $t("common.delete") }}
+                </button>
+              </template>
+            </div>
+          </template>
+        </DataTable>
       </div>
     </section>
 

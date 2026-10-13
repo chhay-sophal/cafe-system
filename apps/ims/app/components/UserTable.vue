@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from "vue";
+import { storeToRefs } from "pinia";
+import { createColumnHelper, tableFeatures, useTable } from "@tanstack/vue-table";
 import type { StaffUser } from "~/types/user";
 
 const emit = defineEmits<{
@@ -7,8 +9,39 @@ const emit = defineEmits<{
   edit: [user: StaffUser];
 }>();
 
+const { t } = useI18n();
 const auth = useAuth();
 const store = useUserStore();
+const { items } = storeToRefs(store);
+
+const features = tableFeatures({});
+const columnHelper = createColumnHelper<typeof features, StaffUser>();
+
+const columns = columnHelper.columns([
+  columnHelper.accessor("name", { header: () => t("staff.table.name") }),
+  columnHelper.accessor("role", {
+    header: () => t("staff.table.role"),
+    cell: ({ getValue }) => t(`staff.roles.${getValue()}`),
+  }),
+  columnHelper.display({ id: "status", header: () => t("staff.table.status") }),
+  columnHelper.accessor("createdAt", {
+    header: () => t("staff.table.created"),
+    cell: ({ getValue }) => formatCreatedAt(getValue()),
+  }),
+  columnHelper.display({ id: "actions", header: "" }),
+]);
+
+// Name/role have no text colour of their own, so they inherit the row's
+// (dimmed for deactivated users - see row-class in the template).
+const cellClass = {
+  name: "px-4 py-3",
+  role: "px-4 py-3",
+  status: "px-4 py-3",
+  createdAt: "px-4 py-3 text-xs text-slate-400",
+  actions: "px-4 py-3 text-right",
+};
+
+const table = useTable({ features, columns, data: items });
 
 onMounted(() => {
   const token = auth.session.value?.token;
@@ -43,52 +76,37 @@ function formatCreatedAt(value: string | null): string {
     <p v-else-if="store.isLoading" class="p-6 text-center text-sm text-slate-500">{{ $t("staff.table.loading") }}</p>
 
     <div v-else class="min-h-0 flex-1 overflow-auto rounded-lg border border-slate-200">
-      <table class="min-w-full divide-y divide-slate-200 text-sm">
-        <thead class="sticky top-0 z-10 bg-slate-50">
-          <tr>
-            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("staff.table.name") }}</th>
-            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("staff.table.role") }}</th>
-            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("staff.table.status") }}</th>
-            <th class="px-4 py-3 text-left font-semibold text-slate-600">{{ $t("staff.table.created") }}</th>
-            <th class="px-4 py-3" />
-          </tr>
-        </thead>
+      <DataTable
+        :table="table"
+        :empty-text="$t('staff.table.empty')"
+        :cell-class="cellClass"
+        :row-class="(row) => (row.original.isActive ? 'text-slate-700' : 'bg-slate-50 text-slate-400')"
+      >
+        <template #cell-status="{ item }">
+          <span
+            v-if="item.isActive"
+            class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700"
+          >
+            {{ $t("staff.table.active") }}
+          </span>
+          <span
+            v-else
+            class="inline-flex items-center rounded-full bg-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600"
+          >
+            {{ $t("staff.table.deactivated") }}
+          </span>
+        </template>
 
-        <tbody class="divide-y divide-slate-100 bg-white">
-          <tr v-if="store.items.length === 0">
-            <td colspan="5" class="px-4 py-8 text-center text-slate-400">{{ $t("staff.table.empty") }}</td>
-          </tr>
-
-          <tr v-for="user in store.items" :key="user.id" :class="!user.isActive ? 'bg-slate-50' : ''">
-            <td class="px-4 py-3" :class="user.isActive ? 'text-slate-700' : 'text-slate-400'">{{ user.name }}</td>
-            <td class="px-4 py-3" :class="user.isActive ? 'text-slate-700' : 'text-slate-400'">{{ $t(`staff.roles.${user.role}`) }}</td>
-            <td class="px-4 py-3">
-              <span
-                v-if="user.isActive"
-                class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700"
-              >
-                {{ $t("staff.table.active") }}
-              </span>
-              <span
-                v-else
-                class="inline-flex items-center rounded-full bg-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600"
-              >
-                {{ $t("staff.table.deactivated") }}
-              </span>
-            </td>
-            <td class="px-4 py-3 text-xs text-slate-400">{{ formatCreatedAt(user.createdAt) }}</td>
-            <td class="px-4 py-3 text-right">
-              <button
-                type="button"
-                class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                @click="emit('edit', user)"
-              >
-                {{ $t("common.edit") }}
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+        <template #cell-actions="{ item }">
+          <button
+            type="button"
+            class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+            @click="emit('edit', item)"
+          >
+            {{ $t("common.edit") }}
+          </button>
+        </template>
+      </DataTable>
     </div>
   </div>
 </template>
