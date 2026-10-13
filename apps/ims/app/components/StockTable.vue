@@ -2,18 +2,9 @@
 import { computed, ref } from "vue";
 import { Pencil, Trash2, Warehouse } from "@lucide/vue";
 import { storeToRefs } from "pinia";
-import {
-  columnFilteringFeature,
-  createColumnHelper,
-  createFilteredRowModel,
-  filterFn_equalsString,
-  filterFn_includesString,
-  globalFilteringFeature,
-  tableFeatures,
-  useTable,
-} from "@tanstack/vue-table";
+import { createColumnHelper, tableFeatures, useTable } from "@tanstack/vue-table";
 import type { InventoryItem } from "~/types/inventory";
-import type { TableSelectFilter } from "~/types/table";
+import type { TableFilterDef } from "~/types/table";
 
 const emit = defineEmits<{
   adjust: [item: InventoryItem];
@@ -29,26 +20,35 @@ const { items, isLoading, error } = storeToRefs(store);
 
 const togglingIds = ref<Set<string>>(new Set());
 
-const features = tableFeatures({
-  ...sortingFeatures,
-  columnFilteringFeature,
-  globalFilteringFeature,
-  filteredRowModel: createFilteredRowModel(),
-  filterFns: { includesString: filterFn_includesString, equalsString: filterFn_equalsString },
-});
+const features = tableFeatures({ ...sortingFeatures, ...filteringFeatures });
 
 const columnHelper = createColumnHelper<typeof features, InventoryItem>();
 
 const columns = columnHelper.columns([
   columnHelper.accessor("name", { header: () => t("stockTable.columns.item") }),
-  columnHelper.accessor("stockQuantity", { header: () => t("stockTable.columns.stock") }),
-  columnHelper.accessor("unit", { header: () => t("stockTable.columns.unit"), filterFn: "equalsString" }),
-  columnHelper.accessor("reorderThreshold", { header: () => t("stockTable.columns.reorderAt") }),
-  // Accessors (for sorting) but rendered via slots and kept out of the
-  // search box - matching "true" or a timestamp would just be noise.
-  columnHelper.accessor("isLowStock", { id: "status", header: () => t("stockTable.columns.status"), enableGlobalFilter: false }),
-  columnHelper.accessor("isActive", { id: "active", header: () => t("stockTable.columns.active"), enableGlobalFilter: false }),
-  columnHelper.accessor("updatedAt", { id: "updated", header: () => t("stockTable.columns.updated"), enableGlobalFilter: false }),
+  columnHelper.accessor("stockQuantity", { header: () => t("stockTable.columns.stock"), filterFn: "inNumberRange" }),
+  columnHelper.accessor("unit", { header: () => t("stockTable.columns.unit"), filterFn: "equals" }),
+  columnHelper.accessor("reorderThreshold", { header: () => t("stockTable.columns.reorderAt"), filterFn: "inNumberRange" }),
+  // Accessors (for sorting/filtering) but rendered via slots and kept out of
+  // the search box - matching "true" or a timestamp would just be noise.
+  columnHelper.accessor("isLowStock", {
+    id: "status",
+    header: () => t("stockTable.columns.status"),
+    filterFn: "equals",
+    enableGlobalFilter: false,
+  }),
+  columnHelper.accessor("isActive", {
+    id: "active",
+    header: () => t("stockTable.columns.active"),
+    filterFn: "equals",
+    enableGlobalFilter: false,
+  }),
+  columnHelper.accessor("updatedAt", {
+    id: "updated",
+    header: () => t("stockTable.columns.updated"),
+    filterFn: "inDayRange",
+    enableGlobalFilter: false,
+  }),
   columnHelper.display({ id: "actions", header: "" }),
 ]);
 
@@ -61,12 +61,34 @@ const cellClass = {
 
 const table = useTable({ features, columns, data: items });
 
-const filters = computed<TableSelectFilter[]>(() => [
+const filters = computed<TableFilterDef[]>(() => [
+  { type: "numberRange", columnId: "stockQuantity", label: t("stockTable.columns.stock") },
   {
+    type: "select",
     columnId: "unit",
-    allLabel: t("stockTable.allUnits"),
+    label: t("stockTable.columns.unit"),
     options: store.units.map((unit) => ({ value: unit, label: unit })),
   },
+  { type: "numberRange", columnId: "reorderThreshold", label: t("stockTable.columns.reorderAt") },
+  {
+    type: "select",
+    columnId: "status",
+    label: t("stockTable.columns.status"),
+    options: [
+      { value: true, label: t("stockTable.lowStock") },
+      { value: false, label: t("stockTable.ok") },
+    ],
+  },
+  {
+    type: "select",
+    columnId: "active",
+    label: t("stockTable.columns.active"),
+    options: [
+      { value: true, label: t("stockTable.activeYes") },
+      { value: false, label: t("stockTable.activeNo") },
+    ],
+  },
+  { type: "dateRange", columnId: "updated", label: t("stockTable.columns.updated") },
 ]);
 
 async function toggleActive(item: InventoryItem) {

@@ -1,7 +1,14 @@
-// A dropdown filter rendered by TableFilters: picking an option filters
-// `columnId` to that value, picking the "all" entry clears the filter.
-export interface TableSelectFilter {
-  columnId: string;
-  allLabel: string;
-  options: Array<{ value: string; label: string }>;
-}
+// A filter shown in TableFilters' dropdown panel. Each type needs its column
+// to use the matching filterFn from utils/table.ts's filteringFeatures:
+//   select      -> "equals" (option values compared with ===)
+//   numberRange -> "inNumberRange"
+//   dateRange   -> "inDayRange"
+export type TableFilterDef =
+  | {
+      type: "select";
+      columnId: string;
+      label: string;
+      options: Array<{ value: string | number | boolean; label: string }>;
+    }
+  | { type: "numberRange"; columnId: string; label: string }
+  | { type: "dateRange"; columnId: string; label: string };

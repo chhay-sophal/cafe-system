@@ -19,6 +19,16 @@
     "sortedAscending": "Sorted ascending",
     "sortedDescending": "Sorted descending"
   },
+  "tableFilters": {
+    "button": "Filters",
+    "heading": "Filters",
+    "clearAll": "Clear all",
+    "any": "Any",
+    "min": "Min",
+    "max": "Max",
+    "from": "From",
+    "to": "To"
+  },
   "app": {
     "title": "Inventory Manager",
     "logout": "Log out",
@@ -237,7 +247,6 @@
   },
   "stockTable": {
     "searchPlaceholder": "Search items...",
-    "allUnits": "All units",
     "lowStockBadge": "{count} low stock",
     "newButton": "+ New Item",
     "loading": "Loading inventory...",
@@ -253,7 +262,9 @@
       "status": "Status",
       "active": "Active",
       "updated": "Updated"
-    }
+    },
+    "activeYes": "Active",
+    "activeNo": "Inactive"
   },
   "staff": {
     "editHeading": "Edit Staff Member",

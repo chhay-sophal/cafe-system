@@ -19,6 +19,16 @@
     "sortedAscending": "តម្រៀបពីតូចទៅធំ",
     "sortedDescending": "តម្រៀបពីធំទៅតូច"
   },
+  "tableFilters": {
+    "button": "តម្រង",
+    "heading": "តម្រង",
+    "clearAll": "សម្អាតទាំងអស់",
+    "any": "ទាំងអស់",
+    "min": "អប្បបរមា",
+    "max": "អតិបរមា",
+    "from": "ពី",
+    "to": "ដល់"
+  },
   "app": {
     "title": "ប្រព័ន្ធគ្រប់គ្រងសារពើភ័ណ្ឌ",
     "logout": "ចាកចេញ",
@@ -237,7 +247,6 @@
   },
   "stockTable": {
     "searchPlaceholder": "ស្វែងរកធាតុ...",
-    "allUnits": "គ្រប់ឯកតាទាំងអស់",
     "lowStockBadge": "ស្តុកទាបចំនួន {count}",
     "newButton": "+ ធាតុថ្មី",
     "loading": "កំពុងផ្ទុកសារពើភ័ណ្ឌ...",
@@ -253,7 +262,9 @@
       "status": "ស្ថានភាព",
       "active": "សកម្ម",
       "updated": "បានធ្វើបច្ចុប្បន្នភាព"
-    }
+    },
+    "activeYes": "សកម្ម",
+    "activeNo": "អសកម្ម"
   },
   "staff": {
     "editHeading": "កែសម្រួលបុគ្គលិក",

@@ -1,23 +1,25 @@
 <script setup lang="ts" generic="TFeatures extends TableFeatures, TData extends RowData">
-import { reactive, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import { Funnel } from "@lucide/vue";
 import type { RowData, TableFeatures, VueTable } from "@tanstack/vue-table";
-import type { TableSelectFilter } from "~/types/table";
+import type { TableFilterDef } from "~/types/table";
 
-// Search box + dropdown filters for a TanStack table. Renders its controls
-// without a wrapper, so they sit inline in the parent's toolbar row.
-//
-// The table needs globalFilteringFeature for the search box and
-// columnFilteringFeature (with the column's filterFn, e.g. "equalsString")
-// for the dropdowns - see StockTable.vue.
+// Search box + a filter button whose dropdown panel holds the caller-defined
+// filters. Renders without a wrapper, so the controls sit inline in the
+// parent's toolbar row. The table needs filteringFeatures from
+// utils/table.ts, and each filtered column the filterFn its TableFilterDef
+// type calls for - see StockTable.vue.
 const props = withDefaults(
   defineProps<{
     table: VueTable<TFeatures, TData>;
     // Leave out to hide the search box.
     searchPlaceholder?: string;
-    filters?: TableSelectFilter[];
+    filters?: TableFilterDef[];
   }>(),
   { filters: () => [] },
 );
+
+const { t } = useI18n();
 
 // The filtering API only exists when the table was built with the filtering
 // features, so it's reached through these loose shapes rather than the
@@ -30,17 +32,86 @@ interface ColumnFilterable {
 }
 
 const search = ref("");
-const filterValues = reactive<Record<string, string>>({});
+// Per column id: the chosen option's index for a select ("" = any), or the
+// [min, max] / [from, to] input strings for a range ("" = open-ended).
+const selectValues = reactive<Record<string, string>>({});
+const rangeValues = reactive<Record<string, [string, string]>>({});
+
+const isOpen = ref(false);
+const rootEl = ref<HTMLElement | null>(null);
 
 function handleSearchInput() {
   (props.table as unknown as GlobalFilterable).setGlobalFilter(search.value);
 }
 
-function handleFilterChange(columnId: string, value: string) {
-  filterValues[columnId] = value;
+function setColumnFilter(columnId: string, value: unknown) {
   const column = props.table.getColumn(columnId) as unknown as ColumnFilterable | undefined;
-  column?.setFilterValue(value || undefined);
+  column?.setFilterValue(value);
 }
+
+function rangeOf(columnId: string): [string, string] {
+  return rangeValues[columnId] ?? ["", ""];
+}
+
+function handleSelectChange(filter: Extract<TableFilterDef, { type: "select" }>, index: string) {
+  selectValues[filter.columnId] = index;
+  setColumnFilter(filter.columnId, index === "" ? undefined : filter.options[Number(index)]?.value);
+}
+
+function handleRangeChange(filter: TableFilterDef, end: 0 | 1, value: string) {
+  const next: [string, string] = [...rangeOf(filter.columnId)];
+  next[end] = value;
+  rangeValues[filter.columnId] = next;
+
+  if (!next[0] && !next[1]) {
+    setColumnFilter(filter.columnId, undefined);
+  } else if (filter.type === "numberRange") {
+    // null = open-ended, which inNumberRange reads as -Infinity / Infinity.
+    setColumnFilter(filter.columnId, next.map((v) => (v === "" ? null : Number(v))));
+  } else {
+    setColumnFilter(filter.columnId, next.map((v) => v || null));
+  }
+}
+
+function isActive(filter: TableFilterDef) {
+  if (filter.type === "select") {
+    return Boolean(selectValues[filter.columnId]);
+  }
+  const [from, to] = rangeOf(filter.columnId);
+  return Boolean(from || to);
+}
+
+const activeCount = computed(() => props.filters.filter(isActive).length);
+
+function clearAll() {
+  for (const filter of props.filters) {
+    delete selectValues[filter.columnId];
+    delete rangeValues[filter.columnId];
+    setColumnFilter(filter.columnId, undefined);
+  }
+}
+
+function handleDocumentClick(event: MouseEvent) {
+  if (isOpen.value && rootEl.value && !rootEl.value.contains(event.target as Node)) {
+    isOpen.value = false;
+  }
+}
+
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key === "Escape") {
+    isOpen.value = false;
+  }
+}
+
+onMounted(() => {
+  document.addEventListener("click", handleDocumentClick);
+  document.addEventListener("keydown", handleKeydown);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener("click", handleDocumentClick);
+  document.removeEventListener("keydown", handleKeydown);
+});
 
 const INPUT_CLASS =
   "rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500";
@@ -57,14 +128,78 @@ const INPUT_CLASS =
     @input="handleSearchInput"
   />
 
-  <select
-    v-for="filter in filters"
-    :key="filter.columnId"
-    :value="filterValues[filter.columnId] ?? ''"
-    :class="INPUT_CLASS"
-    @change="handleFilterChange(filter.columnId, ($event.target as HTMLSelectElement).value)"
-  >
-    <option value="">{{ filter.allLabel }}</option>
-    <option v-for="option in filter.options" :key="option.value" :value="option.value">{{ option.label }}</option>
-  </select>
+  <div v-if="filters.length > 0" ref="rootEl" class="relative">
+    <button
+      type="button"
+      :title="t('tableFilters.button')"
+      :aria-label="t('tableFilters.button')"
+      :aria-expanded="isOpen"
+      class="relative inline-flex h-[38px] w-[38px] items-center justify-center rounded-lg border hover:bg-slate-100"
+      :class="activeCount > 0 ? 'border-slate-500 text-slate-900' : 'border-slate-300 text-slate-600'"
+      @click="isOpen = !isOpen"
+    >
+      <Funnel class="h-4 w-4" aria-hidden="true" />
+      <span
+        v-if="activeCount > 0"
+        class="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-slate-900 px-1 text-[10px] font-semibold text-white"
+      >
+        {{ activeCount }}
+      </span>
+    </button>
+
+    <div
+      v-if="isOpen"
+      class="absolute left-0 z-20 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white p-4 shadow-lg"
+    >
+      <div class="mb-3 flex items-center justify-between">
+        <h3 class="text-sm font-semibold text-slate-900">{{ t("tableFilters.heading") }}</h3>
+        <button
+          type="button"
+          :disabled="activeCount === 0"
+          class="text-xs font-semibold text-slate-600 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40"
+          @click="clearAll"
+        >
+          {{ t("tableFilters.clearAll") }}
+        </button>
+      </div>
+
+      <div class="max-h-[60vh] space-y-3 overflow-y-auto">
+        <div v-for="filter in filters" :key="filter.columnId">
+          <label class="block text-xs font-medium text-slate-600">{{ filter.label }}</label>
+
+          <select
+            v-if="filter.type === 'select'"
+            :value="selectValues[filter.columnId] ?? ''"
+            :class="INPUT_CLASS"
+            class="mt-1 w-full"
+            @change="handleSelectChange(filter, ($event.target as HTMLSelectElement).value)"
+          >
+            <option value="">{{ t("tableFilters.any") }}</option>
+            <option v-for="(option, index) in filter.options" :key="index" :value="String(index)">{{ option.label }}</option>
+          </select>
+
+          <div v-else class="mt-1 grid grid-cols-2 gap-2">
+            <input
+              :type="filter.type === 'numberRange' ? 'number' : 'date'"
+              :value="rangeOf(filter.columnId)[0]"
+              :placeholder="filter.type === 'numberRange' ? t('tableFilters.min') : undefined"
+              :aria-label="`${filter.label} - ${filter.type === 'numberRange' ? t('tableFilters.min') : t('tableFilters.from')}`"
+              :class="INPUT_CLASS"
+              class="w-full min-w-0"
+              @input="handleRangeChange(filter, 0, ($event.target as HTMLInputElement).value)"
+            />
+            <input
+              :type="filter.type === 'numberRange' ? 'number' : 'date'"
+              :value="rangeOf(filter.columnId)[1]"
+              :placeholder="filter.type === 'numberRange' ? t('tableFilters.max') : undefined"
+              :aria-label="`${filter.label} - ${filter.type === 'numberRange' ? t('tableFilters.max') : t('tableFilters.to')}`"
+              :class="INPUT_CLASS"
+              class="w-full min-w-0"
+              @input="handleRangeChange(filter, 1, ($event.target as HTMLInputElement).value)"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
