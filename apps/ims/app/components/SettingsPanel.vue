@@ -9,7 +9,8 @@ const { formatRiel } = useCurrency();
 
 const CURRENCIES: MainCurrency[] = ["USD", "KHR"];
 
-const rateInput = ref("");
+// v-model on a type="number" input writes back a number, or "" when the field is cleared.
+const rateInput = ref<string | number>("");
 const isSubmitting = ref(false);
 const errorMessage = ref<string | null>(null);
 const successMessage = ref(false);
@@ -25,7 +26,7 @@ onMounted(async () => {
 
 const parsedRate = computed(() => Number(rateInput.value));
 const rateError = computed(() => {
-  if (rateInput.value.trim().length === 0 || !Number.isFinite(parsedRate.value) || parsedRate.value <= 0) {
+  if (String(rateInput.value).trim().length === 0 || !Number.isFinite(parsedRate.value) || parsedRate.value <= 0) {
     return t("settings.rateError");
   }
   return null;
