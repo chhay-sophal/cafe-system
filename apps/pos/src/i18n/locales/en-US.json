@@ -154,7 +154,20 @@
       "paperSize": "Paper size",
       "paperSizeHint": "Match the width of the receipt roll in this register's printer. If an 80 mm printer cuts off the right edge of receipts, choose 64 mm. Saved on this register only.",
       "bottomMargin": "Bottom margin",
-      "bottomMarginHint": "Blank paper fed after each receipt. Increase it if the last line gets torn off; decrease it if there's too much blank paper. Saved on this register only."
+      "bottomMarginHint": "Blank paper fed after each receipt. Increase it if the last line gets torn off; decrease it if there's too much blank paper. Saved on this register only.",
+      "test": {
+        "heading": "Test receipt",
+        "hint": "Preview of a receipt with the settings above: same layout and line breaks as the printout, including the bottom margin. Print it to check alignment and that nothing gets torn off.",
+        "print": "Print Test Receipt",
+        "printing": "Printing...",
+        "printed": "Test receipt sent to the printer.",
+        "noPrinter": "Choose a receipt printer above to print a test.",
+        "previewAlt": "Receipt preview",
+        "label": "TEST PRINT",
+        "item1": "Iced Latte",
+        "item2": "Croissant",
+        "modifier": "Oat Milk"
+      }
     },
     "khqr": {
       "intro": "Add each bank you accept Mobile Pay through, with its KHQR code. The cashier picks the bank at checkout and the customer screen shows its QR.",

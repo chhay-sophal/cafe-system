@@ -10,7 +10,7 @@ import { useKhqrBanks } from "../composables/useKhqrBanks";
 import { useNetworkStatus } from "../composables/useNetworkStatus";
 import { useOfflineQueue } from "../composables/useOfflineQueue";
 import { useReceiptPrinter } from "../composables/useReceiptPrinter";
-import type { ReceiptBlock } from "../lib/receipt";
+import { formatReceiptDate, type ReceiptBlock } from "../lib/receipt";
 import type { CartLineItem } from "../types/cart";
 import type { OrderPayload, OrderResult, PaymentMethod } from "../types/order";
 
@@ -245,13 +245,6 @@ async function handleComplete() {
     // outright (unreachable host, timed out) - treat it the same as offline.
     await queueOffline(payload);
   }
-}
-
-// Fixed-width numeric date - receipts shouldn't depend on the webview's
-// locale data, which is incomplete for km-KH (see lib/currency.ts).
-function formatReceiptDate(date: Date): string {
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function buildReceiptBlocks(): ReceiptBlock[] {

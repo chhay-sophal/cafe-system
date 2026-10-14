@@ -149,7 +149,17 @@ function layout(
   return { ops, dividers, height: y + MARGIN };
 }
 
-export function renderReceipt(blocks: ReceiptBlock[], paperSize: PaperSize): HTMLCanvasElement {
+// Fixed-width numeric date - receipts shouldn't depend on the webview's
+// locale data, which is incomplete for km-KH (see lib/currency.ts).
+export function formatReceiptDate(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+// `scale` > 1 is only for on-screen previews: the same layout (measured in
+// printer dots, so line breaks match the printout exactly) drawn with more
+// pixels per dot, sharp on high-DPI screens. Printing always uses 1.
+export function renderReceipt(blocks: ReceiptBlock[], paperSize: PaperSize, scale = 1): HTMLCanvasElement {
   const paperWidth = PAPER_WIDTH_DOTS[paperSize];
   const canvas = document.createElement("canvas");
   canvas.width = paperWidth;
@@ -161,10 +171,12 @@ export function renderReceipt(blocks: ReceiptBlock[], paperSize: PaperSize): HTM
   const { ops, dividers, height } = layout(measureCtx, blocks, paperWidth);
 
   // Resizing resets the context, so draw with a fresh one afterwards.
-  canvas.height = height;
+  canvas.width = Math.round(paperWidth * scale);
+  canvas.height = Math.round(height * scale);
   const ctx = canvas.getContext("2d")!;
+  ctx.scale(scale, scale);
   ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(0, 0, paperWidth, height);
   ctx.fillStyle = "#000000";
   ctx.textBaseline = "alphabetic";
 
@@ -199,6 +211,35 @@ export type BottomMarginMm = (typeof BOTTOM_MARGIN_MM)[number];
 
 const DOTS_PER_MM = 8; // 203 dpi
 
+// Whether the RGBA pixel at `offset` prints as a black dot.
+function isInk(pixels: Uint8ClampedArray, offset: number): boolean {
+  const luminance = 0.299 * pixels[offset] + 0.587 * pixels[offset + 1] + 0.114 * pixels[offset + 2];
+  return luminance < INK_THRESHOLD;
+}
+
+// The settings preview: the receipt with exactly the printout's layout and
+// line breaks, plus the blank bottom margin fed after it, drawn at `scale`
+// pixels per printer dot. It stays smooth (anti-aliased) rather than reduced
+// to the printer's black/white dots - those dots are ~0.125mm, far finer than
+// screen pixels, so 1-bit dots blown up on screen look much more jagged than
+// the paper does.
+export function renderReceiptPreview(
+  blocks: ReceiptBlock[],
+  paperSize: PaperSize,
+  bottomMarginMm: BottomMarginMm,
+  scale: number,
+): HTMLCanvasElement {
+  const receipt = renderReceipt(blocks, paperSize, scale);
+  const preview = document.createElement("canvas");
+  preview.width = receipt.width;
+  preview.height = receipt.height + Math.round(bottomMarginMm * DOTS_PER_MM * scale);
+  const ctx = preview.getContext("2d")!;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, preview.width, preview.height);
+  ctx.drawImage(receipt, 0, 0);
+  return preview;
+}
+
 // ESC @ (reset), the image as GS v 0 raster bands, a blank tail to carry it
 // past the tear bar, then a partial cut. GS V 1 cuts where the paper is
 // now; GS V 66 ("feed to cutter, then cut") would add the head-to-cutter gap
@@ -223,9 +264,7 @@ export function encodeEscPosRaster(canvas: HTMLCanvasElement, bottomMarginMm: Bo
           if (x >= width) {
             continue;
           }
-          const offset = (y * width + x) * 4;
-          const luminance = 0.299 * pixels[offset] + 0.587 * pixels[offset + 1] + 0.114 * pixels[offset + 2];
-          if (luminance < INK_THRESHOLD) {
+          if (isInk(pixels, (y * width + x) * 4)) {
             byte |= 0x80 >> bit;
           }
         }

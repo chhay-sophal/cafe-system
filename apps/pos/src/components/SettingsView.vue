@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { setLocale } from "../i18n";
 import { useKhqrBanks } from "../composables/useKhqrBanks";
 import { useReceiptPrinter } from "../composables/useReceiptPrinter";
+import ReceiptTestCard from "./ReceiptTestCard.vue";
 import { useTheme, type ThemePreference } from "../composables/useTheme";
 import { BOTTOM_MARGIN_MM, type PaperSize } from "../lib/receipt";
 
@@ -225,6 +226,8 @@ function handleRemoveBank(id: string) {
             </button>
           </div>
         </div>
+
+        <ReceiptTestCard />
       </template>
 
       <template v-else-if="activeSection === 'khqr'">
