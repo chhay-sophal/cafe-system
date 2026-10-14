@@ -56,6 +56,20 @@ pub fn run() {
 
             Ok(())
         })
+        // Tauri only exits once every window is closed, so closing the
+        // cashier window alone would leave the customer display up (and the
+        // app running) with nothing driving it. The cashier window is the
+        // app: closing it quits everything. Closing just the customer
+        // display (e.g. Alt+F4 on that screen) leaves the register running.
+        .on_window_event(|window, event| {
+            use tauri::Manager;
+
+            if window.label() == "main" {
+                if let tauri::WindowEvent::Destroyed = event {
+                    window.app_handle().exit(0);
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             greet,
             printer::list_printers,
