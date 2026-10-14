@@ -9,6 +9,7 @@ import { publishPaymentQr, publishSaleCompleted } from "../composables/useCustom
 import { useKhqrBanks } from "../composables/useKhqrBanks";
 import { useNetworkStatus } from "../composables/useNetworkStatus";
 import { useOfflineQueue } from "../composables/useOfflineQueue";
+import { usePaymentMethods } from "../composables/usePaymentMethods";
 import { useReceiptPrinter } from "../composables/useReceiptPrinter";
 import { useStoreName } from "../composables/useStoreName";
 import { formatReceiptDate, type ReceiptBlock } from "../lib/receipt";
@@ -35,11 +36,11 @@ type PrintStatus = "idle" | "printing" | "printed" | "failed" | "noPrinter";
 const { t } = useI18n({ useScope: "global" });
 const { storeName } = useStoreName();
 
-const PAYMENT_METHODS = computed<Array<{ value: PaymentMethod; label: string }>>(() => [
-  { value: "CASH", label: t("checkout.methods.CASH") },
-  { value: "CARD", label: t("checkout.methods.CARD") },
-  { value: "QR_CODE", label: t("checkout.methods.QR_CODE") },
-]);
+// Only the methods this register offers (Settings → Payments).
+const { enabledMethods } = usePaymentMethods();
+const PAYMENT_METHODS = computed<Array<{ value: PaymentMethod; label: string }>>(() =>
+  enabledMethods.value.map((method) => ({ value: method, label: t(`checkout.methods.${method}`) })),
+);
 
 const FAST_CASH_USD_AMOUNTS = [1, 5, 10, 20, 50];
 const FAST_CASH_RIEL_AMOUNTS = [1000, 2000, 5000, 10000, 20000, 50000, 100000];
@@ -143,6 +144,10 @@ function selectPaymentMethod(method: PaymentMethod) {
   const onlyBank = khqrBanks.banks.value.length === 1 ? khqrBanks.banks.value[0] : null;
   selectedBankId.value = method === "QR_CODE" && onlyBank ? onlyBank.id : null;
 }
+
+// Start on the first method this register offers - Cash unless it's turned
+// off - with the tender preset that method needs.
+selectPaymentMethod(enabledMethods.value[0]);
 
 // The customer display shows the chosen bank's KHQR while payment is in
 // progress, and drops it once the sale succeeds or checkout is closed.

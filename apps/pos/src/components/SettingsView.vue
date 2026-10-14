@@ -3,13 +3,14 @@ import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { setLocale } from "../i18n";
 import { useKhqrBanks } from "../composables/useKhqrBanks";
+import { ALL_PAYMENT_METHODS, usePaymentMethods } from "../composables/usePaymentMethods";
 import { useReceiptPrinter } from "../composables/useReceiptPrinter";
 import { STORE_NAME_MAX_LENGTH, useStoreName } from "../composables/useStoreName";
 import ReceiptTestCard from "./ReceiptTestCard.vue";
 import { useTheme, type ThemePreference } from "../composables/useTheme";
 import { BOTTOM_MARGIN_MM, type PaperSize } from "../lib/receipt";
 
-type SectionId = "general" | "printer" | "khqr";
+type SectionId = "general" | "printer" | "payments" | "khqr";
 type Locale = "en-US" | "km-KH";
 
 const { t, locale } = useI18n({ useScope: "global" });
@@ -18,6 +19,7 @@ const { t, locale } = useI18n({ useScope: "global" });
 const sections = computed<Array<{ id: SectionId; label: string }>>(() => [
   { id: "general", label: t("settings.sections.general") },
   { id: "printer", label: t("settings.sections.printer") },
+  { id: "payments", label: t("settings.sections.payments") },
   { id: "khqr", label: t("settings.sections.khqr") },
 ]);
 
@@ -52,6 +54,8 @@ function saveStoreName() {
   // Show what was actually saved (trimmed, length-capped).
   storeNameDraft.value = customStoreName.value;
 }
+
+const paymentMethods = usePaymentMethods();
 
 const activeSection = ref<SectionId>("general");
 
@@ -257,6 +261,34 @@ function handleRemoveBank(id: string) {
         </div>
 
         <ReceiptTestCard />
+      </template>
+
+      <template v-else-if="activeSection === 'payments'">
+        <h3 class="settings__panel-heading">{{ t("settings.sections.payments") }}</h3>
+
+        <div class="settings-field">
+          <div class="settings-field__text">
+            <span class="settings-field__label">{{ t("settings.payments.methods") }}</span>
+            <span class="settings-field__hint">{{ t("settings.payments.methodsHint") }}</span>
+          </div>
+          <!-- Toggles, not a radio group: any combination can be on, but the
+               last one on is disabled so checkout always has a method. -->
+          <div class="settings-choice" role="group" :aria-label="t('settings.payments.methods')">
+            <button
+              v-for="method in ALL_PAYMENT_METHODS"
+              :key="method"
+              type="button"
+              :aria-pressed="paymentMethods.isEnabled(method)"
+              :disabled="!paymentMethods.canToggle(method)"
+              :title="paymentMethods.canToggle(method) ? undefined : t('settings.payments.lastMethod')"
+              class="settings-choice__option"
+              :class="{ 'settings-choice__option--active': paymentMethods.isEnabled(method) }"
+              @click="paymentMethods.toggleMethod(method)"
+            >
+              {{ t(`checkout.methods.${method}`) }}
+            </button>
+          </div>
+        </div>
       </template>
 
       <template v-else-if="activeSection === 'khqr'">
@@ -527,6 +559,12 @@ function handleRemoveBank(id: string) {
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
+}
+
+/* The last payment method left on - it stays shown as on, just can't be
+   turned off (the button's title says why). */
+.settings-choice__option:disabled {
+  cursor: not-allowed;
 }
 
 .settings-choice__option--active {
