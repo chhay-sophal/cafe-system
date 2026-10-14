@@ -47,6 +47,20 @@ const isCheckoutOpen = ref(false);
 const activeView = ref<"register" | "salesHistory" | "settings">("register");
 
 const auth = useAuth();
+
+// Register setup (printer, payment methods, store name...) is for managers
+// and admins only; cashiers and baristas don't get the Settings tab at all.
+const SETTINGS_ROLES = ["MANAGER", "ADMIN"];
+const canManageSettings = computed(() => SETTINGS_ROLES.includes(auth.session.value?.user.role ?? ""));
+
+// activeView outlives a login - a manager who logs out from Settings mustn't
+// hand the next (cashier) login a Settings screen they can't reach.
+watch(canManageSettings, (allowed) => {
+  if (!allowed && activeView.value === "settings") {
+    activeView.value = "register";
+  }
+});
+
 const cart = useCart();
 const network = useNetworkStatus();
 const offlineQueue = useOfflineQueue();
@@ -231,6 +245,7 @@ onUnmounted(() => {
             {{ t("salesHistory.heading") }}
           </button>
           <button
+            v-if="canManageSettings"
             type="button"
             class="pos-header__tab"
             :class="{ 'pos-header__tab--active': activeView === 'settings' }"
@@ -261,7 +276,7 @@ onUnmounted(() => {
     <NetworkStatusBar />
 
     <SalesHistory v-if="activeView === 'salesHistory'" :token="auth.session.value.token" />
-    <SettingsView v-if="activeView === 'settings'" />
+    <SettingsView v-if="activeView === 'settings' && canManageSettings" />
 
     <!-- v-show, not v-if: the cart and catalog must survive a trip to the
          Sales History tab mid-order. -->
