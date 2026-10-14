@@ -410,4 +410,32 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
 }
+
+/* Dark theme: data-theme is set on <html> by composables/useTheme.ts. :where()
+   keeps these rules at their own specificity. At night the header drops the
+   full brown bar for the same dark surface as the cart sidebar, keeping the
+   brand colour as the active tab's accent. */
+:where(:root[data-theme="dark"]) .pos-header {
+  background: #1c1c1c;
+  border-bottom: 2px solid #3a3a3a;
+  color: #f6f6f6;
+}
+
+:where(:root[data-theme="dark"]) .pos-header__tab {
+  color: #bbbbbb;
+}
+
+:where(:root[data-theme="dark"]) .pos-header__tab--active {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+:where(:root[data-theme="dark"]) .pos-header__cashier {
+  color: #aaaaaa;
+}
+
+:where(:root[data-theme="dark"]) .pos-header__logout {
+  border-color: #444444;
+  color: #f2f2f2;
+}
 </style>
