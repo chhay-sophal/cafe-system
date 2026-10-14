@@ -355,7 +355,7 @@ onMounted(async () => {
       <button
         type="button"
         class="rounded-lg px-4 py-2 text-sm font-semibold"
-        :class="targetKind === 'product' ? 'bg-slate-900 text-white' : 'border border-slate-300 text-slate-700 hover:bg-slate-100'"
+        :class="targetKind === 'product' ? 'bg-primary text-white' : 'border border-slate-300 text-slate-700 hover:bg-slate-100'"
         @click="switchTargetKind('product')"
       >
         {{ $t("recipe.menuItemTab") }}
@@ -363,7 +363,7 @@ onMounted(async () => {
       <button
         type="button"
         class="rounded-lg px-4 py-2 text-sm font-semibold"
-        :class="targetKind === 'modifier' ? 'bg-slate-900 text-white' : 'border border-slate-300 text-slate-700 hover:bg-slate-100'"
+        :class="targetKind === 'modifier' ? 'bg-primary text-white' : 'border border-slate-300 text-slate-700 hover:bg-slate-100'"
         @click="switchTargetKind('modifier')"
       >
         {{ $t("recipe.modifierChoiceTab") }}
@@ -477,7 +477,7 @@ onMounted(async () => {
             <button
               type="button"
               :disabled="!canSave"
-              class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+              class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40"
               @click="handleSave"
             >
               {{ isSaving ? $t("common.saving") : $t("recipe.saveRecipe") }}

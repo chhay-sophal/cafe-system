@@ -59,7 +59,7 @@ async function submit() {
       <button
         type="submit"
         :disabled="pin.trim().length === 0 || isSubmitting"
-        class="mt-6 w-full rounded-lg bg-slate-900 px-4 py-2.5 font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+        class="mt-6 w-full rounded-lg bg-primary px-4 py-2.5 font-semibold text-white transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40"
       >
         {{ isSubmitting ? $t("login.signingIn") : $t("login.signIn") }}
       </button>

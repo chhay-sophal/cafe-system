@@ -27,7 +27,8 @@ const chartData = computed(() => ({
     {
       label: t("hourlyVolume.orders"),
       data: hourlyVolume.value.map((entry) => entry.orderCount),
-      backgroundColor: "#2a78d6",
+      // Single series, so it takes the brand colour (tailwind.config.ts).
+      backgroundColor: "#6f4e37",
       borderRadius: { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 },
       maxBarThickness: 24,
     },

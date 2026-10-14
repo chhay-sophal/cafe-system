@@ -309,7 +309,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 1rem 1.25rem;
-  background: #111111;
+  background: var(--color-primary);
   color: #ffffff;
 }
 
@@ -333,7 +333,7 @@ onUnmounted(() => {
 .pos-header__tab {
   border: none;
   background: transparent;
-  color: #aaaaaa;
+  color: rgba(255, 255, 255, 0.75);
   border-radius: 8px;
   padding: 0.45rem 0.9rem;
   font-size: 0.95rem;
@@ -343,7 +343,7 @@ onUnmounted(() => {
 
 .pos-header__tab--active {
   background: #ffffff;
-  color: #111111;
+  color: var(--color-primary);
 }
 
 .pos-header__account {
@@ -388,7 +388,7 @@ onUnmounted(() => {
 }
 
 .pos-header__logout {
-  border: 2px solid #444444;
+  border: 2px solid #cccccc;
   background: transparent;
   color: #ffffff;
   border-radius: 8px;

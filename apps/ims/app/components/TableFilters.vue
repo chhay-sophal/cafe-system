@@ -220,13 +220,13 @@ const INPUT_CLASS =
       :aria-label="t('tableFilters.button')"
       :aria-expanded="isOpen"
       class="relative inline-flex h-[38px] w-[38px] items-center justify-center rounded-lg border hover:bg-slate-100"
-      :class="activeCount > 0 ? 'border-slate-500 text-slate-900' : 'border-slate-300 text-slate-600'"
+      :class="activeCount > 0 ? 'border-primary text-primary' : 'border-slate-300 text-slate-600'"
       @click="togglePanel"
     >
       <Funnel class="h-4 w-4" aria-hidden="true" />
       <span
         v-if="activeCount > 0"
-        class="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-slate-900 px-1 text-[10px] font-semibold text-white"
+        class="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-white"
       >
         {{ activeCount }}
       </span>
@@ -299,7 +299,7 @@ const INPUT_CLASS =
         <button
           type="button"
           :disabled="hasReversedRange"
-          class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+          class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40"
           @click="apply"
         >
           {{ t("tableFilters.apply") }}

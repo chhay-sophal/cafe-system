@@ -196,7 +196,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 1rem 1.25rem;
-  background: #111111;
+  background: var(--color-primary);
   color: #ffffff;
 }
 
@@ -279,8 +279,8 @@ onUnmounted(() => {
 }
 
 .modifier-option--selected {
-  border-color: #111111;
-  background: #111111;
+  border-color: var(--color-primary);
+  background: var(--color-primary);
   color: #ffffff;
 }
 
@@ -343,8 +343,8 @@ onUnmounted(() => {
 }
 
 .modifier-modal__confirm {
-  border: 2px solid #111111;
-  background: #111111;
+  border: 2px solid var(--color-primary);
+  background: var(--color-primary);
   color: #ffffff;
   flex: 1;
 }
@@ -376,9 +376,9 @@ onUnmounted(() => {
 }
 
 :where(:root[data-theme="dark"]) .modifier-option--selected {
-  border-color: #ffffff;
-  background: #ffffff;
-  color: #111111;
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
 }
 
 :where(:root[data-theme="dark"]) .modifier-modal__cancel {
@@ -388,9 +388,9 @@ onUnmounted(() => {
 }
 
 :where(:root[data-theme="dark"]) .modifier-modal__confirm {
-  background: #ffffff;
-  border-color: #ffffff;
-  color: #111111;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
 }
 
 :where(:root[data-theme="dark"]) .modifier-modal__running-price-secondary {

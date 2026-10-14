@@ -17,7 +17,7 @@ withDefaults(
 const VARIANT_CLASS = {
   default: "border border-slate-300 text-slate-700 hover:bg-slate-100",
   danger: "border border-red-200 text-red-600 hover:bg-red-50",
-  primary: "bg-slate-900 text-white hover:bg-slate-700",
+  primary: "bg-primary text-white hover:bg-primary-hover",
 };
 </script>
 

@@ -100,7 +100,7 @@ function formatCreatedAt(value: string | null): string {
       <TableFilters :table="table" :search-placeholder="$t('staff.table.searchPlaceholder')" :filters="filters" />
       <button
         type="button"
-        class="ml-auto rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+        class="ml-auto rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover"
         @click="emit('create')"
       >
         {{ $t("staff.table.newButton") }}

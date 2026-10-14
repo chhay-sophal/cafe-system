@@ -70,9 +70,9 @@ const { t } = useI18n({ useScope: "global" });
 }
 
 .category-tab--active {
-  background: #111111;
+  background: var(--color-primary);
   color: #ffffff;
-  border-color: #111111;
+  border-color: var(--color-primary);
 }
 
 /* Dark theme: data-theme is set on <html> by composables/useTheme.ts. :where()
@@ -90,8 +90,8 @@ const { t } = useI18n({ useScope: "global" });
 }
 
 :where(:root[data-theme="dark"]) .category-tab--active {
-  background: #ffffff;
-  color: #111111;
-  border-color: #ffffff;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  border-color: var(--color-primary);
 }
 </style>

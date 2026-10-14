@@ -256,7 +256,7 @@ async function submit() {
         <button
           type="button"
           :disabled="!canSubmit"
-          class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+          class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40"
           @click="submit"
         >
           {{ isUploadingImage ? $t("product.uploadingImage") : isSubmitting ? $t("common.saving") : isEditMode ? $t("common.saveChanges") : $t("product.createButton") }}

@@ -148,7 +148,7 @@ async function toggleAvailability(product: Product) {
         </button>
         <button
           type="button"
-          class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+          class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover"
           @click="emit('create')"
         >
           {{ $t("productTable.newButton") }}

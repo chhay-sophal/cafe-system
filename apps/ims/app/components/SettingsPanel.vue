@@ -132,7 +132,7 @@ async function selectMainCurrency(currency: MainCurrency) {
           class="rounded-lg border px-4 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
           :class="
             store.mainCurrency === currency
-              ? 'border-slate-900 bg-slate-900 text-white'
+              ? 'border-primary bg-primary text-white'
               : 'border-slate-300 text-slate-700 hover:bg-slate-50'
           "
           @click="selectMainCurrency(currency)"
@@ -206,7 +206,7 @@ async function selectMainCurrency(currency: MainCurrency) {
       <button
         type="button"
         :disabled="!canSubmit"
-        class="mt-4 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+        class="mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40"
         @click="submit"
       >
         {{ isSubmitting ? t("common.saving") : t("common.saveChanges") }}

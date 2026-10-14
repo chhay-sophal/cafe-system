@@ -243,7 +243,7 @@ onMounted(loadOrder);
   align-items: center;
   justify-content: space-between;
   padding: 1rem 1.25rem;
-  background: #111111;
+  background: var(--color-primary);
   color: #ffffff;
 }
 

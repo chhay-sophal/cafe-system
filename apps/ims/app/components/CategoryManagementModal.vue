@@ -148,7 +148,7 @@ async function saveEdit() {
               <button
                 type="button"
                 :disabled="isSavingEdit || editName.trim().length === 0"
-                class="rounded-lg bg-slate-900 px-3 py-1 text-xs font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+                class="rounded-lg bg-primary px-3 py-1 text-xs font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40"
                 @click="saveEdit"
               >
                 {{ isSavingEdit ? $t("common.saving") : $t("common.save") }}
@@ -186,7 +186,7 @@ async function saveEdit() {
         <button
           type="button"
           :disabled="isCreating || newName.trim().length === 0"
-          class="mt-3 w-full rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+          class="mt-3 w-full rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40"
           @click="createCategory"
         >
           {{ isCreating ? $t("categories.adding") : $t("categories.add") }}

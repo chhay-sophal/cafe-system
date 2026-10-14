@@ -296,7 +296,7 @@ function handleRemoveBank(id: string) {
 }
 
 .settings__nav-item--active {
-  background: #111111;
+  background: var(--color-primary);
   color: #ffffff;
 }
 
@@ -437,7 +437,7 @@ function handleRemoveBank(id: string) {
 }
 
 .settings-primary {
-  background: #111111;
+  background: var(--color-primary);
   color: #ffffff;
 }
 
@@ -477,8 +477,8 @@ function handleRemoveBank(id: string) {
 }
 
 .settings-choice__option--active {
-  border-color: #111111;
-  background: #111111;
+  border-color: var(--color-primary);
+  background: var(--color-primary);
   color: #ffffff;
 }
 
@@ -495,8 +495,8 @@ function handleRemoveBank(id: string) {
 }
 
 :where(:root[data-theme="dark"]) .settings__nav-item--active {
-  background: #f6f6f6;
-  color: #111111;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
 }
 
 :where(:root[data-theme="dark"]) .settings-field,
@@ -513,8 +513,8 @@ function handleRemoveBank(id: string) {
 }
 
 :where(:root[data-theme="dark"]) .settings-primary {
-  background: #f6f6f6;
-  color: #111111;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
 }
 
 :where(:root[data-theme="dark"]) .settings-choice__option,
@@ -525,8 +525,8 @@ function handleRemoveBank(id: string) {
 }
 
 :where(:root[data-theme="dark"]) .settings-choice__option--active {
-  background: #f6f6f6;
-  border-color: #f6f6f6;
-  color: #111111;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
 }
 </style>

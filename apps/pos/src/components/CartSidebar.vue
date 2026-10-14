@@ -116,7 +116,7 @@ function handleDiscountInput(event: Event) {
 .cart-sidebar__header {
   flex-shrink: 0;
   padding: 1rem 1.25rem;
-  background: #111111;
+  background: var(--color-primary);
   color: #ffffff;
 }
 
@@ -201,8 +201,8 @@ function handleDiscountInput(event: Event) {
   margin-top: 0.5rem;
   min-height: 52px;
   border-radius: 12px;
-  border: 2px solid #111111;
-  background: #111111;
+  border: 2px solid var(--color-primary);
+  background: var(--color-primary);
   color: #ffffff;
   font-size: 1.05rem;
   font-weight: 700;
@@ -258,8 +258,8 @@ function handleDiscountInput(event: Event) {
 }
 
 :where(:root[data-theme="dark"]) .cart-sidebar__checkout {
-  background: #ffffff;
-  border-color: #ffffff;
-  color: #111111;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
 }
 </style>

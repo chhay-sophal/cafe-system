@@ -214,7 +214,7 @@ onUnmounted(() => {
 .display__header {
   flex-shrink: 0;
   padding: 1.5rem 2rem;
-  background: #111111;
+  background: var(--color-primary);
   color: #ffffff;
 }
 

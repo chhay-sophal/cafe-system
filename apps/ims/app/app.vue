@@ -205,7 +205,7 @@ watch(
             :key="item.key"
             type="button"
             class="rounded-lg px-3 py-1.5 text-sm font-semibold"
-            :class="activeView === item.key ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'"
+            :class="activeView === item.key ? 'bg-primary text-white' : 'text-slate-600 hover:bg-slate-100'"
             @click="selectView(item.key)"
           >
             {{ item.label }}
@@ -267,7 +267,7 @@ watch(
           :key="item.key"
           type="button"
           class="rounded-lg px-3 py-2.5 text-left text-sm font-semibold"
-          :class="activeView === item.key ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'"
+          :class="activeView === item.key ? 'bg-primary text-white' : 'text-slate-600 hover:bg-slate-100'"
           @click="selectView(item.key)"
         >
           {{ item.label }}

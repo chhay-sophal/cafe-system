@@ -582,7 +582,7 @@ function handleDone() {
   align-items: center;
   justify-content: space-between;
   padding: 1rem 1.25rem;
-  background: #111111;
+  background: var(--color-primary);
   color: #ffffff;
 }
 
@@ -663,8 +663,8 @@ function handleDone() {
 }
 
 .payment-method--active {
-  background: #111111;
-  border-color: #111111;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
   color: #ffffff;
 }
 
@@ -790,8 +790,8 @@ function handleDone() {
 .checkout-modal__complete {
   min-height: 52px;
   border-radius: 12px;
-  border: 2px solid #111111;
-  background: #111111;
+  border: 2px solid var(--color-primary);
+  background: var(--color-primary);
   color: #ffffff;
   font-size: 1.05rem;
   font-weight: 700;
@@ -889,9 +889,9 @@ function handleDone() {
 }
 
 :where(:root[data-theme="dark"]) .payment-method--active {
-  background: #ffffff;
-  border-color: #ffffff;
-  color: #111111;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
 }
 
 :where(:root[data-theme="dark"]) .tendered-display__label {
@@ -917,9 +917,9 @@ function handleDone() {
 }
 
 :where(:root[data-theme="dark"]) .checkout-modal__complete {
-  background: #ffffff;
-  border-color: #ffffff;
-  color: #111111;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
 }
 
 :where(:root[data-theme="dark"]) .checkout-modal__complete:disabled {

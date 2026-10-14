@@ -219,8 +219,8 @@ async function submit() {
   width: 100%;
   min-height: 52px;
   border-radius: 12px;
-  border: 2px solid #111111;
-  background: #111111;
+  border: 2px solid var(--color-primary);
+  background: var(--color-primary);
   color: #ffffff;
   font-size: 1.05rem;
   font-weight: 700;
@@ -266,8 +266,8 @@ async function submit() {
 }
 
 :where(:root[data-theme="dark"]) .login-card__submit {
-  background: #ffffff;
-  border-color: #ffffff;
-  color: #111111;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
 }
 </style>

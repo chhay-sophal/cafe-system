@@ -40,6 +40,11 @@
 }
 
 :root {
+  /* Brand colour - Coffee Brown #6F4E37 - for headers, primary buttons and
+     selected states, in both light and dark themes. White text on it is ~7.4:1. */
+  --color-primary: #6f4e37;
+  --color-on-primary: #ffffff;
+
   font-family: "Kantumruy Pro", Inter, Avenir, Helvetica, Arial, sans-serif;
   font-size: 16px;
   line-height: 1.4;
