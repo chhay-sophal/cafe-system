@@ -233,40 +233,41 @@ async function submit() {
   cursor: not-allowed;
 }
 
-@media (prefers-color-scheme: dark) {
-  .login-screen {
-    background: #1a1a1a;
-  }
+/* Dark theme: data-theme is set on <html> by composables/useTheme.ts. :where()
+   keeps these rules at their own specificity, so they override light styles
+   exactly as the prefers-color-scheme media query used to. */
+:where(:root[data-theme="dark"]) .login-screen {
+  background: #1a1a1a;
+}
 
-  .login-card {
-    background: #242424;
-  }
+:where(:root[data-theme="dark"]) .login-card {
+  background: #242424;
+}
 
-  .login-card__title {
-    color: #f2f2f2;
-  }
+:where(:root[data-theme="dark"]) .login-card__title {
+  color: #f2f2f2;
+}
 
-  .login-card__locale {
-    background: #2a2a2a;
-    border-color: #444444;
-    color: #f2f2f2;
-  }
+:where(:root[data-theme="dark"]) .login-card__locale {
+  background: #2a2a2a;
+  border-color: #444444;
+  color: #f2f2f2;
+}
 
-  .login-card__pin-display {
-    color: #f2f2f2;
-    border-color: #444444;
-  }
+:where(:root[data-theme="dark"]) .login-card__pin-display {
+  color: #f2f2f2;
+  border-color: #444444;
+}
 
-  .login-keypad__key {
-    background: #2a2a2a;
-    border-color: #444444;
-    color: #f2f2f2;
-  }
+:where(:root[data-theme="dark"]) .login-keypad__key {
+  background: #2a2a2a;
+  border-color: #444444;
+  color: #f2f2f2;
+}
 
-  .login-card__submit {
-    background: #ffffff;
-    border-color: #ffffff;
-    color: #111111;
-  }
+:where(:root[data-theme="dark"]) .login-card__submit {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: #111111;
 }
 </style>

@@ -321,33 +321,34 @@ onMounted(loadOrders);
   color: #c0392b;
 }
 
-@media (prefers-color-scheme: dark) {
-  .sales-history__refresh,
-  .sales-summary__card,
-  .sales-table-wrap {
-    background: #242424;
-    border-color: #3a3a3a;
-    color: #f6f6f6;
-  }
+/* Dark theme: data-theme is set on <html> by composables/useTheme.ts. :where()
+   keeps these rules at their own specificity, so they override light styles
+   exactly as the prefers-color-scheme media query used to. */
+:where(:root[data-theme="dark"]) .sales-history__refresh,
+:where(:root[data-theme="dark"]) .sales-summary__card,
+:where(:root[data-theme="dark"]) .sales-table-wrap {
+  background: #242424;
+  border-color: #3a3a3a;
+  color: #f6f6f6;
+}
 
-  .sales-table th {
-    background: #1c1c1c;
-    color: #aaaaaa;
-  }
+:where(:root[data-theme="dark"]) .sales-table th {
+  background: #1c1c1c;
+  color: #aaaaaa;
+}
 
-  .sales-table th,
-  .sales-table td {
-    border-bottom-color: #3a3a3a;
-  }
+:where(:root[data-theme="dark"]) .sales-table th,
+:where(:root[data-theme="dark"]) .sales-table td {
+  border-bottom-color: #3a3a3a;
+}
 
-  .sales-table__row:hover td,
-  .sales-table__row:focus-visible td {
-    background: #2e2e2e;
-  }
+:where(:root[data-theme="dark"]) .sales-table__row:hover td,
+:where(:root[data-theme="dark"]) .sales-table__row:focus-visible td {
+  background: #2e2e2e;
+}
 
-  .sales-history__pending {
-    background: #3a1f1c;
-    color: #ff8a7a;
-  }
+:where(:root[data-theme="dark"]) .sales-history__pending {
+  background: #3a1f1c;
+  color: #ff8a7a;
 }
 </style>

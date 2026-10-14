@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { setLocale } from "../i18n";
 import { useKhqrBanks } from "../composables/useKhqrBanks";
 import { useReceiptPrinter } from "../composables/useReceiptPrinter";
+import { useTheme, type ThemePreference } from "../composables/useTheme";
 import type { PaperSize } from "../lib/receipt";
 
 type SectionId = "general" | "printer" | "khqr";
@@ -31,6 +32,13 @@ const PAPER_SIZES: Array<{ value: PaperSize; label: string }> = [
   { value: "64mm", label: "64 mm" },
   { value: "80mm", label: "80 mm" },
 ];
+
+const theme = useTheme();
+const THEMES = computed<Array<{ value: ThemePreference; label: string }>>(() => [
+  { value: "system", label: t("settings.general.themeSystem") },
+  { value: "light", label: t("settings.general.themeLight") },
+  { value: "dark", label: t("settings.general.themeDark") },
+]);
 
 const activeSection = ref<SectionId>("general");
 
@@ -126,6 +134,27 @@ function handleRemoveBank(id: string) {
               @click="setLocale(language.value)"
             >
               {{ language.label }}
+            </button>
+          </div>
+        </div>
+
+        <div class="settings-field">
+          <div class="settings-field__text">
+            <span class="settings-field__label">{{ t("settings.general.appearance") }}</span>
+            <span class="settings-field__hint">{{ t("settings.general.appearanceHint") }}</span>
+          </div>
+          <div class="settings-choice" role="radiogroup" :aria-label="t('settings.general.appearance')">
+            <button
+              v-for="option in THEMES"
+              :key="option.value"
+              type="button"
+              role="radio"
+              :aria-checked="theme.preference.value === option.value"
+              class="settings-choice__option"
+              :class="{ 'settings-choice__option--active': theme.preference.value === option.value }"
+              @click="theme.setPreference(option.value)"
+            >
+              {{ option.label }}
             </button>
           </div>
         </div>
@@ -453,50 +482,51 @@ function handleRemoveBank(id: string) {
   color: #ffffff;
 }
 
-@media (prefers-color-scheme: dark) {
-  .settings__nav {
-    background: #1c1c1c;
-    border-right-color: #3a3a3a;
-  }
+/* Dark theme: data-theme is set on <html> by composables/useTheme.ts. :where()
+   keeps these rules at their own specificity, so they override light styles
+   exactly as the prefers-color-scheme media query used to. */
+:where(:root[data-theme="dark"]) .settings__nav {
+  background: #1c1c1c;
+  border-right-color: #3a3a3a;
+}
 
-  .settings__nav-item {
-    color: #cccccc;
-  }
+:where(:root[data-theme="dark"]) .settings__nav-item {
+  color: #cccccc;
+}
 
-  .settings__nav-item--active {
-    background: #f6f6f6;
-    color: #111111;
-  }
+:where(:root[data-theme="dark"]) .settings__nav-item--active {
+  background: #f6f6f6;
+  color: #111111;
+}
 
-  .settings-field,
-  .bank-list__item,
-  .bank-form {
-    background: #242424;
-    border-color: #3a3a3a;
-  }
+:where(:root[data-theme="dark"]) .settings-field,
+:where(:root[data-theme="dark"]) .bank-list__item,
+:where(:root[data-theme="dark"]) .bank-form {
+  background: #242424;
+  border-color: #3a3a3a;
+}
 
-  .settings-input {
-    background: #2e2e2e;
-    border-color: #3a3a3a;
-    color: #f6f6f6;
-  }
+:where(:root[data-theme="dark"]) .settings-input {
+  background: #2e2e2e;
+  border-color: #3a3a3a;
+  color: #f6f6f6;
+}
 
-  .settings-primary {
-    background: #f6f6f6;
-    color: #111111;
-  }
+:where(:root[data-theme="dark"]) .settings-primary {
+  background: #f6f6f6;
+  color: #111111;
+}
 
-  .settings-choice__option,
-  .settings-select {
-    background: #2e2e2e;
-    border-color: #3a3a3a;
-    color: #f6f6f6;
-  }
+:where(:root[data-theme="dark"]) .settings-choice__option,
+:where(:root[data-theme="dark"]) .settings-select {
+  background: #2e2e2e;
+  border-color: #3a3a3a;
+  color: #f6f6f6;
+}
 
-  .settings-choice__option--active {
-    background: #f6f6f6;
-    border-color: #f6f6f6;
-    color: #111111;
-  }
+:where(:root[data-theme="dark"]) .settings-choice__option--active {
+  background: #f6f6f6;
+  border-color: #f6f6f6;
+  color: #111111;
 }
 </style>

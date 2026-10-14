@@ -224,28 +224,29 @@ function onPointerUp() {
   color: #888888;
 }
 
-@media (prefers-color-scheme: dark) {
-  .cart-row-wrap {
-    border-color: #3a3a3a;
-  }
+/* Dark theme: data-theme is set on <html> by composables/useTheme.ts. :where()
+   keeps these rules at their own specificity, so they override light styles
+   exactly as the prefers-color-scheme media query used to. */
+:where(:root[data-theme="dark"]) .cart-row-wrap {
+  border-color: #3a3a3a;
+}
 
-  .cart-row {
-    background: #242424;
-  }
+:where(:root[data-theme="dark"]) .cart-row {
+  background: #242424;
+}
 
-  .cart-row__name,
-  .cart-row__line-total {
-    color: #f2f2f2;
-  }
+:where(:root[data-theme="dark"]) .cart-row__name,
+:where(:root[data-theme="dark"]) .cart-row__line-total {
+  color: #f2f2f2;
+}
 
-  .cart-row__line-total-secondary {
-    color: #777777;
-  }
+:where(:root[data-theme="dark"]) .cart-row__line-total-secondary {
+  color: #777777;
+}
 
-  .cart-row__stepper button {
-    background: #2a2a2a;
-    border-color: #444444;
-    color: #f2f2f2;
-  }
+:where(:root[data-theme="dark"]) .cart-row__stepper button {
+  background: #2a2a2a;
+  border-color: #444444;
+  color: #f2f2f2;
 }
 </style>

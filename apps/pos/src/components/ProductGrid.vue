@@ -71,13 +71,14 @@ const { t } = useI18n({ useScope: "global" });
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  .product-grid__state {
-    color: #aaaaaa;
-  }
+/* Dark theme: data-theme is set on <html> by composables/useTheme.ts. :where()
+   keeps these rules at their own specificity, so they override light styles
+   exactly as the prefers-color-scheme media query used to. */
+:where(:root[data-theme="dark"]) .product-grid__state {
+  color: #aaaaaa;
+}
 
-  .product-grid__state--error {
-    color: #ff8a7a;
-  }
+:where(:root[data-theme="dark"]) .product-grid__state--error {
+  color: #ff8a7a;
 }
 </style>

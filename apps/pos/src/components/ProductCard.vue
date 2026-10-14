@@ -176,36 +176,37 @@ function handleTap() {
   color: #999999;
 }
 
-@media (prefers-color-scheme: dark) {
-  .product-card {
-    background: #242424;
-    border-color: #3a3a3a;
-  }
+/* Dark theme: data-theme is set on <html> by composables/useTheme.ts. :where()
+   keeps these rules at their own specificity, so they override light styles
+   exactly as the prefers-color-scheme media query used to. */
+:where(:root[data-theme="dark"]) .product-card {
+  background: #242424;
+  border-color: #3a3a3a;
+}
 
-  .product-card__image-wrap {
-    background: #2f2f2f;
-  }
+:where(:root[data-theme="dark"]) .product-card__image-wrap {
+  background: #2f2f2f;
+}
 
-  .product-card__image-fallback {
-    background: #333333;
-    color: #777777;
-  }
+:where(:root[data-theme="dark"]) .product-card__image-fallback {
+  background: #333333;
+  color: #777777;
+}
 
-  .product-card__name {
-    color: #f2f2f2;
-  }
+:where(:root[data-theme="dark"]) .product-card__name {
+  color: #f2f2f2;
+}
 
-  .product-card__price {
-    color: #5fd897;
-  }
+:where(:root[data-theme="dark"]) .product-card__price {
+  color: #5fd897;
+}
 
-  .product-card__price-secondary {
-    color: #777777;
-  }
+:where(:root[data-theme="dark"]) .product-card__price-secondary {
+  color: #777777;
+}
 
-  .product-card--unavailable .product-card__name,
-  .product-card--unavailable .product-card__price {
-    color: #777777;
-  }
+:where(:root[data-theme="dark"]) .product-card--unavailable .product-card__name,
+:where(:root[data-theme="dark"]) .product-card--unavailable .product-card__price {
+  color: #777777;
 }
 </style>

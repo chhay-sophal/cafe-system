@@ -142,7 +142,12 @@
     },
     "general": {
       "language": "Language",
-      "languageHint": "Language used on this register's screens and receipts."
+      "languageHint": "Language used on this register's screens and receipts.",
+      "appearance": "Appearance",
+      "appearanceHint": "Light or dark screens, or follow this computer's setting. Also applies to the customer display.",
+      "themeSystem": "System",
+      "themeLight": "Light",
+      "themeDark": "Dark"
     },
     "printer": {
       "hint": "Receipts print here automatically after each sale. Saved on this register only.",

@@ -4,6 +4,7 @@
   "description": "Capability for the customer-facing display window - read-only, needs only the core event bus to receive cart/sale updates from the main window",
   "windows": ["customer-display"],
   "permissions": [
-    "core:default"
+    "core:default",
+    "core:window:allow-set-theme"
   ]
 }

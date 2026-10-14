@@ -17,11 +17,13 @@ import {
   onRequestSync,
   publishCartUpdate,
   publishLocaleChange,
+  publishThemeChange,
   type CartUpdatePayload,
   type DisplayLocale,
 } from "./composables/useCustomerDisplayChannel";
 import { useExchangeRate } from "./composables/useExchangeRate";
 import { useNetworkStatus } from "./composables/useNetworkStatus";
+import { useTheme } from "./composables/useTheme";
 import { useOfflineQueue } from "./composables/useOfflineQueue";
 import { fetchCategories, fetchProductModifiers, fetchProducts } from "./lib/api";
 import type { Category, Product } from "./types/catalog";
@@ -70,6 +72,10 @@ watch(cartUpdatePayload, publishCartUpdate, { immediate: true });
 
 // Language changes (Settings → General) reach the customer display live.
 watch(locale, (newLocale) => publishLocaleChange(newLocale as DisplayLocale));
+
+// ...and so do appearance changes.
+const { preference: themePreference } = useTheme();
+watch(themePreference, publishThemeChange);
 
 let unlistenRequestSync: (() => void) | undefined;
 

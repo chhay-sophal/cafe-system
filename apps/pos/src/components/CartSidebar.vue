@@ -221,44 +221,45 @@ function handleDiscountInput(event: Event) {
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  .cart-sidebar {
-    background: #1c1c1c;
-    border-left-color: #3a3a3a;
-  }
+/* Dark theme: data-theme is set on <html> by composables/useTheme.ts. :where()
+   keeps these rules at their own specificity, so they override light styles
+   exactly as the prefers-color-scheme media query used to. */
+:where(:root[data-theme="dark"]) .cart-sidebar {
+  background: #1c1c1c;
+  border-left-color: #3a3a3a;
+}
 
-  .cart-sidebar__summary {
-    background: #242424;
-    border-top-color: #3a3a3a;
-  }
+:where(:root[data-theme="dark"]) .cart-sidebar__summary {
+  background: #242424;
+  border-top-color: #3a3a3a;
+}
 
-  .cart-sidebar__row {
-    color: #dddddd;
-  }
+:where(:root[data-theme="dark"]) .cart-sidebar__row {
+  color: #dddddd;
+}
 
-  .cart-sidebar__row--discount label {
-    color: #dddddd;
-  }
+:where(:root[data-theme="dark"]) .cart-sidebar__row--discount label {
+  color: #dddddd;
+}
 
-  .cart-sidebar__discount-input input {
-    background: #2a2a2a;
-    border-color: #444444;
-    color: #f2f2f2;
-  }
+:where(:root[data-theme="dark"]) .cart-sidebar__discount-input input {
+  background: #2a2a2a;
+  border-color: #444444;
+  color: #f2f2f2;
+}
 
-  .cart-sidebar__row--total {
-    color: #f2f2f2;
-    border-top-color: #444444;
-  }
+:where(:root[data-theme="dark"]) .cart-sidebar__row--total {
+  color: #f2f2f2;
+  border-top-color: #444444;
+}
 
-  .cart-sidebar__total-secondary {
-    color: #777777;
-  }
+:where(:root[data-theme="dark"]) .cart-sidebar__total-secondary {
+  color: #777777;
+}
 
-  .cart-sidebar__checkout {
-    background: #ffffff;
-    border-color: #ffffff;
-    color: #111111;
-  }
+:where(:root[data-theme="dark"]) .cart-sidebar__checkout {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: #111111;
 }
 </style>

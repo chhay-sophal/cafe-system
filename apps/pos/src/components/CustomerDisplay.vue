@@ -5,6 +5,7 @@ import {
   onCartUpdate,
   onLocaleChange,
   onPaymentQr,
+  onThemeChange,
   onSaleCompleted,
   requestSync,
   type CartUpdatePayload,
@@ -12,6 +13,7 @@ import {
   type SaleCompletedPayload,
 } from "../composables/useCustomerDisplayChannel";
 import { useExchangeRate } from "../composables/useExchangeRate";
+import { useTheme } from "../composables/useTheme";
 import { formatMain, formatRiel, formatSecondary, formatUsd } from "../lib/currency";
 
 type Mode = "idle" | "building" | "completed";
@@ -27,6 +29,9 @@ const paymentQr = ref<PaymentQrPayload | null>(null);
 let unlistenCartUpdate: (() => void) | undefined;
 let unlistenSaleCompleted: (() => void) | undefined;
 let unlistenLocaleChange: (() => void) | undefined;
+let unlistenThemeChange: (() => void) | undefined;
+
+const { setPreference: setThemePreference } = useTheme();
 let unlistenPaymentQr: (() => void) | undefined;
 
 function handleCartUpdate(payload: CartUpdatePayload) {
@@ -80,6 +85,9 @@ onMounted(async () => {
   unlistenLocaleChange = await onLocaleChange((newLocale) => {
     locale.value = newLocale;
   });
+  unlistenThemeChange = await onThemeChange((theme) => {
+    setThemePreference(theme, { persist: false });
+  });
   unlistenPaymentQr = await onPaymentQr((payload) => {
     paymentQr.value = payload;
   });
@@ -92,6 +100,7 @@ onUnmounted(() => {
   unlistenCartUpdate?.();
   unlistenSaleCompleted?.();
   unlistenLocaleChange?.();
+  unlistenThemeChange?.();
   unlistenPaymentQr?.();
 });
 </script>
@@ -385,35 +394,36 @@ onUnmounted(() => {
   color: #999999;
 }
 
-@media (prefers-color-scheme: dark) {
-  .order__table th {
-    color: #aaaaaa;
-    border-bottom-color: #3a3a3a;
-  }
+/* Dark theme: data-theme is set on <html> by composables/useTheme.ts. :where()
+   keeps these rules at their own specificity, so they override light styles
+   exactly as the prefers-color-scheme media query used to. */
+:where(:root[data-theme="dark"]) .order__table th {
+  color: #aaaaaa;
+  border-bottom-color: #3a3a3a;
+}
 
-  .order__table td {
-    border-bottom-color: #2a2a2a;
-  }
+:where(:root[data-theme="dark"]) .order__table td {
+  border-bottom-color: #2a2a2a;
+}
 
-  .order__item-name {
-    color: #f2f2f2;
-  }
+:where(:root[data-theme="dark"]) .order__item-name {
+  color: #f2f2f2;
+}
 
-  .order__modifiers {
-    color: #999999;
-  }
+:where(:root[data-theme="dark"]) .order__modifiers {
+  color: #999999;
+}
 
-  .order__summary-row {
-    color: #cccccc;
-  }
+:where(:root[data-theme="dark"]) .order__summary-row {
+  color: #cccccc;
+}
 
-  .order__summary-row--total {
-    color: #ffffff;
-    border-top-color: #444444;
-  }
+:where(:root[data-theme="dark"]) .order__summary-row--total {
+  color: #ffffff;
+  border-top-color: #444444;
+}
 
-  .order__summary-secondary {
-    color: #888888;
-  }
+:where(:root[data-theme="dark"]) .order__summary-secondary {
+  color: #888888;
 }
 </style>

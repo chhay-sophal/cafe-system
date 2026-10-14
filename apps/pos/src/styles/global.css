@@ -70,9 +70,10 @@ body {
   margin: 0;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color: #f6f6f6;
-    background-color: #1a1a1a;
-  }
+/* Dark theme: data-theme is set on <html> by composables/useTheme.ts. :where()
+   keeps these rules at their own specificity, so they override light styles
+   exactly as the prefers-color-scheme media query used to. */
+:root:where([data-theme="dark"]) {
+  color: #f6f6f6;
+  background-color: #1a1a1a;
 }

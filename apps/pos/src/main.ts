@@ -2,6 +2,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { createApp } from "vue";
 import App from "./App.vue";
 import CustomerDisplay from "./components/CustomerDisplay.vue";
+import { initTheme } from "./composables/useTheme";
 import { i18n } from "./i18n";
 import "./styles/global.css";
 
@@ -22,5 +23,8 @@ function resolveWindowLabel(): string {
 }
 
 const root = resolveWindowLabel() === "customer-display" ? CustomerDisplay : App;
+
+// Both windows read the saved theme before their first paint.
+initTheme();
 
 createApp(root).use(i18n).mount("#app");

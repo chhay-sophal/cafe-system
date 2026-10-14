@@ -354,45 +354,46 @@ onUnmounted(() => {
   cursor: not-allowed;
 }
 
-@media (prefers-color-scheme: dark) {
-  .modifier-modal {
-    background: #242424;
-  }
+/* Dark theme: data-theme is set on <html> by composables/useTheme.ts. :where()
+   keeps these rules at their own specificity, so they override light styles
+   exactly as the prefers-color-scheme media query used to. */
+:where(:root[data-theme="dark"]) .modifier-modal {
+  background: #242424;
+}
 
-  .modifier-group__name {
-    color: #f2f2f2;
-  }
+:where(:root[data-theme="dark"]) .modifier-group__name {
+  color: #f2f2f2;
+}
 
-  .modifier-modal__footer {
-    border-top-color: #3a3a3a;
-  }
+:where(:root[data-theme="dark"]) .modifier-modal__footer {
+  border-top-color: #3a3a3a;
+}
 
-  .modifier-option {
-    background: #2a2a2a;
-    border-color: #444444;
-    color: #f2f2f2;
-  }
+:where(:root[data-theme="dark"]) .modifier-option {
+  background: #2a2a2a;
+  border-color: #444444;
+  color: #f2f2f2;
+}
 
-  .modifier-option--selected {
-    border-color: #ffffff;
-    background: #ffffff;
-    color: #111111;
-  }
+:where(:root[data-theme="dark"]) .modifier-option--selected {
+  border-color: #ffffff;
+  background: #ffffff;
+  color: #111111;
+}
 
-  .modifier-modal__cancel {
-    background: #2a2a2a;
-    border-color: #444444;
-    color: #f2f2f2;
-  }
+:where(:root[data-theme="dark"]) .modifier-modal__cancel {
+  background: #2a2a2a;
+  border-color: #444444;
+  color: #f2f2f2;
+}
 
-  .modifier-modal__confirm {
-    background: #ffffff;
-    border-color: #ffffff;
-    color: #111111;
-  }
+:where(:root[data-theme="dark"]) .modifier-modal__confirm {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: #111111;
+}
 
-  .modifier-modal__running-price-secondary {
-    color: #777777;
-  }
+:where(:root[data-theme="dark"]) .modifier-modal__running-price-secondary {
+  color: #777777;
 }
 </style>

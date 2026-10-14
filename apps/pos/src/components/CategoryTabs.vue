@@ -75,22 +75,23 @@ const { t } = useI18n({ useScope: "global" });
   border-color: #111111;
 }
 
-@media (prefers-color-scheme: dark) {
-  .category-tabs {
-    background: #1c1c1c;
-    border-bottom-color: #3a3a3a;
-  }
+/* Dark theme: data-theme is set on <html> by composables/useTheme.ts. :where()
+   keeps these rules at their own specificity, so they override light styles
+   exactly as the prefers-color-scheme media query used to. */
+:where(:root[data-theme="dark"]) .category-tabs {
+  background: #1c1c1c;
+  border-bottom-color: #3a3a3a;
+}
 
-  .category-tab {
-    background: #2a2a2a;
-    color: #f2f2f2;
-    border-color: #444444;
-  }
+:where(:root[data-theme="dark"]) .category-tab {
+  background: #2a2a2a;
+  color: #f2f2f2;
+  border-color: #444444;
+}
 
-  .category-tab--active {
-    background: #ffffff;
-    color: #111111;
-    border-color: #ffffff;
-  }
+:where(:root[data-theme="dark"]) .category-tab--active {
+  background: #ffffff;
+  color: #111111;
+  border-color: #ffffff;
 }
 </style>

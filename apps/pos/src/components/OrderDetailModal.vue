@@ -453,30 +453,31 @@ onMounted(loadOrder);
   cursor: default;
 }
 
-@media (prefers-color-scheme: dark) {
-  .order-modal {
-    background: #242424;
-    color: #f6f6f6;
-  }
+/* Dark theme: data-theme is set on <html> by composables/useTheme.ts. :where()
+   keeps these rules at their own specificity, so they override light styles
+   exactly as the prefers-color-scheme media query used to. */
+:where(:root[data-theme="dark"]) .order-modal {
+  background: #242424;
+  color: #f6f6f6;
+}
 
-  .order-modal__secondary {
-    background: #2e2e2e;
-    border-color: #3a3a3a;
-    color: #f6f6f6;
-  }
+:where(:root[data-theme="dark"]) .order-modal__secondary {
+  background: #2e2e2e;
+  border-color: #3a3a3a;
+  color: #f6f6f6;
+}
 
-  .order-totals {
-    border-top-color: #3a3a3a;
-  }
+:where(:root[data-theme="dark"]) .order-totals {
+  border-top-color: #3a3a3a;
+}
 
-  .void-confirm {
-    background: #3a1f1c;
-  }
+:where(:root[data-theme="dark"]) .void-confirm {
+  background: #3a1f1c;
+}
 
-  .void-confirm__reason {
-    background: #1c1c1c;
-    border-color: #3a3a3a;
-    color: #f6f6f6;
-  }
+:where(:root[data-theme="dark"]) .void-confirm__reason {
+  background: #1c1c1c;
+  border-color: #3a3a3a;
+  color: #f6f6f6;
 }
 </style>

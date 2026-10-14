@@ -863,65 +863,66 @@ function handleDone() {
   font-weight: 600;
 }
 
-@media (prefers-color-scheme: dark) {
-  .checkout-modal {
-    background: #242424;
-  }
+/* Dark theme: data-theme is set on <html> by composables/useTheme.ts. :where()
+   keeps these rules at their own specificity, so they override light styles
+   exactly as the prefers-color-scheme media query used to. */
+:where(:root[data-theme="dark"]) .checkout-modal {
+  background: #242424;
+}
 
-  .checkout-total {
-    background: #2f2f2f;
-  }
+:where(:root[data-theme="dark"]) .checkout-total {
+  background: #2f2f2f;
+}
 
-  .checkout-total__amount {
-    color: #f2f2f2;
-  }
+:where(:root[data-theme="dark"]) .checkout-total__amount {
+  color: #f2f2f2;
+}
 
-  .checkout-total__amount-secondary {
-    color: #777777;
-  }
+:where(:root[data-theme="dark"]) .checkout-total__amount-secondary {
+  color: #777777;
+}
 
-  .payment-method {
-    background: #2a2a2a;
-    border-color: #444444;
-    color: #f2f2f2;
-  }
+:where(:root[data-theme="dark"]) .payment-method {
+  background: #2a2a2a;
+  border-color: #444444;
+  color: #f2f2f2;
+}
 
-  .payment-method--active {
-    background: #ffffff;
-    border-color: #ffffff;
-    color: #111111;
-  }
+:where(:root[data-theme="dark"]) .payment-method--active {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: #111111;
+}
 
-  .tendered-display__label {
-    color: #dddddd;
-  }
+:where(:root[data-theme="dark"]) .tendered-display__label {
+  color: #dddddd;
+}
 
-  .tendered-display__input-wrap input {
-    background: #2a2a2a;
-    border-color: #444444;
-    color: #f2f2f2;
-  }
+:where(:root[data-theme="dark"]) .tendered-display__input-wrap input {
+  background: #2a2a2a;
+  border-color: #444444;
+  color: #f2f2f2;
+}
 
-  .fast-cash__button {
-    background: #2a2a2a;
-    border-color: #444444;
-    color: #f2f2f2;
-  }
+:where(:root[data-theme="dark"]) .fast-cash__button {
+  background: #2a2a2a;
+  border-color: #444444;
+  color: #f2f2f2;
+}
 
-  .checkout-modal__cancel {
-    background: #2a2a2a;
-    border-color: #444444;
-    color: #f2f2f2;
-  }
+:where(:root[data-theme="dark"]) .checkout-modal__cancel {
+  background: #2a2a2a;
+  border-color: #444444;
+  color: #f2f2f2;
+}
 
-  .checkout-modal__complete {
-    background: #ffffff;
-    border-color: #ffffff;
-    color: #111111;
-  }
+:where(:root[data-theme="dark"]) .checkout-modal__complete {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: #111111;
+}
 
-  .checkout-modal__complete:disabled {
-    opacity: 0.35;
-  }
+:where(:root[data-theme="dark"]) .checkout-modal__complete:disabled {
+  opacity: 0.35;
 }
 </style>

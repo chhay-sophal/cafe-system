@@ -1,5 +1,6 @@
 import { emit, emitTo, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { PaymentMethod } from "../types/order";
+import type { ThemePreference } from "./useTheme";
 
 // Tauri's event bus is the cross-window channel: the cashier ("main")
 // window and the customer-facing display are separate webviews with no
@@ -9,6 +10,7 @@ const CART_UPDATE_EVENT = "customer-display:cart-update";
 const SALE_COMPLETED_EVENT = "customer-display:sale-completed";
 const REQUEST_SYNC_EVENT = "customer-display:request-sync";
 const LOCALE_CHANGE_EVENT = "customer-display:locale-change";
+const THEME_CHANGE_EVENT = "customer-display:theme-change";
 const PAYMENT_QR_EVENT = "customer-display:payment-qr";
 
 export type DisplayLocale = "en-US" | "km-KH";
@@ -67,6 +69,12 @@ export function publishLocaleChange(locale: DisplayLocale): void {
   silently(emit(LOCALE_CHANGE_EVENT, locale));
 }
 
+// Same as the locale: the display reads the saved theme when it opens, and
+// this covers changes made while it's already open.
+export function publishThemeChange(theme: ThemePreference): void {
+  silently(emit(THEME_CHANGE_EVENT, theme));
+}
+
 export function publishPaymentQr(payload: PaymentQrPayload | null): void {
   silently(emit(PAYMENT_QR_EVENT, payload));
 }
@@ -85,6 +93,10 @@ export function onSaleCompleted(handler: (payload: SaleCompletedPayload) => void
 
 export function onLocaleChange(handler: (locale: DisplayLocale) => void): Promise<UnlistenFn> {
   return listen<DisplayLocale>(LOCALE_CHANGE_EVENT, (event) => handler(event.payload));
+}
+
+export function onThemeChange(handler: (theme: ThemePreference) => void): Promise<UnlistenFn> {
+  return listen<ThemePreference>(THEME_CHANGE_EVENT, (event) => handler(event.payload));
 }
 
 export function onPaymentQr(handler: (payload: PaymentQrPayload | null) => void): Promise<UnlistenFn> {
