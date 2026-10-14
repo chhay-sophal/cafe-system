@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useExchangeRate } from "../composables/useExchangeRate";
 import { formatMain, formatSecondary } from "../lib/currency";
@@ -33,9 +34,20 @@ function formatSecondaryEquivalent(value: number): string {
   return formatSecondary(value, mainCurrency.value, exchangeRateRielPerUsd.value);
 }
 
+// The discount is typed in the store's main currency (Settings in IMS) but
+// the cart keeps it in USD like every other amount. Riel converts exactly,
+// without the usual round-to-100: the input shows the stored value back on
+// every keystroke, so rounding would fight the cashier mid-typing.
+const isMainKhr = computed(() => mainCurrency.value === "KHR");
+const discountPrefix = computed(() => (isMainKhr.value ? "-" : "-$"));
+
+const discountInputValue = computed(() =>
+  isMainKhr.value ? Math.round(props.discountAmount * exchangeRateRielPerUsd.value) : props.discountAmount,
+);
+
 function handleDiscountInput(event: Event) {
   const value = Number((event.target as HTMLInputElement).value);
-  emit("update:discount", value);
+  emit("update:discount", isMainKhr.value ? value / exchangeRateRielPerUsd.value : value);
 }
 </script>
 
@@ -70,15 +82,17 @@ function handleDiscountInput(event: Event) {
       <div class="cart-sidebar__row cart-sidebar__row--discount">
         <label for="discount-input">{{ t("cart.discount") }}</label>
         <div class="cart-sidebar__discount-input">
-          <span>-$</span>
+          <span>{{ discountPrefix }}</span>
           <input
             id="discount-input"
             type="number"
             min="0"
-            step="0.01"
-            :value="props.discountAmount"
+            :step="isMainKhr ? 100 : 0.01"
+            :value="discountInputValue"
             @input="handleDiscountInput"
           />
+          <!-- Riel's sign goes after the amount, as in formatRiel. -->
+          <span v-if="isMainKhr">៛</span>
         </div>
       </div>
       <div class="cart-sidebar__row cart-sidebar__row--total">
@@ -171,7 +185,8 @@ function handleDiscountInput(event: Event) {
 }
 
 .cart-sidebar__discount-input input {
-  width: 70px;
+  /* Room for riel amounts like 20000 as well as dollars. */
+  width: 96px;
   min-height: 36px;
   border: 2px solid #dcdcdc;
   border-radius: 8px;
