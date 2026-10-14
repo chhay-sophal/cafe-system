@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from "vue";
+import { computed, onUnmounted, ref, watch, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { HttpError, submitOrder } from "../lib/api";
 import { computeChange, formatMain, formatRiel, formatSecondary, formatUsd, round2 } from "../lib/currency";
@@ -177,14 +177,42 @@ function clearTendered() {
   amountTenderedRiel.value = 0;
 }
 
+// A tendered field's text: empty while its amount is 0 (so the "0"
+// placeholder shows instead of a pre-filled 0), otherwise left exactly as
+// typed - binding the number directly would wipe a typed "0" on its way to
+// "0.5". Replaced only when the amount stops matching it, i.e. when the
+// fast-cash buttons, Exact, Clear or a payment method switch change it.
+function amountText(amount: Ref<number>): Ref<string> {
+  const text = ref("");
+  watch(
+    amount,
+    (value) => {
+      if (Math.abs((Number(text.value) || 0) - value) > 1e-9) {
+        text.value = value === 0 ? "" : String(value);
+      }
+    },
+    { immediate: true },
+  );
+  return text;
+}
+
+const tenderedUsdText = amountText(amountTenderedUsd);
+const tenderedRielText = amountText(amountTenderedRiel);
+
+// Empty, negative or half-typed input counts as nothing tendered.
+function parseTendered(text: string): number {
+  const value = Number(text);
+  return Number.isFinite(value) && value >= 0 ? value : 0;
+}
+
 function handleTenderedUsdInput(event: Event) {
-  const value = Number((event.target as HTMLInputElement).value);
-  amountTenderedUsd.value = Number.isFinite(value) && value >= 0 ? value : 0;
+  tenderedUsdText.value = (event.target as HTMLInputElement).value;
+  amountTenderedUsd.value = parseTendered(tenderedUsdText.value);
 }
 
 function handleTenderedRielInput(event: Event) {
-  const value = Number((event.target as HTMLInputElement).value);
-  amountTenderedRiel.value = Number.isFinite(value) && value >= 0 ? value : 0;
+  tenderedRielText.value = (event.target as HTMLInputElement).value;
+  amountTenderedRiel.value = parseTendered(tenderedRielText.value);
 }
 
 function buildOrderPayload(): OrderPayload {
@@ -450,7 +478,8 @@ function handleDone() {
                     type="number"
                     min="0"
                     step="0.01"
-                    :value="amountTenderedUsd"
+                    placeholder="0"
+                    :value="tenderedUsdText"
                     @input="handleTenderedUsdInput"
                   />
                 </div>
@@ -480,7 +509,8 @@ function handleDone() {
                     type="number"
                     min="0"
                     step="100"
-                    :value="amountTenderedRiel"
+                    placeholder="0"
+                    :value="tenderedRielText"
                     @input="handleTenderedRielInput"
                   />
                   <span>៛</span>

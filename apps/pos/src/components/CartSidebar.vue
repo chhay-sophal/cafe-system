@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useExchangeRate } from "../composables/useExchangeRate";
 import { formatMain, formatSecondary } from "../lib/currency";
@@ -41,12 +41,33 @@ function formatSecondaryEquivalent(value: number): string {
 const isMainKhr = computed(() => mainCurrency.value === "KHR");
 const discountPrefix = computed(() => (isMainKhr.value ? "-" : "-$"));
 
-const discountInputValue = computed(() =>
-  isMainKhr.value ? Math.round(props.discountAmount * exchangeRateRielPerUsd.value) : props.discountAmount,
+// The discount in the field's own units (riel or dollars).
+function toInputUnits(usd: number): number {
+  return isMainKhr.value ? Math.round(usd * exchangeRateRielPerUsd.value) : usd;
+}
+
+// What's typed, kept as-is so no discount reads as an empty field with a
+// "0" placeholder - binding the number directly would show 0, and would wipe
+// a typed "0" on its way to "0.5". Only replaced when the cart's discount
+// stops matching it: capped at the subtotal, reset after a sale, or the
+// main currency switched.
+const discountText = ref("");
+
+watch(
+  [() => props.discountAmount, isMainKhr, exchangeRateRielPerUsd],
+  ([usd]) => {
+    const expected = toInputUnits(usd);
+    if (Math.abs(Number(discountText.value) - expected) > 1e-6) {
+      discountText.value = expected === 0 ? "" : String(expected);
+    }
+  },
+  { immediate: true },
 );
 
 function handleDiscountInput(event: Event) {
-  const value = Number((event.target as HTMLInputElement).value);
+  discountText.value = (event.target as HTMLInputElement).value;
+  // Empty (or a half-typed number the browser can't parse yet) counts as 0.
+  const value = Number(discountText.value) || 0;
   emit("update:discount", isMainKhr.value ? value / exchangeRateRielPerUsd.value : value);
 }
 </script>
@@ -88,7 +109,8 @@ function handleDiscountInput(event: Event) {
             type="number"
             min="0"
             :step="isMainKhr ? 100 : 0.01"
-            :value="discountInputValue"
+            placeholder="0"
+            :value="discountText"
             @input="handleDiscountInput"
           />
           <!-- Riel's sign goes after the amount, as in formatRiel. -->
