@@ -239,7 +239,13 @@
     "saveRecipe": "រក្សាទុករូបមន្ត",
     "saveError": "បរាជ័យក្នុងការរក្សាទុករូបមន្ត។",
     "saveSuccess": "បានរក្សាទុករូបមន្តរួចរាល់។",
-    "loadingMenuItems": "កំពុងផ្ទុកធាតុម៉ឺនុយ..."
+    "loadingMenuItems": "កំពុងផ្ទុកធាតុម៉ឺនុយ...",
+    "searchPlaceholder": "ស្វែងរកមុខទំនិញ...",
+    "recipeFilter": "រូបមន្ត",
+    "configured": "បានកំណត់",
+    "notConfiguredOption": "មិនទាន់កំណត់",
+    "ingredientsFilter": "គ្រឿងផ្សំ",
+    "noMatches": "គ្មានមុខទំនិញត្រូវនឹងការស្វែងរក ឬតម្រងរបស់អ្នកទេ។"
   },
   "stockAdjustment": {
     "types": {

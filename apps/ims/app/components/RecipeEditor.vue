@@ -2,10 +2,11 @@
 import { computed, onMounted, ref } from "vue";
 import { Pencil, Plus, Trash2 } from "@lucide/vue";
 import { storeToRefs } from "pinia";
-import { createColumnHelper, tableFeatures, useTable } from "@tanstack/vue-table";
+import { columnVisibilityFeature, createColumnHelper, tableFeatures, useTable } from "@tanstack/vue-table";
 import type { InventoryItem } from "~/types/inventory";
 import type { Product } from "~/types/catalog";
 import type { RecipeIngredientDraft, RecipeTarget, RecipeTargetKind, RecipeUpdatePayload } from "~/types/recipe";
+import type { TableFilterDef } from "~/types/table";
 
 const { t } = useI18n();
 const auth = useAuth();
@@ -30,13 +31,49 @@ const deletingProduct = ref<Product | null>(null);
 const inventoryItems = computed<InventoryItem[]>(() => inventoryStore.items);
 
 const { products } = storeToRefs(catalogStore);
-const recipeTableFeatures = tableFeatures({ ...sortingFeatures });
-const recipeColumnHelper = createColumnHelper<typeof recipeTableFeatures, Product>();
+
+// Each product plus what the table sorts and filters on. Recipe counts live
+// in the recipe store, not on the product - building the rows here means a
+// saved or deleted recipe gives the table new data, so sorting/filtering by
+// recipe status updates right away instead of using cached row values.
+type RecipeRow = Product & { categoryName: string; ingredientCount: number };
+
+const recipeRows = computed<RecipeRow[]>(() => {
+  const categoryNames = new Map(catalogStore.categories.map((category) => [category.id, category.name]));
+  return products.value.map((product) => ({
+    ...product,
+    categoryName: categoryNames.get(product.categoryId) ?? "",
+    ingredientCount: recipeStore.productRecipeCounts[product.id] ?? 0,
+  }));
+});
+
+const recipeTableFeatures = tableFeatures({ ...sortingFeatures, ...filteringFeatures, columnVisibilityFeature });
+const recipeColumnHelper = createColumnHelper<typeof recipeTableFeatures, RecipeRow>();
 
 const recipeColumns = recipeColumnHelper.columns([
   recipeColumnHelper.accessor("name", { header: () => t("productTable.item") }),
-  recipeColumnHelper.display({ id: "status", header: () => t("recipe.recipeStatus") }),
+  // Rendered via slot (the status badge); the ingredient count is what
+  // sorting and the Ingredients range compare.
+  recipeColumnHelper.accessor("ingredientCount", {
+    id: "status",
+    header: () => t("recipe.recipeStatus"),
+    filterFn: "inNumberRange",
+    enableGlobalFilter: false,
+  }),
   recipeColumnHelper.display({ id: "actions", header: "" }),
+  // Hidden, filter-only columns.
+  recipeColumnHelper.accessor("categoryName", {
+    id: "category",
+    filterFn: "equals",
+    enableGlobalFilter: false,
+    enableSorting: false,
+  }),
+  recipeColumnHelper.accessor((row) => row.ingredientCount > 0, {
+    id: "hasRecipe",
+    filterFn: "equals",
+    enableGlobalFilter: false,
+    enableSorting: false,
+  }),
 ]);
 
 const recipeCellClass = {
@@ -44,7 +81,38 @@ const recipeCellClass = {
   actions: "px-4 py-3 text-right",
 };
 
-const recipeTable = useTable({ features: recipeTableFeatures, columns: recipeColumns, data: products });
+const recipeTable = useTable({
+  features: recipeTableFeatures,
+  columns: recipeColumns,
+  data: recipeRows,
+  globalFilterFn: "includesDisplayText",
+  initialState: { columnVisibility: { category: false, hasRecipe: false } },
+});
+
+const recipeFilters = computed<TableFilterDef[]>(() => [
+  {
+    type: "select",
+    columnId: "category",
+    label: t("productTable.category"),
+    options: catalogStore.categories.map((category) => ({ value: category.name, label: category.name })),
+  },
+  {
+    type: "select",
+    columnId: "hasRecipe",
+    label: t("recipe.recipeFilter"),
+    options: [
+      { value: true, label: t("recipe.configured") },
+      { value: false, label: t("recipe.notConfiguredOption") },
+    ],
+  },
+  { type: "numberRange", columnId: "status", label: t("recipe.ingredientsFilter") },
+]);
+
+// "No products yet" would be wrong when there are menu items but the search
+// or filters hide them all.
+const recipeEmptyText = computed(() =>
+  products.value.length > 0 ? t("recipe.noMatches") : t("productTable.empty"),
+);
 
 const productsByCategory = computed(() => {
   const grouped = new Map<string, Product[]>();
@@ -241,7 +309,9 @@ onMounted(async () => {
 <template>
   <div>
     <section class="mb-8">
-      <h2 class="mb-3 text-sm font-semibold text-slate-700">{{ $t("recipe.menuItemsHeading") }}</h2>
+      <div class="mb-3 flex flex-wrap items-center gap-3">
+        <TableFilters :table="recipeTable" :search-placeholder="$t('recipe.searchPlaceholder')" :filters="recipeFilters" />
+      </div>
 
       <p v-if="catalogErrorMessage" class="rounded-lg bg-red-50 p-4 text-sm font-medium text-red-700">
         {{ catalogErrorMessage }}
@@ -252,7 +322,7 @@ onMounted(async () => {
       </p>
 
       <div v-else class="max-h-[45vh] overflow-auto rounded-lg border border-slate-200">
-        <DataTable :table="recipeTable" :empty-text="$t('productTable.empty')" :cell-class="recipeCellClass">
+        <DataTable :table="recipeTable" :empty-text="recipeEmptyText" :cell-class="recipeCellClass">
           <template #cell-status="{ item }">
             <span
               v-if="recipeStore.hasProductRecipe(item.id)"

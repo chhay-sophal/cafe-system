@@ -239,7 +239,13 @@
     "saveRecipe": "Save Recipe",
     "saveError": "Failed to save recipe.",
     "saveSuccess": "Recipe saved.",
-    "loadingMenuItems": "Loading menu items..."
+    "loadingMenuItems": "Loading menu items...",
+    "searchPlaceholder": "Search menu items...",
+    "recipeFilter": "Recipe",
+    "configured": "Configured",
+    "notConfiguredOption": "Not configured",
+    "ingredientsFilter": "Ingredients",
+    "noMatches": "No menu items match your search or filters."
   },
   "stockAdjustment": {
     "types": {
