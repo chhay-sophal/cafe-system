@@ -148,6 +148,8 @@ git push origin pos-v1.2.0
 
 then publish the resulting draft release on GitHub before downloading.
 
+The tag is the POS version: the release workflow stamps `1.2.0` from `pos-v1.2.0` into the build, so `apps/pos/src-tauri/tauri.conf.json` keeps `"version": "0.0.0"` as a placeholder and never needs a manual bump. Each new tag must be higher than the last published one, or installed tills won't see it as an update.
+
 ### Verify
 
 - Open `http://localhost:8080` and log into IMS.
