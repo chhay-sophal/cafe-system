@@ -3,8 +3,15 @@
 // receipt is drawn onto a canvas in Kantumruy Pro (same as the UI), turned
 // into 1-bit pixels and sent with the GS v 0 raster command.
 
-// 58mm paper: 48mm printable at 203 dpi = 384 dots, 8 dots per byte.
-const PAPER_WIDTH_DOTS = 384;
+// Printable width per setting at 203 dpi (8 dots per byte): 58mm paper
+// prints 48mm = 384 dots, 80mm paper prints 72mm = 576 dots. "64mm" is also
+// 80mm paper, for printers whose print head only covers 64mm = 512 dots -
+// with 576 they cut off the receipt's right edge. Font sizes stay the same
+// throughout; wider paper just fits more per line.
+export const PAPER_WIDTH_DOTS = { "58mm": 384, "64mm": 512, "80mm": 576 } as const;
+
+export type PaperSize = keyof typeof PAPER_WIDTH_DOTS;
+
 const BAND_HEIGHT_DOTS = 255;
 const MARGIN = 4;
 const FONT_FAMILY = '"Kantumruy Pro", sans-serif';
@@ -84,10 +91,14 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number)
   return lines;
 }
 
-function layout(ctx: CanvasRenderingContext2D, blocks: ReceiptBlock[]): { ops: DrawOp[]; dividers: number[]; height: number } {
+function layout(
+  ctx: CanvasRenderingContext2D,
+  blocks: ReceiptBlock[],
+  paperWidth: number,
+): { ops: DrawOp[]; dividers: number[]; height: number } {
   const ops: DrawOp[] = [];
   const dividers: number[] = [];
-  const contentWidth = PAPER_WIDTH_DOTS - MARGIN * 2;
+  const contentWidth = paperWidth - MARGIN * 2;
   let y = MARGIN;
 
   for (const block of blocks) {
@@ -114,7 +125,7 @@ function layout(ctx: CanvasRenderingContext2D, blocks: ReceiptBlock[]): { ops: D
       for (const line of wrapText(ctx, block.text, contentWidth - indent)) {
         ops.push({
           text: line,
-          x: isCenter ? PAPER_WIDTH_DOTS / 2 : MARGIN + indent,
+          x: isCenter ? paperWidth / 2 : MARGIN + indent,
           y: y + baseline,
           font,
           align: isCenter ? "center" : "left",
@@ -128,7 +139,7 @@ function layout(ctx: CanvasRenderingContext2D, blocks: ReceiptBlock[]): { ops: D
     // in whatever width remains, with the value on its first line.
     const rightWidth = ctx.measureText(block.right).width;
     const leftLines = wrapText(ctx, block.left, contentWidth - rightWidth - 12);
-    ops.push({ text: block.right, x: PAPER_WIDTH_DOTS - MARGIN, y: y + baseline, font, align: "right" });
+    ops.push({ text: block.right, x: paperWidth - MARGIN, y: y + baseline, font, align: "right" });
     for (const line of leftLines) {
       ops.push({ text: line, x: MARGIN, y: y + baseline, font, align: "left" });
       y += lineHeight;
@@ -138,15 +149,16 @@ function layout(ctx: CanvasRenderingContext2D, blocks: ReceiptBlock[]): { ops: D
   return { ops, dividers, height: y + MARGIN };
 }
 
-export function renderReceipt(blocks: ReceiptBlock[]): HTMLCanvasElement {
+export function renderReceipt(blocks: ReceiptBlock[], paperSize: PaperSize): HTMLCanvasElement {
+  const paperWidth = PAPER_WIDTH_DOTS[paperSize];
   const canvas = document.createElement("canvas");
-  canvas.width = PAPER_WIDTH_DOTS;
+  canvas.width = paperWidth;
   const measureCtx = canvas.getContext("2d");
   if (!measureCtx) {
     throw new Error("Canvas 2D context unavailable");
   }
 
-  const { ops, dividers, height } = layout(measureCtx, blocks);
+  const { ops, dividers, height } = layout(measureCtx, blocks, paperWidth);
 
   // Resizing resets the context, so draw with a fresh one afterwards.
   canvas.height = height;
@@ -167,7 +179,7 @@ export function renderReceipt(blocks: ReceiptBlock[]): HTMLCanvasElement {
   for (const dividerY of dividers) {
     ctx.beginPath();
     ctx.moveTo(MARGIN, dividerY);
-    ctx.lineTo(PAPER_WIDTH_DOTS - MARGIN, dividerY);
+    ctx.lineTo(paperWidth - MARGIN, dividerY);
     ctx.stroke();
   }
 

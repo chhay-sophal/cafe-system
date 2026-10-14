@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { setLocale } from "../i18n";
 import { useKhqrBanks } from "../composables/useKhqrBanks";
 import { useReceiptPrinter } from "../composables/useReceiptPrinter";
+import type { PaperSize } from "../lib/receipt";
 
 type SectionId = "general" | "printer" | "khqr";
 type Locale = "en-US" | "km-KH";
@@ -22,6 +23,13 @@ const sections = computed<Array<{ id: SectionId; label: string }>>(() => [
 const LANGUAGES: Array<{ value: Locale; label: string }> = [
   { value: "en-US", label: "English" },
   { value: "km-KH", label: "ខ្មែរ" },
+];
+
+// Roll widths are written the same in every language, so not translated.
+const PAPER_SIZES: Array<{ value: PaperSize; label: string }> = [
+  { value: "58mm", label: "58 mm" },
+  { value: "64mm", label: "64 mm" },
+  { value: "80mm", label: "80 mm" },
 ];
 
 const activeSection = ref<SectionId>("general");
@@ -143,6 +151,27 @@ function handleRemoveBank(id: string) {
             </select>
             <button type="button" class="settings-choice__option" @click="receiptPrinter.refreshPrinters()">
               {{ t("salesHistory.refresh") }}
+            </button>
+          </div>
+        </div>
+
+        <div class="settings-field">
+          <div class="settings-field__text">
+            <span class="settings-field__label">{{ t("settings.printer.paperSize") }}</span>
+            <span class="settings-field__hint">{{ t("settings.printer.paperSizeHint") }}</span>
+          </div>
+          <div class="settings-choice" role="radiogroup" :aria-label="t('settings.printer.paperSize')">
+            <button
+              v-for="size in PAPER_SIZES"
+              :key="size.value"
+              type="button"
+              role="radio"
+              :aria-checked="receiptPrinter.paperSize.value === size.value"
+              class="settings-choice__option"
+              :class="{ 'settings-choice__option--active': receiptPrinter.paperSize.value === size.value }"
+              @click="receiptPrinter.setPaperSize(size.value)"
+            >
+              {{ size.label }}
             </button>
           </div>
         </div>
