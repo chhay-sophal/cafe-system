@@ -2,9 +2,11 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAuth } from "../composables/useAuth";
+import { useStoreName } from "../composables/useStoreName";
 import { setLocale } from "../i18n";
 
 const { t, locale } = useI18n({ useScope: "global" });
+const { storeName } = useStoreName();
 const auth = useAuth();
 
 const pin = ref("");
@@ -63,7 +65,7 @@ async function submit() {
           <option value="km-KH">ខ្មែរ</option>
         </select>
       </div>
-      <h1 class="login-card__title">{{ t("app.title") }}</h1>
+      <h1 class="login-card__title">{{ storeName }}</h1>
       <p class="login-card__subtitle">{{ t("login.subtitle") }}</p>
 
       <div class="login-card__pin-display" aria-live="polite">

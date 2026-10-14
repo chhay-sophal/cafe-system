@@ -10,6 +10,7 @@ import { useKhqrBanks } from "../composables/useKhqrBanks";
 import { useNetworkStatus } from "../composables/useNetworkStatus";
 import { useOfflineQueue } from "../composables/useOfflineQueue";
 import { useReceiptPrinter } from "../composables/useReceiptPrinter";
+import { useStoreName } from "../composables/useStoreName";
 import { formatReceiptDate, type ReceiptBlock } from "../lib/receipt";
 import type { CartLineItem } from "../types/cart";
 import type { OrderPayload, OrderResult, PaymentMethod } from "../types/order";
@@ -32,6 +33,7 @@ type Phase = "payment" | "submitting" | "success" | "error";
 type PrintStatus = "idle" | "printing" | "printed" | "failed" | "noPrinter";
 
 const { t } = useI18n({ useScope: "global" });
+const { storeName } = useStoreName();
 
 const PAYMENT_METHODS = computed<Array<{ value: PaymentMethod; label: string }>>(() => [
   { value: "CASH", label: t("checkout.methods.CASH") },
@@ -254,7 +256,7 @@ function buildReceiptBlocks(): ReceiptBlock[] {
     : t("checkout.orderNumber", { number: orderResult.value?.orderNumber });
 
   const blocks: ReceiptBlock[] = [
-    { type: "text", text: t("app.title"), align: "center", size: "large", bold: true },
+    { type: "text", text: storeName.value, align: "center", size: "large", bold: true },
     { type: "text", text: formatReceiptDate(new Date()), align: "center", size: "small" },
     { type: "text", text: orderLabel, align: "center", bold: true },
   ];

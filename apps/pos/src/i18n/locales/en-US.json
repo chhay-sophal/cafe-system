@@ -141,6 +141,8 @@
       "khqr": "KHQR"
     },
     "general": {
+      "storeName": "Store name",
+      "storeNameHint": "This branch's name on this register's header, receipts and customer display. Leave empty to use \"{default}\".",
       "language": "Language",
       "languageHint": "Language used on this register's screens and receipts.",
       "appearance": "Appearance",

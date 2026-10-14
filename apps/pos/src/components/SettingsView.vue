@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { setLocale } from "../i18n";
 import { useKhqrBanks } from "../composables/useKhqrBanks";
 import { useReceiptPrinter } from "../composables/useReceiptPrinter";
+import { STORE_NAME_MAX_LENGTH, useStoreName } from "../composables/useStoreName";
 import ReceiptTestCard from "./ReceiptTestCard.vue";
 import { useTheme, type ThemePreference } from "../composables/useTheme";
 import { BOTTOM_MARGIN_MM, type PaperSize } from "../lib/receipt";
@@ -40,6 +41,17 @@ const THEMES = computed<Array<{ value: ThemePreference; label: string }>>(() => 
   { value: "light", label: t("settings.general.themeLight") },
   { value: "dark", label: t("settings.general.themeDark") },
 ]);
+
+const { customName: customStoreName, setStoreName } = useStoreName();
+// Edited as a draft and saved on blur/Enter (the input's change event), so
+// the header and customer display don't update on every keystroke.
+const storeNameDraft = ref(customStoreName.value);
+
+function saveStoreName() {
+  setStoreName(storeNameDraft.value);
+  // Show what was actually saved (trimmed, length-capped).
+  storeNameDraft.value = customStoreName.value;
+}
 
 const activeSection = ref<SectionId>("general");
 
@@ -117,6 +129,23 @@ function handleRemoveBank(id: string) {
     <div class="settings__panel">
       <template v-if="activeSection === 'general'">
         <h3 class="settings__panel-heading">{{ t("settings.sections.general") }}</h3>
+
+        <div class="settings-field">
+          <div class="settings-field__text">
+            <label class="settings-field__label" for="store-name">{{ t("settings.general.storeName") }}</label>
+            <span class="settings-field__hint">{{ t("settings.general.storeNameHint", { default: t("app.title") }) }}</span>
+          </div>
+          <input
+            id="store-name"
+            v-model="storeNameDraft"
+            type="text"
+            class="settings-input"
+            :maxlength="STORE_NAME_MAX_LENGTH"
+            :placeholder="t('app.title')"
+            @change="saveStoreName"
+            @keydown.enter="($event.target as HTMLInputElement).blur()"
+          />
+        </div>
 
         <div class="settings-field">
           <div class="settings-field__text">

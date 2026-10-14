@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useI18n } from "vue-i18n";
 import CartSidebar from "./components/CartSidebar.vue";
 import CategoryTabs from "./components/CategoryTabs.vue";
@@ -17,12 +18,14 @@ import {
   onRequestSync,
   publishCartUpdate,
   publishLocaleChange,
+  publishStoreNameChange,
   publishThemeChange,
   type CartUpdatePayload,
   type DisplayLocale,
 } from "./composables/useCustomerDisplayChannel";
 import { useExchangeRate } from "./composables/useExchangeRate";
 import { useNetworkStatus } from "./composables/useNetworkStatus";
+import { useStoreName } from "./composables/useStoreName";
 import { useTheme } from "./composables/useTheme";
 import { useOfflineQueue } from "./composables/useOfflineQueue";
 import { fetchCategories, fetchProductModifiers, fetchProducts } from "./lib/api";
@@ -76,6 +79,24 @@ watch(locale, (newLocale) => publishLocaleChange(newLocale as DisplayLocale));
 // ...and so do appearance changes.
 const { preference: themePreference } = useTheme();
 watch(themePreference, publishThemeChange);
+
+// ...and the branch's store name (Settings → General).
+const { customName: customStoreName, storeName } = useStoreName();
+watch(customStoreName, publishStoreNameChange);
+
+// The title bar and taskbar show it too. document.title covers plain
+// `vite dev` in a browser tab, where getCurrentWindow() throws (no Tauri
+// bridge) - fire-and-forget either way, a title isn't worth an error.
+function applyWindowTitle(title: string) {
+  document.title = title;
+  try {
+    getCurrentWindow().setTitle(title).catch(() => {});
+  } catch {
+    // Not running inside a Tauri window.
+  }
+}
+
+watch(storeName, applyWindowTitle, { immediate: true });
 
 let unlistenRequestSync: (() => void) | undefined;
 
@@ -191,7 +212,7 @@ onUnmounted(() => {
   <main v-else class="pos-screen">
     <header class="pos-header">
       <div class="pos-header__nav">
-        <h1 class="pos-header__title">{{ t("app.title") }}</h1>
+        <h1 class="pos-header__title">{{ storeName }}</h1>
         <nav class="pos-header__tabs">
           <button
             type="button"

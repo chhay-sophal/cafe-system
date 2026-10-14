@@ -5,6 +5,7 @@ import {
   onCartUpdate,
   onLocaleChange,
   onPaymentQr,
+  onStoreNameChange,
   onThemeChange,
   onSaleCompleted,
   requestSync,
@@ -13,6 +14,7 @@ import {
   type SaleCompletedPayload,
 } from "../composables/useCustomerDisplayChannel";
 import { useExchangeRate } from "../composables/useExchangeRate";
+import { useStoreName } from "../composables/useStoreName";
 import { useTheme } from "../composables/useTheme";
 import { formatMain, formatRiel, formatSecondary, formatUsd } from "../lib/currency";
 
@@ -30,8 +32,10 @@ let unlistenCartUpdate: (() => void) | undefined;
 let unlistenSaleCompleted: (() => void) | undefined;
 let unlistenLocaleChange: (() => void) | undefined;
 let unlistenThemeChange: (() => void) | undefined;
+let unlistenStoreNameChange: (() => void) | undefined;
 
 const { setPreference: setThemePreference } = useTheme();
+const { storeName, setStoreName } = useStoreName();
 let unlistenPaymentQr: (() => void) | undefined;
 
 function handleCartUpdate(payload: CartUpdatePayload) {
@@ -85,6 +89,9 @@ onMounted(async () => {
   unlistenLocaleChange = await onLocaleChange((newLocale) => {
     locale.value = newLocale;
   });
+  unlistenStoreNameChange = await onStoreNameChange((customName) => {
+    setStoreName(customName, { persist: false });
+  });
   unlistenThemeChange = await onThemeChange((theme) => {
     setThemePreference(theme, { persist: false });
   });
@@ -101,6 +108,7 @@ onUnmounted(() => {
   unlistenSaleCompleted?.();
   unlistenLocaleChange?.();
   unlistenThemeChange?.();
+  unlistenStoreNameChange?.();
   unlistenPaymentQr?.();
 });
 </script>
@@ -108,7 +116,7 @@ onUnmounted(() => {
 <template>
   <div class="display">
     <header class="display__header">
-      <h1>{{ t("app.title") }}</h1>
+      <h1>{{ storeName }}</h1>
     </header>
 
     <div v-if="mode === 'idle'" class="idle">

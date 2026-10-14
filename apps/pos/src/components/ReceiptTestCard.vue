@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { useAuth } from "../composables/useAuth";
 import { useExchangeRate } from "../composables/useExchangeRate";
 import { useReceiptPrinter } from "../composables/useReceiptPrinter";
+import { useStoreName } from "../composables/useStoreName";
 import { formatMain, formatSecondary } from "../lib/currency";
 import {
   formatReceiptDate,
@@ -14,6 +15,7 @@ import {
 } from "../lib/receipt";
 
 const { t, locale } = useI18n({ useScope: "global" });
+const { storeName } = useStoreName();
 const auth = useAuth();
 const { exchangeRateRielPerUsd, mainCurrency } = useExchangeRate();
 const receiptPrinter = useReceiptPrinter();
@@ -36,7 +38,7 @@ function format(value: number): string {
 // Khmer script, which comes out as a picture, not printer text.
 function buildTestBlocks(): ReceiptBlock[] {
   const blocks: ReceiptBlock[] = [
-    { type: "text", text: t("app.title"), align: "center", size: "large", bold: true },
+    { type: "text", text: storeName.value, align: "center", size: "large", bold: true },
     { type: "text", text: formatReceiptDate(new Date()), align: "center", size: "small" },
     { type: "text", text: t("settings.printer.test.label"), align: "center", bold: true },
   ];
@@ -78,7 +80,7 @@ async function refreshPreview() {
 }
 
 watch(
-  [receiptPrinter.paperSize, receiptPrinter.bottomMarginMm, locale, mainCurrency, exchangeRateRielPerUsd],
+  [receiptPrinter.paperSize, receiptPrinter.bottomMarginMm, locale, storeName, mainCurrency, exchangeRateRielPerUsd],
   refreshPreview,
   { immediate: true },
 );

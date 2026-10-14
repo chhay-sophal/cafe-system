@@ -11,6 +11,7 @@ const SALE_COMPLETED_EVENT = "customer-display:sale-completed";
 const REQUEST_SYNC_EVENT = "customer-display:request-sync";
 const LOCALE_CHANGE_EVENT = "customer-display:locale-change";
 const THEME_CHANGE_EVENT = "customer-display:theme-change";
+const STORE_NAME_CHANGE_EVENT = "customer-display:store-name-change";
 const PAYMENT_QR_EVENT = "customer-display:payment-qr";
 
 export type DisplayLocale = "en-US" | "km-KH";
@@ -75,6 +76,13 @@ export function publishThemeChange(theme: ThemePreference): void {
   silently(emit(THEME_CHANGE_EVENT, theme));
 }
 
+// Also like the locale: read from localStorage when the display opens, and
+// sent live for changes made while it's open. Carries the custom name only
+// ("" = default title), so each window falls back in its own language.
+export function publishStoreNameChange(customName: string): void {
+  silently(emit(STORE_NAME_CHANGE_EVENT, customName));
+}
+
 export function publishPaymentQr(payload: PaymentQrPayload | null): void {
   silently(emit(PAYMENT_QR_EVENT, payload));
 }
@@ -97,6 +105,10 @@ export function onLocaleChange(handler: (locale: DisplayLocale) => void): Promis
 
 export function onThemeChange(handler: (theme: ThemePreference) => void): Promise<UnlistenFn> {
   return listen<ThemePreference>(THEME_CHANGE_EVENT, (event) => handler(event.payload));
+}
+
+export function onStoreNameChange(handler: (customName: string) => void): Promise<UnlistenFn> {
+  return listen<string>(STORE_NAME_CHANGE_EVENT, (event) => handler(event.payload));
 }
 
 export function onPaymentQr(handler: (payload: PaymentQrPayload | null) => void): Promise<UnlistenFn> {
