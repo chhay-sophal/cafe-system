@@ -186,9 +186,24 @@ export function renderReceipt(blocks: ReceiptBlock[], paperSize: PaperSize): HTM
   return canvas;
 }
 
-// ESC @ (reset), the image as GS v 0 raster bands, then feed past the tear
-// bar and cut. Printers without a cutter ignore the cut command.
-export function encodeEscPosRaster(canvas: HTMLCanvasElement): Uint8Array {
+// The tear bar / cutter sits above the print head, so after the last line
+// the paper must travel at least that gap before the receipt is torn, or the
+// end ("Thank you") stays below the bar and gets torn off. The gap is
+// ~10-25mm depending on the model, so the feed is a per-register setting;
+// 30mm clears most printers with a little margin left under the last line.
+// Fed as blank raster rows rather than ESC d (n text lines), whose distance
+// depends on each printer's line-spacing setting.
+export const BOTTOM_MARGIN_MM = [20, 30, 40, 50] as const;
+
+export type BottomMarginMm = (typeof BOTTOM_MARGIN_MM)[number];
+
+const DOTS_PER_MM = 8; // 203 dpi
+
+// ESC @ (reset), the image as GS v 0 raster bands, a blank tail to carry it
+// past the tear bar, then a partial cut. GS V 1 cuts where the paper is
+// now; GS V 66 ("feed to cutter, then cut") would add the head-to-cutter gap
+// again on top of the tail. Printers without a cutter ignore the cut.
+export function encodeEscPosRaster(canvas: HTMLCanvasElement, bottomMarginMm: BottomMarginMm): Uint8Array {
   const ctx = canvas.getContext("2d")!;
   const { width, height } = canvas;
   const pixels = ctx.getImageData(0, 0, width, height).data;
@@ -220,6 +235,17 @@ export function encodeEscPosRaster(canvas: HTMLCanvasElement): Uint8Array {
     chunks.push(band);
   }
 
-  chunks.push([0x1b, 0x64, 0x04], [0x1d, 0x56, 0x42, 0x00]);
+  // Blank bands, split like the image since one band holds at most
+  // BAND_HEIGHT_DOTS rows (40mm = 320 dots needs two).
+  const tailDots = bottomMarginMm * DOTS_PER_MM;
+  for (let fed = 0; fed < tailDots; fed += BAND_HEIGHT_DOTS) {
+    const bandHeight = Math.min(BAND_HEIGHT_DOTS, tailDots - fed);
+    chunks.push([
+      0x1d, 0x76, 0x30, 0x00, bytesPerRow & 0xff, bytesPerRow >> 8, bandHeight & 0xff, bandHeight >> 8,
+      ...new Array<number>(bytesPerRow * bandHeight).fill(0),
+    ]);
+  }
+
+  chunks.push([0x1d, 0x56, 0x01]);
   return Uint8Array.from(chunks.flat());
 }

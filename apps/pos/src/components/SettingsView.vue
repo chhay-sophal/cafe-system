@@ -5,7 +5,7 @@ import { setLocale } from "../i18n";
 import { useKhqrBanks } from "../composables/useKhqrBanks";
 import { useReceiptPrinter } from "../composables/useReceiptPrinter";
 import { useTheme, type ThemePreference } from "../composables/useTheme";
-import type { PaperSize } from "../lib/receipt";
+import { BOTTOM_MARGIN_MM, type PaperSize } from "../lib/receipt";
 
 type SectionId = "general" | "printer" | "khqr";
 type Locale = "en-US" | "km-KH";
@@ -201,6 +201,27 @@ function handleRemoveBank(id: string) {
               @click="receiptPrinter.setPaperSize(size.value)"
             >
               {{ size.label }}
+            </button>
+          </div>
+        </div>
+
+        <div class="settings-field">
+          <div class="settings-field__text">
+            <span class="settings-field__label">{{ t("settings.printer.bottomMargin") }}</span>
+            <span class="settings-field__hint">{{ t("settings.printer.bottomMarginHint") }}</span>
+          </div>
+          <div class="settings-choice" role="radiogroup" :aria-label="t('settings.printer.bottomMargin')">
+            <button
+              v-for="mm in BOTTOM_MARGIN_MM"
+              :key="mm"
+              type="button"
+              role="radio"
+              :aria-checked="receiptPrinter.bottomMarginMm.value === mm"
+              class="settings-choice__option"
+              :class="{ 'settings-choice__option--active': receiptPrinter.bottomMarginMm.value === mm }"
+              @click="receiptPrinter.setBottomMargin(mm)"
+            >
+              {{ mm }} mm
             </button>
           </div>
         </div>

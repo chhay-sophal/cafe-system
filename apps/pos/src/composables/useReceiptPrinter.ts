@@ -1,16 +1,19 @@
 import { invoke } from "@tauri-apps/api/core";
 import { ref } from "vue";
 import {
+  BOTTOM_MARGIN_MM,
   encodeEscPosRaster,
   loadReceiptFonts,
   PAPER_WIDTH_DOTS,
   renderReceipt,
+  type BottomMarginMm,
   type PaperSize,
   type ReceiptBlock,
 } from "../lib/receipt";
 
 const PRINTER_STORAGE_KEY = "pos.receiptPrinter";
 const PAPER_SIZE_STORAGE_KEY = "pos.receiptPaperSize";
+const BOTTOM_MARGIN_STORAGE_KEY = "pos.receiptBottomMarginMm";
 
 // Per-register choice (each till has its own USB printer), so it lives in
 // localStorage rather than in the store-wide settings from the backend.
@@ -25,6 +28,15 @@ function loadPaperSize(): PaperSize {
 }
 
 const paperSize = ref<PaperSize>(loadPaperSize());
+
+// Also per register - the tear bar's distance above the print head differs
+// between printer models. 30mm suits most.
+function loadBottomMargin(): BottomMarginMm {
+  const stored = Number(localStorage.getItem(BOTTOM_MARGIN_STORAGE_KEY));
+  return (BOTTOM_MARGIN_MM as readonly number[]).includes(stored) ? (stored as BottomMarginMm) : 30;
+}
+
+const bottomMarginMm = ref<BottomMarginMm>(loadBottomMargin());
 
 async function refreshPrinters(): Promise<void> {
   try {
@@ -49,6 +61,11 @@ function setPaperSize(size: PaperSize) {
   localStorage.setItem(PAPER_SIZE_STORAGE_KEY, size);
 }
 
+function setBottomMargin(mm: BottomMarginMm) {
+  bottomMarginMm.value = mm;
+  localStorage.setItem(BOTTOM_MARGIN_STORAGE_KEY, String(mm));
+}
+
 // Rejects with the spooler's message (printer offline, wrong name, driver
 // refusing RAW data) so the checkout screen can show it and offer a reprint.
 async function printReceipt(blocks: ReceiptBlock[]): Promise<void> {
@@ -57,10 +74,20 @@ async function printReceipt(blocks: ReceiptBlock[]): Promise<void> {
   }
 
   await loadReceiptFonts();
-  const data = encodeEscPosRaster(renderReceipt(blocks, paperSize.value));
+  const data = encodeEscPosRaster(renderReceipt(blocks, paperSize.value), bottomMarginMm.value);
   await invoke("print_raw", { printerName: printerName.value, data: Array.from(data) });
 }
 
 export function useReceiptPrinter() {
-  return { printerName, availablePrinters, paperSize, refreshPrinters, setPrinter, setPaperSize, printReceipt };
+  return {
+    printerName,
+    availablePrinters,
+    paperSize,
+    bottomMarginMm,
+    refreshPrinters,
+    setPrinter,
+    setPaperSize,
+    setBottomMargin,
+    printReceipt,
+  };
 }
