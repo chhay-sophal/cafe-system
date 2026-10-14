@@ -1,16 +1,21 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { getVersion } from "@tauri-apps/api/app";
+import type { Update } from "@tauri-apps/plugin-updater";
+import { computed, onMounted, ref, shallowRef } from "vue";
 import { useI18n } from "vue-i18n";
 import { setLocale } from "../i18n";
+import { checkForUpdate, installUpdate, updatesEnabled } from "../composables/useAppUpdater";
 import { useKhqrBanks } from "../composables/useKhqrBanks";
+import { useNetworkStatus } from "../composables/useNetworkStatus";
 import { ALL_PAYMENT_METHODS, usePaymentMethods } from "../composables/usePaymentMethods";
 import { useReceiptPrinter } from "../composables/useReceiptPrinter";
 import { STORE_NAME_MAX_LENGTH, useStoreName } from "../composables/useStoreName";
 import ReceiptTestCard from "./ReceiptTestCard.vue";
 import { useTheme, type ThemePreference } from "../composables/useTheme";
+import { API_BASE_URL } from "../lib/api";
 import { BOTTOM_MARGIN_MM, type PaperSize } from "../lib/receipt";
 
-type SectionId = "general" | "printer" | "payments" | "khqr";
+type SectionId = "general" | "printer" | "payments" | "khqr" | "about";
 type Locale = "en-US" | "km-KH";
 
 const { t, locale } = useI18n({ useScope: "global" });
@@ -21,6 +26,7 @@ const sections = computed<Array<{ id: SectionId; label: string }>>(() => [
   { id: "printer", label: t("settings.sections.printer") },
   { id: "payments", label: t("settings.sections.payments") },
   { id: "khqr", label: t("settings.sections.khqr") },
+  { id: "about", label: t("settings.sections.about") },
 ]);
 
 // Language names are shown in their own script, not translated, so a
@@ -44,7 +50,7 @@ const THEMES = computed<Array<{ value: ThemePreference; label: string }>>(() => 
   { value: "dark", label: t("settings.general.themeDark") },
 ]);
 
-const { customName: customStoreName, setStoreName } = useStoreName();
+const { customName: customStoreName, storeName, setStoreName } = useStoreName();
 // Edited as a draft and saved on blur/Enter (the input's change event), so
 // the header and customer display don't update on every keystroke.
 const storeNameDraft = ref(customStoreName.value);
@@ -70,6 +76,57 @@ const printerOptions = computed(() => {
 });
 
 onMounted(receiptPrinter.refreshPrinters);
+
+const network = useNetworkStatus();
+
+// From the installed app (tauri.conf.json, stamped from the release tag).
+// Stays null outside a Tauri window, e.g. plain `vite dev` in a browser.
+const appVersion = ref<string | null>(null);
+getVersion()
+  .then((version) => {
+    appVersion.value = version;
+  })
+  .catch(() => {
+    appVersion.value = null;
+  });
+
+type UpdateStatus = "idle" | "checking" | "upToDate" | "available" | "installing" | "failed";
+
+const updateStatus = ref<UpdateStatus>("idle");
+// shallowRef: the Update object wraps a native resource handle - Vue
+// shouldn't make it deeply reactive.
+const availableUpdate = shallowRef<Update | null>(null);
+const updateError = ref<string | null>(null);
+
+async function handleCheckForUpdates() {
+  updateStatus.value = "checking";
+  updateError.value = null;
+  try {
+    availableUpdate.value = await checkForUpdate();
+    updateStatus.value = availableUpdate.value ? "available" : "upToDate";
+  } catch (error) {
+    // Plugin errors arrive as plain strings, not Error objects.
+    updateError.value = error instanceof Error ? error.message : String(error);
+    updateStatus.value = "failed";
+  }
+}
+
+// Downloads, installs and restarts the app - only on the cashier's tap, never
+// mid-sale on its own. Pending offline orders are kept on disk, so they
+// survive the restart and sync afterwards.
+async function handleInstallUpdate() {
+  if (!availableUpdate.value) {
+    return;
+  }
+  updateStatus.value = "installing";
+  updateError.value = null;
+  try {
+    await installUpdate(availableUpdate.value);
+  } catch (error) {
+    updateError.value = error instanceof Error ? error.message : String(error);
+    updateStatus.value = "failed";
+  }
+}
 
 const khqrBanks = useKhqrBanks();
 const newBankName = ref("");
@@ -338,6 +395,75 @@ function handleRemoveBank(id: string) {
           </button>
         </form>
       </template>
+
+      <template v-else-if="activeSection === 'about'">
+        <h3 class="settings__panel-heading">{{ t("settings.sections.about") }}</h3>
+
+        <div class="settings-field">
+          <span class="settings-field__label">{{ t("settings.about.version") }}</span>
+          <span class="settings-field__value">
+            <template v-if="appVersion">
+              {{ appVersion }}<template v-if="!updatesEnabled"> ({{ t("settings.about.development") }})</template>
+            </template>
+            <template v-else>{{ t("settings.about.versionUnknown") }}</template>
+          </span>
+        </div>
+
+        <div class="settings-field">
+          <span class="settings-field__label">{{ t("settings.general.storeName") }}</span>
+          <span class="settings-field__value">{{ storeName }}</span>
+        </div>
+
+        <div class="settings-field">
+          <div class="settings-field__text">
+            <span class="settings-field__label">{{ t("settings.about.server") }}</span>
+            <span class="settings-field__hint settings-field__hint--mono">{{ API_BASE_URL }}</span>
+          </div>
+          <span
+            class="settings-status"
+            :class="network.isOnline.value ? 'settings-status--ok' : 'settings-status--error'"
+          >
+            {{ network.isOnline.value ? t("app.online") : t("app.offline") }}
+          </span>
+        </div>
+
+        <div class="settings-field">
+          <div class="settings-field__text">
+            <span class="settings-field__label">{{ t("settings.about.updates") }}</span>
+            <span v-if="!updatesEnabled" class="settings-field__hint">{{ t("settings.about.updatesDisabled") }}</span>
+            <span v-else-if="updateStatus === 'checking'" class="settings-field__hint">{{ t("settings.about.checking") }}</span>
+            <span v-else-if="updateStatus === 'upToDate'" class="settings-field__hint">{{ t("settings.about.upToDate") }}</span>
+            <span v-else-if="updateStatus === 'available'" class="settings-field__hint settings-field__hint--strong">
+              {{ t("settings.about.available", { version: availableUpdate?.version }) }}
+            </span>
+            <span v-else-if="updateStatus === 'installing'" class="settings-field__hint">{{ t("settings.about.installing") }}</span>
+            <span v-else-if="updateStatus === 'failed'" class="settings__error">
+              {{ t("settings.about.updateError", { error: updateError }) }}
+            </span>
+            <span v-else class="settings-field__hint">{{ t("settings.about.updatesHint") }}</span>
+          </div>
+          <div v-if="updatesEnabled" class="settings-field__control">
+            <button
+              v-if="updateStatus === 'available' || updateStatus === 'installing'"
+              type="button"
+              class="settings-primary"
+              :disabled="updateStatus === 'installing'"
+              @click="handleInstallUpdate"
+            >
+              {{ t("settings.about.install") }}
+            </button>
+            <button
+              v-else
+              type="button"
+              class="settings-choice__option"
+              :disabled="updateStatus === 'checking'"
+              @click="handleCheckForUpdates"
+            >
+              {{ t("settings.about.check") }}
+            </button>
+          </div>
+        </div>
+      </template>
     </div>
   </section>
 </template>
@@ -437,6 +563,47 @@ function handleRemoveBank(id: string) {
   margin: 0;
   color: #777777;
   font-size: 0.9rem;
+}
+
+.settings-field__value {
+  font-weight: 600;
+  color: #444444;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.settings-field__hint--mono {
+  font-family: Consolas, "Courier New", monospace;
+  overflow-wrap: anywhere;
+}
+
+.settings-field__hint--strong {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.settings-status {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 700;
+}
+
+.settings-status::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.settings-status--ok {
+  color: #1e8e4e;
+}
+
+.settings-status--error {
+  color: #c0392b;
 }
 
 .settings__error {
@@ -595,6 +762,22 @@ function handleRemoveBank(id: string) {
 :where(:root[data-theme="dark"]) .bank-form {
   background: #242424;
   border-color: #3a3a3a;
+}
+
+:where(:root[data-theme="dark"]) .settings-field__value {
+  color: #dddddd;
+}
+
+:where(:root[data-theme="dark"]) .settings-field__hint--strong {
+  color: #d4a27f;
+}
+
+:where(:root[data-theme="dark"]) .settings-status--ok {
+  color: #6fd08c;
+}
+
+:where(:root[data-theme="dark"]) .settings-status--error {
+  color: #ff8a7a;
 }
 
 :where(:root[data-theme="dark"]) .settings-input {

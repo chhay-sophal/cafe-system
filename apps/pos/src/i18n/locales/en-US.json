@@ -140,7 +140,8 @@
       "general": "General",
       "printer": "Printer",
       "payments": "Payments",
-      "khqr": "KHQR"
+      "khqr": "KHQR",
+      "about": "About"
     },
     "general": {
       "storeName": "Store name",
@@ -191,6 +192,22 @@
       "add": "Add Bank",
       "adding": "Adding...",
       "addError": "Couldn't add the bank. Check the file is an image and try again."
+    },
+    "about": {
+      "version": "Version",
+      "development": "development build",
+      "versionUnknown": "Unavailable outside the desktop app",
+      "server": "Server",
+      "updates": "Software updates",
+      "updatesHint": "Updates also install automatically when the app starts.",
+      "updatesDisabled": "Updates are turned off in development builds.",
+      "check": "Check for Updates",
+      "checking": "Checking for updates...",
+      "upToDate": "You're on the latest version.",
+      "available": "Version {version} is available.",
+      "install": "Install and Restart",
+      "installing": "Downloading and installing - the app will restart.",
+      "updateError": "Couldn't update: {error}"
     }
   },
   "customerDisplay": {

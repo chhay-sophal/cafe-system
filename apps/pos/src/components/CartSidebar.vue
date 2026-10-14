@@ -74,9 +74,9 @@ function handleDiscountInput(event: Event) {
 
 <template>
   <aside class="cart-sidebar" :aria-label="t('cart.ariaLabel')">
-    <header class="cart-sidebar__header">
+    <!-- <header class="cart-sidebar__header">
       <h2>{{ t("cart.heading") }}</h2>
-    </header>
+    </header> -->
 
     <div class="cart-sidebar__items">
       <p v-if="items.length === 0" class="cart-sidebar__empty">{{ t("cart.empty") }}</p>
