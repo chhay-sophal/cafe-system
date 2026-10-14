@@ -12,6 +12,7 @@ import { useNetworkStatus } from "../composables/useNetworkStatus";
 import { useOfflineQueue } from "../composables/useOfflineQueue";
 import { usePaymentMethods } from "../composables/usePaymentMethods";
 import { useReceiptPrinter } from "../composables/useReceiptPrinter";
+import { storeFooterBlocks, storeHeaderBlocks } from "../composables/useStoreDetails";
 import { useStoreName } from "../composables/useStoreName";
 import { formatReceiptDate, type ReceiptBlock } from "../lib/receipt";
 import type { CartLineItem } from "../types/cart";
@@ -289,8 +290,13 @@ function buildReceiptBlocks(): ReceiptBlock[] {
     ? t("receipt.pendingSync")
     : t("checkout.orderNumber", { number: orderResult.value?.orderNumber });
 
+  const storeHeader = storeHeaderBlocks();
   const blocks: ReceiptBlock[] = [
     { type: "text", text: storeName.value, align: "center", size: "large", bold: true },
+    // Address, phones and emails from Settings → General, set apart from the
+    // sale details below.
+    ...storeHeader,
+    ...(storeHeader.length > 0 ? [{ type: "spacer", height: 8 } as const] : []),
     { type: "text", text: formatReceiptDate(new Date()), align: "center", size: "small" },
     { type: "text", text: orderLabel, align: "center", bold: true },
   ];
@@ -340,6 +346,8 @@ function buildReceiptBlocks(): ReceiptBlock[] {
 
   blocks.push({ type: "spacer", height: 12 });
   blocks.push({ type: "text", text: t("receipt.thankYou"), align: "center" });
+  // Social media under the thanks, where customers look for where to follow.
+  blocks.push(...storeFooterBlocks());
   return blocks;
 }
 

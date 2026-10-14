@@ -12,6 +12,7 @@ import { useReceiptPrinter } from "../composables/useReceiptPrinter";
 import { STORE_NAME_MAX_LENGTH, useStoreName } from "../composables/useStoreName";
 import FastCashSettings from "./FastCashSettings.vue";
 import ReceiptTestCard from "./ReceiptTestCard.vue";
+import StoreDetailsSettings from "./StoreDetailsSettings.vue";
 import { useTheme, type ThemePreference } from "../composables/useTheme";
 import { API_BASE_URL } from "../lib/api";
 import { BOTTOM_MARGIN_MM, type PaperSize } from "../lib/receipt";
@@ -208,6 +209,8 @@ function handleRemoveBank(id: string) {
             @keydown.enter="($event.target as HTMLInputElement).blur()"
           />
         </div>
+
+        <StoreDetailsSettings />
 
         <div class="settings-field">
           <div class="settings-field__text">

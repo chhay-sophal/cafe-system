@@ -152,7 +152,50 @@
       "appearanceHint": "Light or dark screens, or follow this computer's setting. Also applies to the customer display.",
       "themeSystem": "System",
       "themeLight": "Light",
-      "themeDark": "Dark"
+      "themeDark": "Dark",
+      "address": "Store location",
+      "addressHint": "Printed under the store name on receipts. Use a new line for each part of the address.",
+      "addressPlaceholder": "e.g. #12, Street 240, Phnom Penh",
+      "contactHint": "Printed on receipts. Up to {max}.",
+      "add": "Add",
+      "remove": "Remove {entry}",
+      "phones": {
+        "heading": "Phone numbers",
+        "placeholder": "e.g. 012 345 678",
+        "errors": {
+          "invalid": "Enter a phone number with at least 6 digits.",
+          "duplicate": "That number is already listed.",
+          "full": "Up to {max} numbers - remove one first."
+        }
+      },
+      "emails": {
+        "heading": "Emails",
+        "placeholder": "e.g. hello{'@'}mycafe.com",
+        "errors": {
+          "invalid": "Enter a valid email address.",
+          "duplicate": "That email is already listed.",
+          "full": "Up to {max} emails - remove one first."
+        }
+      },
+      "socials": {
+        "heading": "Social media",
+        "hint": "Printed at the bottom of receipts, after the thank-you. Up to {max}.",
+        "platform": "Platform",
+        "handle": "Page, handle or link",
+        "placeholder": {
+          "FACEBOOK": "e.g. My Cafe Phnom Penh",
+          "INSTAGRAM": "e.g. {'@'}mycafe",
+          "TIKTOK": "e.g. {'@'}mycafe",
+          "TELEGRAM": "e.g. {'@'}mycafe",
+          "WEBSITE": "e.g. mycafe.com",
+          "OTHER": "Text to print as is"
+        },
+        "errors": {
+          "invalid": "Enter the page, handle or link.",
+          "duplicate": "That account is already listed.",
+          "full": "Up to {max} accounts - remove one first."
+        }
+      }
     },
     "printer": {
       "hint": "Receipts print here automatically after each sale. Saved on this register only.",
@@ -250,5 +293,16 @@
       "paymentMethod": "Payment Method"
     },
     "scanToPay": "Scan to pay"
+  },
+  "storeDetails": {
+    "platforms": {
+      "FACEBOOK": "Facebook",
+      "INSTAGRAM": "Instagram",
+      "TIKTOK": "TikTok",
+      "TELEGRAM": "Telegram",
+      "WEBSITE": "Website",
+      "OTHER": "Other"
+    },
+    "receiptPhone": "Tel: {phones}"
   }
 }

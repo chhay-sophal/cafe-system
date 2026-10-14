@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { useAuth } from "../composables/useAuth";
 import { useExchangeRate } from "../composables/useExchangeRate";
 import { useReceiptPrinter } from "../composables/useReceiptPrinter";
+import { storeFooterBlocks, storeHeaderBlocks, useStoreDetails } from "../composables/useStoreDetails";
 import { useStoreName } from "../composables/useStoreName";
 import { formatMain, formatSecondary } from "../lib/currency";
 import {
@@ -16,6 +17,7 @@ import {
 
 const { t, locale } = useI18n({ useScope: "global" });
 const { storeName } = useStoreName();
+const { details: storeDetails } = useStoreDetails();
 const auth = useAuth();
 const { exchangeRateRielPerUsd, mainCurrency } = useExchangeRate();
 const receiptPrinter = useReceiptPrinter();
@@ -37,8 +39,11 @@ function format(value: number): string {
 // in the current language - in Khmer it also proves the printer reproduces
 // Khmer script, which comes out as a picture, not printer text.
 function buildTestBlocks(): ReceiptBlock[] {
+  const storeHeader = storeHeaderBlocks();
   const blocks: ReceiptBlock[] = [
     { type: "text", text: storeName.value, align: "center", size: "large", bold: true },
+    ...storeHeader,
+    ...(storeHeader.length > 0 ? [{ type: "spacer", height: 8 } as const] : []),
     { type: "text", text: formatReceiptDate(new Date()), align: "center", size: "small" },
     { type: "text", text: t("settings.printer.test.label"), align: "center", bold: true },
   ];
@@ -59,6 +64,7 @@ function buildTestBlocks(): ReceiptBlock[] {
     { type: "row", left: "", right: formatSecondary(6.75, mainCurrency.value, exchangeRateRielPerUsd.value), size: "small" },
     { type: "spacer", height: 12 },
     { type: "text", text: t("receipt.thankYou"), align: "center" },
+    ...storeFooterBlocks(),
   );
   return blocks;
 }
@@ -80,7 +86,7 @@ async function refreshPreview() {
 }
 
 watch(
-  [receiptPrinter.paperSize, receiptPrinter.bottomMarginMm, locale, storeName, mainCurrency, exchangeRateRielPerUsd],
+  [receiptPrinter.paperSize, receiptPrinter.bottomMarginMm, locale, storeName, storeDetails, mainCurrency, exchangeRateRielPerUsd],
   refreshPreview,
   { immediate: true },
 );
