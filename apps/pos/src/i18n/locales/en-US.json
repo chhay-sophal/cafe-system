@@ -18,10 +18,10 @@
   },
   "login": {
     "subtitle": "Enter your PIN to start a shift",
-    "enterPin": "Enter PIN",
     "loggingIn": "Logging in...",
-    "logIn": "Log In",
-    "genericError": "Login failed."
+    "genericError": "Login failed.",
+    "pinProgress": "PIN: {count} of {total} digits entered",
+    "keyboardHint": "Tap the keypad or type on the keyboard"
   },
   "cart": {
     "ariaLabel": "Current order",

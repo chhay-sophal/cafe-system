@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAuth } from "../composables/useAuth";
 import { useStoreName } from "../composables/useStoreName";
@@ -9,32 +9,67 @@ const { t, locale } = useI18n({ useScope: "global" });
 const { storeName } = useStoreName();
 const auth = useAuth();
 
+// Staff PINs are always exactly 4 digits (enforced by the backend and IMS),
+// so the 4th digit submits on its own - no Log In button to reach for.
+const PIN_LENGTH = 4;
+
 const pin = ref("");
 const isSubmitting = ref(false);
 const errorMessage = ref<string | null>(null);
 
-const maskedPin = computed(() => "•".repeat(pin.value.length));
-
 function pressDigit(digit: string) {
-  if (pin.value.length >= 8) {
+  if (pin.value.length >= PIN_LENGTH || isSubmitting.value) {
     return;
   }
   errorMessage.value = null;
   pin.value += digit;
+  if (pin.value.length === PIN_LENGTH) {
+    submit();
+  }
 }
 
 function pressBackspace() {
+  if (isSubmitting.value) {
+    return;
+  }
   errorMessage.value = null;
   pin.value = pin.value.slice(0, -1);
 }
 
 function pressClear() {
+  if (isSubmitting.value) {
+    return;
+  }
   errorMessage.value = null;
   pin.value = "";
 }
 
+// A physical keyboard (or a numpad) works alongside the on-screen keypad:
+// digits type, Backspace deletes, Escape/Delete clears. Listens on the whole
+// window since there's no text box to focus any more.
+function handleKeydown(event: KeyboardEvent) {
+  // Leave shortcuts (Ctrl+R, Alt+F4...) and the language picker alone.
+  if (event.ctrlKey || event.altKey || event.metaKey || event.target instanceof HTMLSelectElement) {
+    return;
+  }
+
+  if (/^[0-9]$/.test(event.key)) {
+    pressDigit(event.key);
+  } else if (event.key === "Backspace") {
+    pressBackspace();
+  } else if (event.key === "Escape" || event.key === "Delete") {
+    pressClear();
+  } else {
+    return;
+  }
+  event.preventDefault();
+}
+
+onMounted(() => window.addEventListener("keydown", handleKeydown));
+onUnmounted(() => window.removeEventListener("keydown", handleKeydown));
+
 async function submit() {
-  if (pin.value.length === 0 || isSubmitting.value) {
+  if (pin.value.length !== PIN_LENGTH || isSubmitting.value) {
     return;
   }
 
@@ -68,12 +103,23 @@ async function submit() {
       <h1 class="login-card__title">{{ storeName }}</h1>
       <p class="login-card__subtitle">{{ t("login.subtitle") }}</p>
 
-      <div class="login-card__pin-display" aria-live="polite">
-        <span v-if="pin.length > 0">{{ maskedPin }}</span>
-        <span v-else class="login-card__pin-placeholder">{{ t("login.enterPin") }}</span>
+      <!-- One hole per PIN digit, filled as digits are entered. -->
+      <div
+        class="login-pin"
+        role="status"
+        :aria-label="t('login.pinProgress', { count: pin.length, total: PIN_LENGTH })"
+      >
+        <span
+          v-for="index in PIN_LENGTH"
+          :key="index"
+          class="login-pin__hole"
+          :class="{ 'login-pin__hole--filled': index <= pin.length }"
+        />
       </div>
 
-      <p v-if="errorMessage" class="login-card__error">{{ errorMessage }}</p>
+      <p v-if="isSubmitting" class="login-card__status" aria-live="polite">{{ t("login.loggingIn") }}</p>
+      <p v-else-if="errorMessage" class="login-card__error" aria-live="polite">{{ errorMessage }}</p>
+      <p v-else class="login-card__status">{{ t("login.keyboardHint") }}</p>
 
       <div class="login-keypad">
         <button
@@ -94,15 +140,6 @@ async function submit() {
           &larr;
         </button>
       </div>
-
-      <button
-        type="button"
-        class="login-card__submit"
-        :disabled="pin.length === 0 || isSubmitting"
-        @click="submit"
-      >
-        {{ isSubmitting ? t("login.loggingIn") : t("login.logIn") }}
-      </button>
     </div>
   </div>
 </template>
@@ -154,31 +191,43 @@ async function submit() {
   font-size: 0.95rem;
 }
 
-.login-card__pin-display {
-  min-height: 48px;
+.login-pin {
   display: flex;
-  align-items: center;
   justify-content: center;
-  font-size: 1.75rem;
-  letter-spacing: 0.4rem;
-  font-weight: 700;
-  color: #111111;
-  border: 2px solid #dcdcdc;
-  border-radius: 12px;
+  gap: 1rem;
   margin-bottom: 0.75rem;
 }
 
-.login-card__pin-placeholder {
-  font-size: 1rem;
-  letter-spacing: normal;
-  font-weight: 500;
-  color: #999999;
+.login-pin__hole {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #b5b5b5;
+  transition:
+    background-color 0.1s ease,
+    border-color 0.1s ease;
+}
+
+.login-pin__hole--filled {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+/* Fixed height so switching between hint, "Logging in..." and an error
+   doesn't shift the keypad. */
+.login-card__status,
+.login-card__error {
+  min-height: 1.4em;
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+}
+
+.login-card__status {
+  color: #777777;
 }
 
 .login-card__error {
-  margin: 0 0 0.75rem;
   color: #c0392b;
-  font-size: 0.9rem;
   font-weight: 600;
 }
 
@@ -186,7 +235,6 @@ async function submit() {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 0.6rem;
-  margin-bottom: 1.25rem;
 }
 
 .login-keypad__key {
@@ -217,24 +265,6 @@ async function submit() {
   color: #666666;
 }
 
-.login-card__submit {
-  width: 100%;
-  min-height: 52px;
-  border-radius: 12px;
-  border: 2px solid var(--color-primary);
-  background: var(--color-primary);
-  color: #ffffff;
-  font-size: 1.05rem;
-  font-weight: 700;
-  cursor: pointer;
-  touch-action: manipulation;
-}
-
-.login-card__submit:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
 /* Dark theme: data-theme is set on <html> by composables/useTheme.ts. :where()
    keeps these rules at their own specificity, so they override light styles
    exactly as the prefers-color-scheme media query used to. */
@@ -256,20 +286,26 @@ async function submit() {
   color: #f2f2f2;
 }
 
-:where(:root[data-theme="dark"]) .login-card__pin-display {
-  color: #f2f2f2;
-  border-color: #444444;
+:where(:root[data-theme="dark"]) .login-pin__hole {
+  border-color: #5a5a5a;
+}
+
+:where(:root[data-theme="dark"]) .login-pin__hole--filled {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+:where(:root[data-theme="dark"]) .login-card__status {
+  color: #999999;
+}
+
+:where(:root[data-theme="dark"]) .login-card__error {
+  color: #ff8a7a;
 }
 
 :where(:root[data-theme="dark"]) .login-keypad__key {
   background: #2a2a2a;
   border-color: #444444;
   color: #f2f2f2;
-}
-
-:where(:root[data-theme="dark"]) .login-card__submit {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: var(--color-on-primary);
 }
 </style>
