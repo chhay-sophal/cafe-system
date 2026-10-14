@@ -414,7 +414,13 @@ function handleDone() {
 
 <template>
   <div class="checkout-backdrop">
-    <div class="checkout-modal" role="dialog" aria-modal="true" :aria-label="t('checkout.dialogAriaLabel')">
+    <div
+      class="checkout-modal"
+      :class="{ 'checkout-modal--wide': phase === 'payment' }"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="t('checkout.dialogAriaLabel')"
+    >
       <header class="checkout-modal__header">
         <h2>{{ t("checkout.heading") }}</h2>
         <button
@@ -428,20 +434,23 @@ function handleDone() {
         </button>
       </header>
 
-      <div v-if="phase === 'payment'" class="checkout-modal__body">
-        <div class="checkout-total">
-          <span>{{ t("checkout.totalDue") }}</span>
-          <span class="checkout-total__amount">
-            {{ format(totalAmount) }}
-            <span class="checkout-total__amount-secondary">{{ formatSecondaryAmount(totalAmount) }}</span>
-          </span>
+      <!-- Two columns on landscape screens: the decision (total, method,
+           change, Complete) on the left, the tender details on the right -
+           so Complete never scrolls out of view. One column when narrow. -->
+      <div v-if="phase === 'payment'" class="checkout-pay">
+        <div class="checkout-total checkout-pay__total">
+          <span class="checkout-total__label">{{ t("checkout.totalDue") }}</span>
+          <span class="checkout-total__amount">{{ format(totalAmount) }}</span>
+          <span class="checkout-total__amount-secondary">{{ formatSecondaryAmount(totalAmount) }}</span>
         </div>
 
-        <div class="payment-methods">
+        <div class="payment-methods checkout-pay__methods" role="radiogroup" :aria-label="t('receipt.payment')">
           <button
             v-for="method in PAYMENT_METHODS"
             :key="method.value"
             type="button"
+            role="radio"
+            :aria-checked="paymentMethod === method.value"
             class="payment-method"
             :class="{ 'payment-method--active': paymentMethod === method.value }"
             @click="selectPaymentMethod(method.value)"
@@ -450,29 +459,12 @@ function handleDone() {
           </button>
         </div>
 
-        <div v-if="isQrPayment" class="qr-banks">
-          <span class="qr-banks__label">{{ t("checkout.chooseBank") }}</span>
-          <p v-if="khqrBanks.banks.value.length === 0" class="qr-banks__empty">{{ t("checkout.noBanks") }}</p>
-          <div v-else class="qr-banks__options">
-            <button
-              v-for="bank in khqrBanks.banks.value"
-              :key="bank.id"
-              type="button"
-              class="payment-method"
-              :class="{ 'payment-method--active': selectedBankId === bank.id }"
-              @click="selectedBankId = bank.id"
-            >
-              {{ bank.name }}
-            </button>
-          </div>
-        </div>
-
-        <template v-if="isCash">
-          <div class="tender-sections">
+        <div class="checkout-pay__detail">
+          <template v-if="isCash">
             <div class="tender-section" :style="{ order: isMainKhr ? 2 : 1 }">
-              <div class="tendered-display">
+              <label class="tendered-display">
                 <span class="tendered-display__label">{{ t("checkout.amountTenderedUsd") }}</span>
-                <div class="tendered-display__input-wrap">
+                <span class="tendered-display__input-wrap">
                   <span>$</span>
                   <input
                     type="number"
@@ -482,8 +474,8 @@ function handleDone() {
                     :value="tenderedUsdText"
                     @input="handleTenderedUsdInput"
                   />
-                </div>
-              </div>
+                </span>
+              </label>
 
               <div class="fast-cash">
                 <button
@@ -502,9 +494,9 @@ function handleDone() {
             </div>
 
             <div class="tender-section" :style="{ order: isMainKhr ? 1 : 2 }">
-              <div class="tendered-display">
+              <label class="tendered-display">
                 <span class="tendered-display__label">{{ t("checkout.amountTenderedRiel") }}</span>
-                <div class="tendered-display__input-wrap">
+                <span class="tendered-display__input-wrap">
                   <input
                     type="number"
                     min="0"
@@ -514,8 +506,8 @@ function handleDone() {
                     @input="handleTenderedRielInput"
                   />
                   <span>៛</span>
-                </div>
-              </div>
+                </span>
+              </label>
 
               <div class="fast-cash">
                 <button
@@ -529,19 +521,40 @@ function handleDone() {
                 </button>
               </div>
             </div>
+
+            <button type="button" class="tendered-clear" @click="clearTendered">{{ t("common.clear") }}</button>
+          </template>
+
+          <div v-else-if="isQrPayment" class="qr-banks">
+            <span class="qr-banks__label">{{ t("checkout.chooseBank") }}</span>
+            <p v-if="khqrBanks.banks.value.length === 0" class="checkout-pay__note">{{ t("checkout.noBanks") }}</p>
+            <div v-else class="qr-banks__options">
+              <button
+                v-for="bank in khqrBanks.banks.value"
+                :key="bank.id"
+                type="button"
+                class="payment-method"
+                :class="{ 'payment-method--active': selectedBankId === bank.id }"
+                @click="selectedBankId = bank.id"
+              >
+                {{ bank.name }}
+              </button>
+            </div>
           </div>
 
-          <button type="button" class="tendered-clear" @click="clearTendered">{{ t("common.clear") }}</button>
+          <p v-else class="checkout-pay__note">{{ t("checkout.cardNote") }}</p>
+        </div>
 
-          <div class="change-banner" :class="{ 'change-banner--warning': isInsufficient }">
+        <div class="checkout-pay__footer">
+          <div v-if="isCash" class="change-banner" :class="{ 'change-banner--warning': isInsufficient }" aria-live="polite">
             <span v-if="isInsufficient">{{ t("checkout.amountShort", { amount: format(amountShort) }) }}</span>
             <span v-else>{{ t("checkout.changeDue", { amount: formatChangeAmount(changeSplit.usd, changeSplit.riel) }) }}</span>
           </div>
-        </template>
 
-        <button type="button" class="checkout-modal__complete" :disabled="!canComplete" @click="handleComplete">
-          {{ t("checkout.completePayment") }}
-        </button>
+          <button type="button" class="checkout-modal__complete" :disabled="!canComplete" @click="handleComplete">
+            {{ t("checkout.completePayment") }}
+          </button>
+        </div>
       </div>
 
       <div v-else-if="phase === 'submitting'" class="checkout-modal__body checkout-modal__body--centered">
@@ -597,9 +610,9 @@ function handleDone() {
 
 .checkout-modal {
   width: 100%;
-  max-width: 420px;
-  max-height: 90vh;
-  overflow-y: auto;
+  max-width: 460px;
+  max-height: calc(100vh - 2rem);
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   background: #ffffff;
@@ -607,18 +620,25 @@ function handleDone() {
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
 }
 
+/* The payment step's two columns need the room; the processing, success
+   and error steps stay narrow. */
+.checkout-modal--wide {
+  max-width: 820px;
+}
+
 .checkout-modal__header {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 1.25rem;
+  padding: 0.5rem 0.75rem 0.5rem 1.25rem;
   background: var(--color-primary);
   color: #ffffff;
 }
 
 .checkout-modal__header h2 {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: 1.1rem;
 }
 
 .checkout-modal__close {
@@ -637,46 +657,112 @@ function handleDone() {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  overflow-y: auto;
 }
 
 .checkout-modal__body--centered {
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 3rem 1.5rem;
-  min-height: 260px;
+  padding: 2rem 1.5rem;
+  min-height: 240px;
+}
+
+/* ---- Payment step -------------------------------------------------- */
+
+.checkout-pay {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  grid-template-rows: auto auto 1fr;
+  grid-template-areas:
+    "total   detail"
+    "methods detail"
+    "footer  detail";
+  gap: 0.75rem 1.25rem;
+  padding: 1rem 1.25rem 1.25rem;
+}
+
+.checkout-pay__total {
+  grid-area: total;
+}
+
+.checkout-pay__methods {
+  grid-area: methods;
+}
+
+/* Change + Complete sit at the bottom of the left column. */
+.checkout-pay__footer {
+  grid-area: footer;
+  align-self: end;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Only this column scrolls, and only if the screen is too short for it. */
+.checkout-pay__detail {
+  grid-area: detail;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  /* Right padding keeps the riel sign after its input from being clipped by
+     this scrolling column's edge. */
+  padding: 0 0.25rem 0 1.25rem;
+  border-left: 2px solid #eeeeee;
+}
+
+.checkout-pay__note {
+  margin: auto 0;
+  padding: 1rem;
+  border-radius: 12px;
+  background: #f4f4f4;
+  color: #666666;
+  font-size: 0.95rem;
+  text-align: center;
 }
 
 .checkout-total {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 0.1rem;
   padding: 0.75rem 1rem;
   border-radius: 12px;
   background: #f4f4f4;
 }
 
+.checkout-total__label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #666666;
+}
+
 .checkout-total__amount {
-  font-size: 1.5rem;
-  font-weight: 700;
+  font-size: 1.9rem;
+  font-weight: 800;
+  line-height: 1.2;
   color: #111111;
 }
 
 .checkout-total__amount-secondary {
-  margin-left: 0.35rem;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   font-weight: 600;
   color: #999999;
 }
 
+/* Stacked in the left column; a row of buttons when there's one column. */
 .payment-methods {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: 0.5rem;
 }
 
 .payment-method {
-  min-height: 52px;
+  min-height: 48px;
+  padding: 0 0.75rem;
   border-radius: 12px;
   border: 2px solid #dcdcdc;
   background: #ffffff;
@@ -716,32 +802,22 @@ function handleDone() {
   gap: 0.5rem;
 }
 
-.qr-banks__empty {
-  margin: 0;
-  font-size: 0.85rem;
-  color: #888888;
-}
-
-.tender-sections {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
 .tender-section {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.5rem;
 }
 
 .tendered-display {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.75rem;
 }
 
 .tendered-display__label {
   font-weight: 600;
+  font-size: 0.95rem;
   color: #444444;
 }
 
@@ -754,7 +830,7 @@ function handleDone() {
 }
 
 .tendered-display__input-wrap input {
-  width: 120px;
+  width: 130px;
   min-height: 44px;
   border: 2px solid #dcdcdc;
   border-radius: 10px;
@@ -764,14 +840,17 @@ function handleDone() {
   text-align: right;
 }
 
+/* As many columns as fit: four in the wide layout, so each currency's
+   buttons take two rows. */
 .fast-cash {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
   gap: 0.5rem;
 }
 
 .fast-cash__button {
-  min-height: 52px;
+  min-height: 48px;
+  padding: 0 0.25rem;
   border-radius: 12px;
   border: 2px solid #dcdcdc;
   background: #ffffff;
@@ -791,6 +870,7 @@ function handleDone() {
 }
 
 .tendered-clear {
+  order: 3;
   align-self: flex-end;
   border: none;
   background: transparent;
@@ -799,16 +879,16 @@ function handleDone() {
   font-weight: 600;
   cursor: pointer;
   text-decoration: underline;
-  padding: 0;
+  padding: 0.25rem 0;
 }
 
 .change-banner {
-  padding: 0.85rem 1rem;
+  padding: 0.75rem 1rem;
   border-radius: 12px;
   background: #e6f6ec;
   color: #1c7a41;
   font-weight: 700;
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   text-align: center;
 }
 
@@ -893,6 +973,81 @@ function handleDone() {
   font-weight: 600;
 }
 
+/* Narrow screens: one column - total, methods (now a row), tender details,
+   then change + Complete pinned under them while the details scroll. */
+@media (max-width: 700px) {
+  .checkout-pay {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "total"
+      "methods"
+      "detail"
+      "footer";
+  }
+
+  .checkout-total {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 0.5rem;
+  }
+
+  .checkout-total__label {
+    flex-basis: 100%;
+  }
+
+  .payment-methods {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+  }
+
+  .checkout-pay__detail {
+    padding-left: 0;
+    border-left: none;
+  }
+}
+
+/* Short screens (e.g. 1024x600 or 800x600): smaller targets and gaps so the
+   whole payment step fits without scrolling. */
+@media (max-height: 640px) {
+  .checkout-pay {
+    gap: 0.5rem 1rem;
+    padding: 0.75rem 1rem 1rem;
+  }
+
+  .checkout-total {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .checkout-total__amount {
+    font-size: 1.6rem;
+  }
+
+  .payment-method,
+  .fast-cash__button {
+    min-height: 42px;
+  }
+
+  .checkout-pay__detail,
+  .tender-section {
+    gap: 0.5rem;
+  }
+
+  .tendered-display__input-wrap input {
+    min-height: 40px;
+  }
+
+  .change-banner {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .checkout-modal__complete {
+    min-height: 46px;
+  }
+}
+
 /* Dark theme: data-theme is set on <html> by composables/useTheme.ts. :where()
    keeps these rules at their own specificity, so they override light styles
    exactly as the prefers-color-scheme media query used to. */
@@ -910,6 +1065,29 @@ function handleDone() {
 
 :where(:root[data-theme="dark"]) .checkout-total__amount-secondary {
   color: #777777;
+}
+
+:where(:root[data-theme="dark"]) .checkout-total__label {
+  color: #aaaaaa;
+}
+
+:where(:root[data-theme="dark"]) .checkout-pay__detail {
+  border-left-color: #3a3a3a;
+}
+
+:where(:root[data-theme="dark"]) .change-banner {
+  background: #1f3a2a;
+  color: #7ddc9c;
+}
+
+:where(:root[data-theme="dark"]) .change-banner--warning {
+  background: #4a2420;
+  color: #ff9d8f;
+}
+
+:where(:root[data-theme="dark"]) .checkout-pay__note {
+  background: #2f2f2f;
+  color: #bbbbbb;
 }
 
 :where(:root[data-theme="dark"]) .payment-method {

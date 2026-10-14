@@ -65,7 +65,8 @@
       "QR_CODE": "Mobile Pay"
     },
     "chooseBank": "Bank",
-    "noBanks": "No banks set up - add them in Settings → KHQR to show a QR code to the customer."
+    "noBanks": "No banks set up - add them in Settings → KHQR to show a QR code to the customer.",
+    "cardNote": "Take the card payment on the card terminal, then press Complete Payment."
   },
   "modifier": {
     "customizeAria": "Customize {name}",
