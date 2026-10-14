@@ -10,6 +10,7 @@ import { useNetworkStatus } from "../composables/useNetworkStatus";
 import { ALL_PAYMENT_METHODS, usePaymentMethods } from "../composables/usePaymentMethods";
 import { useReceiptPrinter } from "../composables/useReceiptPrinter";
 import { STORE_NAME_MAX_LENGTH, useStoreName } from "../composables/useStoreName";
+import FastCashSettings from "./FastCashSettings.vue";
 import ReceiptTestCard from "./ReceiptTestCard.vue";
 import { useTheme, type ThemePreference } from "../composables/useTheme";
 import { API_BASE_URL } from "../lib/api";
@@ -346,6 +347,8 @@ function handleRemoveBank(id: string) {
             </button>
           </div>
         </div>
+
+        <FastCashSettings />
       </template>
 
       <template v-else-if="activeSection === 'khqr'">

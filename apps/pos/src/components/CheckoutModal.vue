@@ -5,6 +5,7 @@ import { HttpError, submitOrder } from "../lib/api";
 import { computeChange, formatMain, formatRiel, formatSecondary, formatUsd, round2 } from "../lib/currency";
 import { useAuth } from "../composables/useAuth";
 import { useExchangeRate } from "../composables/useExchangeRate";
+import { formatFastCashLabel, useFastCash } from "../composables/useFastCash";
 import { publishPaymentQr, publishSaleCompleted } from "../composables/useCustomerDisplayChannel";
 import { useKhqrBanks } from "../composables/useKhqrBanks";
 import { useNetworkStatus } from "../composables/useNetworkStatus";
@@ -42,8 +43,8 @@ const PAYMENT_METHODS = computed<Array<{ value: PaymentMethod; label: string }>>
   enabledMethods.value.map((method) => ({ value: method, label: t(`checkout.methods.${method}`) })),
 );
 
-const FAST_CASH_USD_AMOUNTS = [1, 5, 10, 20, 50];
-const FAST_CASH_RIEL_AMOUNTS = [1000, 2000, 5000, 10000, 20000, 50000, 100000];
+// Quick-add tender buttons, configured per register in Settings → Payments.
+const { amounts: fastCashAmounts } = useFastCash();
 
 const network = useNetworkStatus();
 const offlineQueue = useOfflineQueue();
@@ -479,13 +480,13 @@ function handleDone() {
 
               <div class="fast-cash">
                 <button
-                  v-for="amount in FAST_CASH_USD_AMOUNTS"
+                  v-for="amount in fastCashAmounts.USD.value"
                   :key="amount"
                   type="button"
                   class="fast-cash__button"
                   @click="addFastCashUsd(amount)"
                 >
-                  +${{ amount }}
+                  {{ formatFastCashLabel("USD", amount) }}
                 </button>
                 <button type="button" class="fast-cash__button fast-cash__button--exact" @click="setExactChange">
                   {{ t("checkout.exactChange") }}
@@ -509,15 +510,15 @@ function handleDone() {
                 </span>
               </label>
 
-              <div class="fast-cash">
+              <div v-if="fastCashAmounts.KHR.value.length > 0" class="fast-cash">
                 <button
-                  v-for="amount in FAST_CASH_RIEL_AMOUNTS"
+                  v-for="amount in fastCashAmounts.KHR.value"
                   :key="amount"
                   type="button"
                   class="fast-cash__button"
                   @click="addFastCashRiel(amount)"
                 >
-                  +{{ amount.toLocaleString() }}៛
+                  {{ formatFastCashLabel("KHR", amount) }}
                 </button>
               </div>
             </div>

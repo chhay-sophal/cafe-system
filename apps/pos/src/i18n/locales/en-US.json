@@ -177,7 +177,32 @@
     "payments": {
       "methods": "Payment methods",
       "methodsHint": "Methods shown at checkout on this register. Turn off any this till can't take. Saved on this register only.",
-      "lastMethod": "At least one payment method must stay on."
+      "lastMethod": "At least one payment method must stay on.",
+      "fastCash": {
+        "heading": {
+          "USD": "Quick cash buttons (USD)",
+          "KHR": "Quick cash buttons (Riel)"
+        },
+        "hint": "Tap-to-add amounts shown at checkout for cash payments, smallest first. Up to {max}.",
+        "empty": "No quick cash buttons - cashiers type the amount instead.",
+        "add": "Add",
+        "remove": "Remove {amount}",
+        "reset": "Reset to defaults",
+        "errors": {
+          "invalid": {
+            "USD": "Enter an amount above $0, to the cent.",
+            "KHR": "Enter an amount in hundreds of riel, e.g. 500 or 5000."
+          },
+          "duplicate": {
+            "USD": "That amount is already a button.",
+            "KHR": "That amount is already a button."
+          },
+          "full": {
+            "USD": "Up to {max} buttons - remove one first.",
+            "KHR": "Up to {max} buttons - remove one first."
+          }
+        }
+      }
     },
     "khqr": {
       "intro": "Add each bank you accept Mobile Pay through, with its KHQR code. The cashier picks the bank at checkout and the customer screen shows its QR.",
