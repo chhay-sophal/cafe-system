@@ -2,17 +2,21 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type { MainCurrency } from "~/types/settings";
 
-const { t } = useI18n();
+const { t, locale, locales, setLocale } = useI18n();
 const auth = useAuth();
 const store = useSettingsStore();
 const { formatRiel } = useCurrency();
 
 const CURRENCIES: MainCurrency[] = ["USD", "KHR"];
+type SupportedLocale = "en-US" | "km-KH";
 
 // Mirrors isDirty up to app.vue so it can confirm before switching tabs or logging out.
 const dirty = defineModel<boolean>("dirty", { default: false });
 
 // Edits are held locally as a draft and only sent to the API when "Save Changes" is clicked.
+// Language is a per-device preference (persisted to localStorage by app.vue), but it goes
+// through the same draft so every setting on this page behaves the same way.
+const draftLocale = ref<SupportedLocale>(locale.value as SupportedLocale);
 const draftCurrency = ref<MainCurrency>(store.mainCurrency);
 const draftTaxEnabled = ref(store.taxEnabled);
 // v-model on a type="number" input writes back a number, or "" when the field is cleared.
@@ -23,6 +27,7 @@ const errorMessage = ref<string | null>(null);
 const successMessage = ref(false);
 
 function resetDraft() {
+  draftLocale.value = locale.value as SupportedLocale;
   draftCurrency.value = store.mainCurrency;
   draftTaxEnabled.value = store.taxEnabled;
   rateInput.value = String(store.exchangeRateRielPerUsd);
@@ -43,10 +48,11 @@ const rateError = computed(() => {
 
 const previewRiel = computed(() => (rateError.value ? null : formatRiel(parsedRate.value)));
 
+const isLocaleDirty = computed(() => draftLocale.value !== locale.value);
 const isCurrencyDirty = computed(() => draftCurrency.value !== store.mainCurrency);
 const isTaxDirty = computed(() => draftTaxEnabled.value !== store.taxEnabled);
 const isRateDirty = computed(() => String(rateInput.value) !== String(store.exchangeRateRielPerUsd));
-const isDirty = computed(() => isCurrencyDirty.value || isTaxDirty.value || isRateDirty.value);
+const isDirty = computed(() => isLocaleDirty.value || isCurrencyDirty.value || isTaxDirty.value || isRateDirty.value);
 const canSubmit = computed(() => isDirty.value && !rateError.value && !isSubmitting.value);
 
 watch(isDirty, (value) => {
@@ -69,6 +75,11 @@ onBeforeUnmount(() => {
 function markEdited() {
   successMessage.value = false;
   errorMessage.value = null;
+}
+
+function selectLocale(value: SupportedLocale) {
+  draftLocale.value = value;
+  markEdited();
 }
 
 function selectMainCurrency(currency: MainCurrency) {
@@ -113,6 +124,9 @@ async function submit() {
     if (isRateDirty.value) {
       await store.updateExchangeRate(parsedRate.value, token);
     }
+    if (isLocaleDirty.value) {
+      await setLocale(draftLocale.value);
+    }
     successMessage.value = true;
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : t("settings.saveError");
@@ -127,6 +141,29 @@ async function submit() {
     <h2 class="mb-4 text-sm font-semibold text-slate-700">{{ t("settings.heading") }}</h2>
 
     <div class="max-w-md rounded-lg border border-slate-200 p-5">
+      <label class="block text-sm font-medium text-slate-700">{{ t("settings.languageLabel") }}</label>
+      <p class="mt-1 text-xs text-slate-500">{{ t("settings.languageHint") }}</p>
+
+      <div class="mt-3 grid grid-cols-2 gap-2">
+        <button
+          v-for="loc in locales"
+          :key="loc.code"
+          type="button"
+          :disabled="isSubmitting"
+          class="rounded-lg border px-4 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+          :class="
+            draftLocale === loc.code
+              ? 'border-primary bg-primary text-white'
+              : 'border-slate-300 text-slate-700 hover:bg-slate-50'
+          "
+          @click="selectLocale(loc.code as SupportedLocale)"
+        >
+          {{ loc.name }}
+        </button>
+      </div>
+    </div>
+
+    <div class="mt-5 max-w-md rounded-lg border border-slate-200 p-5">
       <label class="block text-sm font-medium text-slate-700">{{ t("settings.mainCurrencyLabel") }}</label>
       <p class="mt-1 text-xs text-slate-500">{{ t("settings.mainCurrencyHint") }}</p>
 

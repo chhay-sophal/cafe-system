@@ -321,6 +321,8 @@
   },
   "settings": {
     "heading": "Store Settings",
+    "languageLabel": "Language",
+    "languageHint": "The language IMS is shown in on this device.",
     "mainCurrencyLabel": "Main Currency",
     "mainCurrencyHint": "The currency shown prominently throughout IMS and POS. Prices are still stored and calculated in USD either way.",
     "currencyUsd": "US Dollar ($)",

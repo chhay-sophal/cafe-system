@@ -4,7 +4,7 @@ import type { ModifierGroup, Product } from "~/types/catalog";
 import type { InventoryItem } from "~/types/inventory";
 import type { StaffUser } from "~/types/user";
 
-const { locale, locales, setLocale, t } = useI18n();
+const { locale, setLocale, t } = useI18n();
 const auth = useAuth();
 const store = useInventoryStore();
 const settingsStore = useSettingsStore();
@@ -244,13 +244,6 @@ watch(
       </div>
 
       <div class="hidden items-center gap-3 text-sm md:flex">
-        <select
-          :value="locale"
-          class="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-700 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
-          @change="setLocale(($event.target as HTMLSelectElement).value as 'en-US' | 'km-KH')"
-        >
-          <option v-for="loc in locales" :key="loc.code" :value="loc.code">{{ loc.name }}</option>
-        </select>
         <span class="text-slate-500">{{ auth.session.value.user.name }}</span>
         <button
           type="button"
@@ -305,13 +298,6 @@ watch(
       </nav>
 
       <div class="flex flex-col gap-3 border-t border-slate-200 p-4 text-sm">
-        <select
-          :value="locale"
-          class="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-700 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
-          @change="setLocale(($event.target as HTMLSelectElement).value as 'en-US' | 'km-KH')"
-        >
-          <option v-for="loc in locales" :key="loc.code" :value="loc.code">{{ loc.name }}</option>
-        </select>
         <span class="text-slate-500">{{ auth.session.value.user.name }}</span>
         <button
           type="button"

@@ -11,7 +11,7 @@ export default defineNuxtConfig({
       { code: 'en-US', language: 'en-US', name: 'English', file: 'en-US.json' },
       { code: 'km-KH', language: 'km-KH', name: 'ខ្មែរ', file: 'km-KH.json' }
     ],
-    defaultLocale: 'en-US',
+    defaultLocale: 'km-KH',
     langDir: 'locales',
     strategy: 'no_prefix',
     // Client-only SPA (see ssr: false below) - locale choice is a plain
