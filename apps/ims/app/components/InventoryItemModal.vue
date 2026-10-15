@@ -128,7 +128,7 @@ async function submit() {
         <label class="block text-sm font-medium text-slate-700">{{ $t("inventoryItem.unit") }}</label>
         <select
           v-model="unit"
-          class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+          class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 h-[38px]"
         >
           <option v-for="option in UNITS" :key="option" :value="option">{{ option }}</option>
         </select>

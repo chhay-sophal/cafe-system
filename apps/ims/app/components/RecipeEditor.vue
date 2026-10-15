@@ -379,7 +379,7 @@ onMounted(async () => {
         <select
           v-if="targetKind === 'product'"
           v-model="selectedProductId"
-          class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+          class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 h-[38px]"
           @change="selectTarget"
         >
           <option value="">{{ $t("recipe.selectMenuItem") }}</option>
@@ -393,7 +393,7 @@ onMounted(async () => {
         <select
           v-else
           v-model="selectedModifierId"
-          class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+          class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 h-[38px]"
           @change="selectTarget"
         >
           <option value="">{{ $t("recipe.selectModifierChoice") }}</option>
@@ -430,7 +430,7 @@ onMounted(async () => {
               <div class="min-w-[220px] flex-1">
                 <select
                   v-model="row.inventoryItemId"
-                  class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+                  class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 h-[38px]"
                 >
                   <option value="">{{ $t("recipe.selectIngredientOption") }}</option>
                   <option v-for="item in pickerOptionsForRow(row)" :key="item.id" :value="item.id">{{ item.name }}</option>
@@ -448,14 +448,14 @@ onMounted(async () => {
               </div>
 
               <div class="w-24">
-                <select disabled class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                <select disabled class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 h-[38px]">
                   <option>{{ unitForRow(row) }}</option>
                 </select>
               </div>
 
               <button
                 type="button"
-                class="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                class="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 h-[38px]"
                 @click="removeRow(row.rowKey)"
               >
                 {{ $t("recipe.remove") }}

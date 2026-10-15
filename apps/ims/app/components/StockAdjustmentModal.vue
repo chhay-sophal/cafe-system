@@ -118,7 +118,7 @@ async function submit() {
         <label class="block text-sm font-medium text-slate-700">{{ $t("stockAdjustment.adjustmentType") }}</label>
         <select
           v-model="type"
-          class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+          class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 h-[38px]"
         >
           <option v-for="option in ADJUSTMENT_TYPES" :key="option.value" :value="option.value">
             {{ option.label }}

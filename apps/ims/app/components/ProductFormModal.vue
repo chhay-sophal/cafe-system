@@ -222,7 +222,7 @@ async function submit() {
           <label class="block text-sm font-medium text-slate-700">{{ $t("product.category") }}</label>
           <select
             v-model="categoryId"
-            class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+            class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 h-[38px]"
           >
             <option value="">{{ $t("common.selectEllipsis") }}</option>
             <option v-for="category in store.categories" :key="category.id" :value="category.id">

@@ -248,7 +248,7 @@ const INPUT_CLASS =
         </button>
       </div>
 
-      <div class="max-h-[60vh] space-y-3 overflow-y-auto">
+      <div class="max-h-[60vh] space-y-3 overflow-y-auto pb-1">
         <div v-for="filter in filters" :key="filter.columnId" class="px-0.5">
           <label class="block text-xs font-medium text-slate-600">{{ filter.label }}</label>
 
@@ -256,7 +256,7 @@ const INPUT_CLASS =
             v-if="filter.type === 'select'"
             :value="selectIndexOf(filter)"
             :class="INPUT_CLASS"
-            class="mt-1 w-full"
+            class="mt-1 w-full h-[38px]"
             @change="handleSelectChange(filter, ($event.target as HTMLSelectElement).value)"
           >
             <option value="">{{ t("tableFilters.any") }}</option>
