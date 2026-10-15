@@ -98,9 +98,39 @@ const navItems = computed<Array<{ key: ActiveView; label: string }>>(() => {
   return items;
 });
 
+const hasUnsavedSettings = ref(false);
+const isUnsavedDialogOpen = ref(false);
+// What to run once the user confirms leaving Settings with unsaved changes.
+const pendingLeaveAction = ref<(() => void) | null>(null);
+
+function guardUnsavedSettings(action: () => void) {
+  if (activeView.value === "settings" && hasUnsavedSettings.value) {
+    pendingLeaveAction.value = action;
+    isUnsavedDialogOpen.value = true;
+    return;
+  }
+  action();
+}
+
+function confirmLeaveSettings() {
+  hasUnsavedSettings.value = false;
+  pendingLeaveAction.value?.();
+  pendingLeaveAction.value = null;
+}
+
 function selectView(view: ActiveView) {
-  activeView.value = view;
   isDrawerOpen.value = false;
+  if (view === activeView.value) {
+    return;
+  }
+  guardUnsavedSettings(() => {
+    activeView.value = view;
+  });
+}
+
+function logout() {
+  isDrawerOpen.value = false;
+  guardUnsavedSettings(() => auth.logout());
 }
 
 function openAdjustModal(item: InventoryItem) {
@@ -225,7 +255,7 @@ watch(
         <button
           type="button"
           class="rounded-lg border border-slate-300 px-3 py-1.5 font-semibold text-slate-700 hover:bg-slate-50"
-          @click="auth.logout()"
+          @click="logout"
         >
           {{ $t("app.logout") }}
         </button>
@@ -286,7 +316,7 @@ watch(
         <button
           type="button"
           class="w-full rounded-lg border border-slate-300 px-3 py-1.5 font-semibold text-slate-700 hover:bg-slate-50"
-          @click="auth.logout()"
+          @click="logout"
         >
           {{ $t("app.logout") }}
         </button>
@@ -316,13 +346,14 @@ watch(
       />
       <RecipeEditor v-else-if="activeView === 'recipes'" />
       <UserTable v-else-if="activeView === 'staff' && isAdmin" @create="openCreateUserModal" @edit="openEditUserModal" />
-      <SettingsPanel v-else-if="activeView === 'settings' && isAdmin" />
+      <SettingsPanel v-else-if="activeView === 'settings' && isAdmin" v-model:dirty="hasUnsavedSettings" />
       <AnalyticsDashboard v-else />
     </main>
 
     <StockAdjustmentModal v-model:open="isAdjustOpen" :item="selectedItem" />
     <InventoryItemModal v-model:open="isItemModalOpen" :item="editingItem" />
     <DeleteConfirmationDialog v-model:open="isDeleteOpen" :item="deletingItem" />
+    <UnsavedChangesDialog v-model:open="isUnsavedDialogOpen" @leave="confirmLeaveSettings" />
     <UserFormModal v-if="isAdmin" v-model:open="isUserModalOpen" :user="editingUser" />
     <ProductFormModal v-model:open="isProductModalOpen" :product="editingProduct" />
     <ProductDeleteConfirmModal v-model:open="isProductDeleteOpen" :product="deletingProduct" />
