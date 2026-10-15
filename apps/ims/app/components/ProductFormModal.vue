@@ -38,13 +38,13 @@ const isEditMode = computed(() => props.product !== null);
 const nameError = computed(() => (name.value.trim().length === 0 ? t("common.nameRequired") : null));
 const categoryError = computed(() => (categoryId.value.length === 0 ? t("product.categoryRequired") : null));
 const priceError = computed(() =>
-  priceInput.value === null || Number.isNaN(priceInput.value) || priceInput.value < 0
+  !isFiniteNumber(priceInput.value) || priceInput.value < 0
     ? t("product.priceError")
     : null,
 );
 
 const basePriceUsd = computed<number | null>(() => {
-  if (priceError.value || priceInput.value === null) {
+  if (priceError.value || !isFiniteNumber(priceInput.value)) {
     return null;
   }
   if (props.product && priceInput.value === initialPriceInput.value) {
@@ -236,9 +236,9 @@ async function submit() {
           </label>
           <input
             v-model.number="priceInput"
-            type="number"
-            :step="isRielInput ? 100 : 0.01"
-            min="0"
+            v-numeric
+            type="text"
+            inputmode="decimal"
             :placeholder="isRielInput ? '0' : '0.00'"
             class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
           />

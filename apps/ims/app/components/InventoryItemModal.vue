@@ -27,16 +27,16 @@ const isEditMode = computed(() => props.item !== null);
 
 const nameError = computed(() => (name.value.trim().length === 0 ? t("common.nameRequired") : null));
 const reorderError = computed(() =>
-  reorderThreshold.value === null || reorderThreshold.value < 0 ? t("inventoryItem.reorderError") : null,
+  !isFiniteNumber(reorderThreshold.value) || reorderThreshold.value < 0 ? t("inventoryItem.reorderError") : null,
 );
 const costError = computed(() =>
-  costPerUnit.value === null || costPerUnit.value < 0 ? t("inventoryItem.costError") : null,
+  !isFiniteNumber(costPerUnit.value) || costPerUnit.value < 0 ? t("inventoryItem.costError") : null,
 );
 
 const canSubmit = computed(() => !nameError.value && !reorderError.value && !costError.value && !isSubmitting.value);
 
 const costRielPreview = computed(() =>
-  costPerUnit.value !== null && !Number.isNaN(costPerUnit.value) && costPerUnit.value >= 0
+  isFiniteNumber(costPerUnit.value) && costPerUnit.value >= 0
     ? formatRielEquivalent(costPerUnit.value)
     : null,
 );
@@ -139,9 +139,9 @@ async function submit() {
           <label class="block text-sm font-medium text-slate-700">{{ $t("inventoryItem.reorderThreshold") }}</label>
           <input
             v-model.number="reorderThreshold"
-            type="number"
-            step="any"
-            min="0"
+            v-numeric
+            type="text"
+            inputmode="decimal"
             class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
           />
         </div>
@@ -149,9 +149,9 @@ async function submit() {
           <label class="block text-sm font-medium text-slate-700">{{ $t("inventoryItem.costPerUnit") }}</label>
           <input
             v-model.number="costPerUnit"
-            type="number"
-            step="any"
-            min="0"
+            v-numeric
+            type="text"
+            inputmode="decimal"
             class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
           />
           <p v-if="costRielPreview" class="mt-1 text-xs text-slate-400">≈ {{ costRielPreview }}</p>

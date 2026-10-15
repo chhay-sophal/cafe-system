@@ -88,7 +88,7 @@ const optionsError = computed(() => {
   if (options.value.some((option) => option.name.trim().length === 0)) {
     return t("modifier.optionNameRequired");
   }
-  if (options.value.some((option) => option.priceExtra === "" || option.priceExtra < 0)) {
+  if (options.value.some((option) => !isFiniteNumber(option.priceExtra) || option.priceExtra < 0)) {
     return t("modifier.optionPriceError");
   }
   return null;
@@ -121,7 +121,7 @@ function toPriceUsd(option: OptionDraft): number {
 
 // Shows the price in the other currency under each row, so both values are visible.
 function pricePreview(option: OptionDraft): string | null {
-  if (option.priceExtra === "" || option.priceExtra < 0) {
+  if (!isFiniteNumber(option.priceExtra) || option.priceExtra < 0) {
     return null;
   }
   const usd = toPriceUsd(option);
@@ -214,9 +214,9 @@ async function submit() {
             <label class="block text-sm font-medium text-slate-700">{{ $t("modifier.minSelection") }}</label>
             <input
               v-model.number="minSelection"
-              type="number"
-              min="0"
-              step="1"
+              v-numeric
+              type="text"
+              inputmode="numeric"
               class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
             />
           </div>
@@ -224,9 +224,9 @@ async function submit() {
             <label class="block text-sm font-medium text-slate-700">{{ $t("modifier.maxSelection") }}</label>
             <input
               v-model.number="maxSelection"
-              type="number"
-              min="1"
-              step="1"
+              v-numeric
+              type="text"
+              inputmode="numeric"
               class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
             />
           </div>
@@ -257,9 +257,9 @@ async function submit() {
                 />
                 <input
                   v-model.number="option.priceExtra"
-                  type="number"
-                  :step="isRielInput ? 100 : 0.01"
-                  min="0"
+                  v-numeric
+                  type="text"
+                  inputmode="decimal"
                   :aria-label="$t('modifier.optionPrice')"
                   :placeholder="isRielInput ? '0' : '0.00'"
                   class="w-24 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"

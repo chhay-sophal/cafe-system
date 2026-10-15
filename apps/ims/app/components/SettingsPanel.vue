@@ -19,7 +19,7 @@ const dirty = defineModel<boolean>("dirty", { default: false });
 const draftLocale = ref<SupportedLocale>(locale.value as SupportedLocale);
 const draftCurrency = ref<MainCurrency>(store.mainCurrency);
 const draftTaxEnabled = ref(store.taxEnabled);
-// v-model on a type="number" input writes back a number, or "" when the field is cleared.
+// The rate field is a text input (see v-numeric), so v-model writes back the typed string.
 const rateInput = ref<string | number>(String(store.exchangeRateRielPerUsd));
 
 const isSubmitting = ref(false);
@@ -217,9 +217,9 @@ async function submit() {
         <span class="text-sm font-semibold text-slate-500">1 USD =</span>
         <input
           v-model="rateInput"
-          type="number"
-          min="0"
-          step="1"
+          v-numeric
+          type="text"
+          inputmode="decimal"
           :disabled="isSubmitting"
           @input="markEdited"
           class="w-32 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"

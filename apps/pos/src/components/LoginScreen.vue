@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { useAuth } from "../composables/useAuth";
 import { useStoreName } from "../composables/useStoreName";
 import { setLocale } from "../i18n";
+import { toWesternDigits } from "../lib/numericInput";
 
 const { t, locale } = useI18n({ useScope: "global" });
 const { storeName } = useStoreName();
@@ -53,8 +54,10 @@ function handleKeydown(event: KeyboardEvent) {
     return;
   }
 
-  if (/^[0-9]$/.test(event.key)) {
-    pressDigit(event.key);
+  // A Khmer keyboard layout sends ០-៩; treat them as the matching 0-9.
+  const key = toWesternDigits(event.key);
+  if (/^[0-9]$/.test(key)) {
+    pressDigit(key);
   } else if (event.key === "Backspace") {
     pressBackspace();
   } else if (event.key === "Escape" || event.key === "Delete") {

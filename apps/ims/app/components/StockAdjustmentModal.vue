@@ -34,7 +34,7 @@ const quantityLabel = computed(() => {
 // correction can legitimately go either way, so it's the only type where the
 // cashier enters the signed value directly.
 const resolvedQuantityChanged = computed(() => {
-  if (quantity.value === null) {
+  if (!isFiniteNumber(quantity.value)) {
     return 0;
   }
   if (type.value === "RESTOCK") {
@@ -46,7 +46,7 @@ const resolvedQuantityChanged = computed(() => {
   return quantity.value;
 });
 
-const canSubmit = computed(() => quantity.value !== null && quantity.value !== 0 && !isSubmitting.value);
+const canSubmit = computed(() => resolvedQuantityChanged.value !== 0 && !isSubmitting.value);
 
 watch(open, (isOpen) => {
   if (isOpen) {
@@ -130,8 +130,9 @@ async function submit() {
         <label class="block text-sm font-medium text-slate-700">{{ quantityLabel }}</label>
         <input
           v-model.number="quantity"
-          type="number"
-          step="any"
+          v-numeric.signed
+          type="text"
+          inputmode="decimal"
           class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
           :placeholder="$t('stockAdjustment.amountPlaceholder', { unit: item.unit })"
         />

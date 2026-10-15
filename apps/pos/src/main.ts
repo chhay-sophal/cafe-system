@@ -4,6 +4,7 @@ import App from "./App.vue";
 import CustomerDisplay from "./components/CustomerDisplay.vue";
 import { initTheme } from "./composables/useTheme";
 import { i18n } from "./i18n";
+import { vNumeric } from "./lib/numericInput";
 import "./styles/global.css";
 
 // One frontend bundle, two windows: the cashier ("main") mounts the full
@@ -27,4 +28,4 @@ const root = resolveWindowLabel() === "customer-display" ? CustomerDisplay : App
 // Both windows read the saved theme before their first paint.
 initTheme();
 
-createApp(root).use(i18n).mount("#app");
+createApp(root).use(i18n).directive("numeric", vNumeric).mount("#app");

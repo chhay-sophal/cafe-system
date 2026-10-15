@@ -476,9 +476,9 @@ function handleDone() {
                 <span class="tendered-display__input-wrap">
                   <span>$</span>
                   <input
-                    type="number"
-                    min="0"
-                    step="0.01"
+                    v-numeric
+                    type="text"
+                    inputmode="decimal"
                     placeholder="0"
                     :value="tenderedUsdText"
                     @input="handleTenderedUsdInput"
@@ -507,9 +507,9 @@ function handleDone() {
                 <span class="tendered-display__label">{{ t("checkout.amountTenderedRiel") }}</span>
                 <span class="tendered-display__input-wrap">
                   <input
-                    type="number"
-                    min="0"
-                    step="100"
+                    v-numeric
+                    type="text"
+                    inputmode="decimal"
                     placeholder="0"
                     :value="tenderedRielText"
                     @input="handleTenderedRielInput"

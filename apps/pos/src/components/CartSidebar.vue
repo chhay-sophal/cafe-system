@@ -106,9 +106,9 @@ function handleDiscountInput(event: Event) {
           <span>{{ discountPrefix }}</span>
           <input
             id="discount-input"
-            type="number"
-            min="0"
-            :step="isMainKhr ? 100 : 0.01"
+            v-numeric
+            type="text"
+            inputmode="decimal"
             placeholder="0"
             :value="discountText"
             @input="handleDiscountInput"

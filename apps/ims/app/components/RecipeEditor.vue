@@ -178,7 +178,7 @@ function rowError(row: RecipeIngredientDraft): string | null {
   if (!row.inventoryItemId) {
     return t("recipe.selectIngredientRequired");
   }
-  if (row.quantityRequired === null || Number.isNaN(row.quantityRequired) || row.quantityRequired <= 0) {
+  if (!isFiniteNumber(row.quantityRequired) || row.quantityRequired <= 0) {
     return t("recipe.quantityError");
   }
   return null;
@@ -440,8 +440,9 @@ onMounted(async () => {
               <div class="w-32">
                 <input
                   v-model.number="row.quantityRequired"
-                  type="number"
-                  step="any"
+                  v-numeric
+                  type="text"
+                  inputmode="decimal"
                   :placeholder="$t('recipe.quantityPlaceholder')"
                   class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
                 />

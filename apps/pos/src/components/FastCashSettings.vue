@@ -76,9 +76,9 @@ function handleDraftInput(currency: FastCashCurrency, value: string) {
     <form class="fast-cash-settings__add" @submit.prevent="handleAdd(currency)">
       <span class="fast-cash-settings__unit">{{ currency === "KHR" ? "៛" : "$" }}</span>
       <input
-        type="number"
-        min="0"
-        :step="currency === 'KHR' ? 100 : 0.01"
+        v-numeric
+        type="text"
+        inputmode="decimal"
         :placeholder="currency === 'KHR' ? '5000' : '5'"
         :aria-label="t(`settings.payments.fastCash.heading.${currency}`)"
         :value="drafts[currency]"
