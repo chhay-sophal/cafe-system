@@ -12,11 +12,17 @@ const { t } = useI18n();
 const auth = useAuth();
 const store = useCatalogStore();
 const { uploadProductImage } = useApi();
-const { formatRielEquivalent } = useCurrency();
+const settings = useSettingsStore();
+const { formatUsd, formatRiel, usdToRiel } = useCurrency();
 
 const name = ref("");
 const categoryId = ref("");
-const basePrice = ref<number | null>(null);
+// The price is typed in the store's main currency, but always stored in USD.
+const isRielInput = computed(() => settings.mainCurrency === "KHR");
+const priceInput = ref<number | null>(null);
+// When editing in Riel, the shown value is rounded to 100៛. Remember it so an untouched
+// price keeps its exact stored USD value instead of being re-derived from the rounded Riel.
+const initialPriceInput = ref<number | null>(null);
 const isAvailable = ref(true);
 const existingImageUrl = ref<string | null>(null);
 const selectedFile = ref<File | null>(null);
@@ -32,16 +38,28 @@ const isEditMode = computed(() => props.product !== null);
 const nameError = computed(() => (name.value.trim().length === 0 ? t("common.nameRequired") : null));
 const categoryError = computed(() => (categoryId.value.length === 0 ? t("product.categoryRequired") : null));
 const priceError = computed(() =>
-  basePrice.value === null || Number.isNaN(basePrice.value) || basePrice.value < 0
+  priceInput.value === null || Number.isNaN(priceInput.value) || priceInput.value < 0
     ? t("product.priceError")
     : null,
 );
 
-const priceRielPreview = computed(() =>
-  basePrice.value !== null && !Number.isNaN(basePrice.value) && basePrice.value >= 0
-    ? formatRielEquivalent(basePrice.value)
-    : null,
-);
+const basePriceUsd = computed<number | null>(() => {
+  if (priceError.value || priceInput.value === null) {
+    return null;
+  }
+  if (props.product && priceInput.value === initialPriceInput.value) {
+    return props.product.basePrice;
+  }
+  return isRielInput.value ? priceInput.value / settings.exchangeRateRielPerUsd : priceInput.value;
+});
+
+// Shows the other currency, so the user always sees both values.
+const pricePreview = computed(() => {
+  if (basePriceUsd.value === null) {
+    return null;
+  }
+  return isRielInput.value ? formatUsd(basePriceUsd.value) : formatRiel(usdToRiel(basePriceUsd.value));
+});
 
 const canSubmit = computed(
   () => !nameError.value && !categoryError.value && !priceError.value && !isSubmitting.value && !isUploadingImage.value,
@@ -90,13 +108,15 @@ watch(open, (isOpen) => {
   if (props.product) {
     name.value = props.product.name;
     categoryId.value = props.product.categoryId;
-    basePrice.value = props.product.basePrice;
+    priceInput.value = isRielInput.value ? usdToRiel(props.product.basePrice) : props.product.basePrice;
+    initialPriceInput.value = priceInput.value;
     isAvailable.value = props.product.isAvailable;
     existingImageUrl.value = props.product.imageUrl;
   } else {
     name.value = "";
     categoryId.value = store.categories[0]?.id ?? "";
-    basePrice.value = null;
+    priceInput.value = null;
+    initialPriceInput.value = null;
     isAvailable.value = true;
     existingImageUrl.value = null;
   }
@@ -139,7 +159,7 @@ async function submit() {
   const payload = {
     categoryId: categoryId.value,
     name: name.value.trim(),
-    basePrice: basePrice.value as number,
+    basePrice: basePriceUsd.value as number,
     isAvailable: isAvailable.value,
     imageUrl,
   };
@@ -211,16 +231,18 @@ async function submit() {
           </select>
         </div>
         <div>
-          <label class="block text-sm font-medium text-slate-700">{{ $t("product.basePrice") }}</label>
+          <label class="block text-sm font-medium text-slate-700">
+            {{ $t("product.basePrice") }} ({{ isRielInput ? "៛" : "$" }})
+          </label>
           <input
-            v-model.number="basePrice"
+            v-model.number="priceInput"
             type="number"
-            step="0.01"
+            :step="isRielInput ? 100 : 0.01"
             min="0"
-            placeholder="0.00"
+            :placeholder="isRielInput ? '0' : '0.00'"
             class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
           />
-          <p v-if="priceRielPreview" class="mt-1 text-xs text-slate-400">≈ {{ priceRielPreview }}</p>
+          <p v-if="pricePreview" class="mt-1 text-xs text-slate-400">≈ {{ pricePreview }}</p>
         </div>
       </div>
 

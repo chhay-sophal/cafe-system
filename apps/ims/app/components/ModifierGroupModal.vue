@@ -13,13 +13,22 @@ interface OptionDraft {
   key: number;
   id?: string;
   name: string;
+  // Typed in the store's main currency; converted to USD (how it's stored) on save.
   // v-model.number leaves "" behind when the field is cleared.
   priceExtra: number | "";
+  // For existing options: the stored USD price and the value first shown for it. An untouched
+  // Riel price (rounded to 100៛ for display) then keeps its exact USD value on save.
+  originalPriceUsd?: number;
+  initialPriceInput?: number;
 }
 
 const { t } = useI18n();
 const auth = useAuth();
 const store = useCatalogStore();
+const settings = useSettingsStore();
+const { formatUsd, formatRiel, usdToRiel } = useCurrency();
+
+const isRielInput = computed(() => settings.mainCurrency === "KHR");
 
 const name = ref("");
 const minSelection = ref<number | "">(0);
@@ -43,7 +52,17 @@ watch(open, (isOpen) => {
   minSelection.value = props.group?.minSelection ?? 0;
   maxSelection.value = props.group?.maxSelection ?? 1;
   options.value = props.group
-    ? props.group.options.map((option) => ({ key: nextKey++, id: option.id, name: option.name, priceExtra: option.priceExtra }))
+    ? props.group.options.map((option) => {
+        const priceInput = isRielInput.value ? usdToRiel(option.priceExtra) : option.priceExtra;
+        return {
+          key: nextKey++,
+          id: option.id,
+          name: option.name,
+          priceExtra: priceInput,
+          originalPriceUsd: option.priceExtra,
+          initialPriceInput: priceInput,
+        };
+      })
     : [{ key: nextKey++, name: "", priceExtra: 0 }];
   selectedProductIds.value = new Set(props.group?.productIds ?? []);
 });
@@ -92,6 +111,23 @@ const selectionError = computed(() => {
 
 const canSubmit = computed(() => !nameError.value && !optionsError.value && !selectionError.value && !isSubmitting.value);
 
+function toPriceUsd(option: OptionDraft): number {
+  const input = option.priceExtra as number;
+  if (option.originalPriceUsd !== undefined && input === option.initialPriceInput) {
+    return option.originalPriceUsd;
+  }
+  return isRielInput.value ? input / settings.exchangeRateRielPerUsd : input;
+}
+
+// Shows the price in the other currency under each row, so both values are visible.
+function pricePreview(option: OptionDraft): string | null {
+  if (option.priceExtra === "" || option.priceExtra < 0) {
+    return null;
+  }
+  const usd = toPriceUsd(option);
+  return isRielInput.value ? formatUsd(usd) : formatRiel(usdToRiel(usd));
+}
+
 function addOption() {
   options.value.push({ key: nextKey++, name: "", priceExtra: 0 });
 }
@@ -135,7 +171,7 @@ async function submit() {
     options: options.value.map((option) => ({
       id: option.id,
       name: option.name.trim(),
-      priceExtra: option.priceExtra as number,
+      priceExtra: toPriceUsd(option),
     })),
     productIds: [...selectedProductIds.value],
   };
@@ -211,33 +247,42 @@ async function submit() {
           </div>
 
           <div class="mt-2 space-y-2">
-            <div v-for="option in options" :key="option.key" class="flex items-center gap-2">
-              <input
-                v-model="option.name"
-                type="text"
-                :placeholder="$t('modifier.optionNamePlaceholder')"
-                class="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
-              />
-              <input
-                v-model.number="option.priceExtra"
-                type="number"
-                step="0.01"
-                min="0"
-                :aria-label="$t('modifier.optionPrice')"
-                placeholder="0.00"
-                class="w-24 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
-              />
-              <button
-                type="button"
-                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600"
-                :aria-label="$t('modifier.removeOption')"
-                @click="removeOption(option.key)"
-              >
-                &times;
-              </button>
+            <div v-for="option in options" :key="option.key">
+              <div class="flex items-center gap-2">
+                <input
+                  v-model="option.name"
+                  type="text"
+                  :placeholder="$t('modifier.optionNamePlaceholder')"
+                  class="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+                />
+                <input
+                  v-model.number="option.priceExtra"
+                  type="number"
+                  :step="isRielInput ? 100 : 0.01"
+                  min="0"
+                  :aria-label="$t('modifier.optionPrice')"
+                  :placeholder="isRielInput ? '0' : '0.00'"
+                  class="w-24 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+                />
+                <button
+                  type="button"
+                  class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600"
+                  :aria-label="$t('modifier.removeOption')"
+                  @click="removeOption(option.key)"
+                >
+                  &times;
+                </button>
+              </div>
+              <p v-if="pricePreview(option)" class="mt-0.5 pr-11 text-right text-xs text-slate-400">
+                ≈ {{ pricePreview(option) }}
+              </p>
             </div>
           </div>
-          <p class="mt-1 text-xs text-slate-500">{{ $t("modifier.optionPriceHint") }}</p>
+          <p class="mt-1 text-xs text-slate-500">{{
+            $t("modifier.optionPriceHint", {
+              currency: isRielInput ? $t("settings.currencyKhr") : $t("settings.currencyUsd"),
+            })
+          }}</p>
           <p v-if="optionsError" class="mt-1 text-xs font-medium text-red-600">{{ optionsError }}</p>
         </div>
 

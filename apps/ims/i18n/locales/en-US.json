@@ -158,7 +158,7 @@
     "removeOption": "Remove option",
     "optionNamePlaceholder": "e.g. Oat Milk",
     "optionPrice": "Extra price",
-    "optionPriceHint": "Extra price is in USD, added to the item's base price. Use 0 for no extra charge.",
+    "optionPriceHint": "Extra price is in {currency}, added to the item's base price. Use 0 for no extra charge.",
     "optionsRequired": "Add at least one option",
     "optionNameRequired": "Every option needs a name",
     "optionPriceError": "Enter an extra price of 0 or more",
