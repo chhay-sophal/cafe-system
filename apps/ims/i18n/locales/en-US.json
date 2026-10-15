@@ -96,7 +96,6 @@
     "none": "No categories yet.",
     "addHeading": "Add Category",
     "namePlaceholder": "e.g. Bakery",
-    "orderPlaceholder": "Order",
     "add": "Add Category",
     "adding": "Adding...",
     "createError": "Failed to create category.",
@@ -106,7 +105,10 @@
     "deleteError": "Failed to delete category.",
     "reassignHint": "{count} product(s) in \"{name}\" need a new category before it can be deleted.",
     "reassignLabel": "Move products to",
-    "reassignNoTarget": "Create another category first - there's nowhere to move these products to."
+    "reassignNoTarget": "Create another category first - there's nowhere to move these products to.",
+    "dragHint": "Drag the handle to change the order categories appear in. It is saved automatically.",
+    "dragHandle": "Drag to reorder",
+    "reorderError": "Failed to save category order."
   },
   "inventoryItem": {
     "deleteHeading": "Delete Inventory Item",

@@ -14,6 +14,7 @@ import { authenticate, hashPin, requireRole, signToken, verifyPin } from './midd
 import { validateBody } from './middleware/validate.js';
 import { productImageUpload, saveProductImage } from './lib/uploads.js';
 import {
+  categoryOrderSchema,
   categorySchema,
   exchangeRateSchema,
   inventoryAdjustmentSchema,
@@ -272,6 +273,37 @@ function createApp() {
       res.status(201).json(created);
     } catch (error) {
       res.status(500).json({ error: 'Failed to create category' });
+    }
+  });
+
+  // Registered before PUT /api/categories/:id so "order" isn't matched as an id.
+  app.put('/api/categories/order', authenticate, requireRole(['MANAGER', 'ADMIN']), validateBody(categoryOrderSchema), async (req, res) => {
+    const { categoryIds } = req.body as { categoryIds: string[] };
+
+    try {
+      // Require the complete set, so a client working from a stale list can't
+      // silently drop or misplace categories it doesn't know about.
+      const existing = await db.select({ id: categories.id }).from(categories).all();
+      const existingIds = new Set(existing.map((category) => category.id));
+      const requestedIds = new Set(categoryIds);
+      if (
+        requestedIds.size !== categoryIds.length
+        || requestedIds.size !== existingIds.size
+        || categoryIds.some((id) => !existingIds.has(id))
+      ) {
+        return res.status(409).json({ error: 'Category list is out of date. Reload and try again.' });
+      }
+
+      await db.transaction(async (tx) => {
+        for (const [index, id] of categoryIds.entries()) {
+          await tx.update(categories).set({ sortOrder: index }).where(eq(categories.id, id)).run();
+        }
+      });
+
+      const result = await db.select().from(categories).orderBy(categories.sortOrder).all();
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to reorder categories' });
     }
   });
 

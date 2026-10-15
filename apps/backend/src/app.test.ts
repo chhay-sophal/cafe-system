@@ -586,6 +586,48 @@ describe('category deletion', () => {
     await db.delete(categories).where(eq(categories.id, categoryId)).run();
   });
 
+  it('reorders categories to match the given id list', async () => {
+    const token = await managerToken();
+    const original = await db.select().from(categories).orderBy(categories.sortOrder).all();
+    const reversedIds = original.map((category) => category.id).reverse();
+
+    const response = await request(app)
+      .put('/api/categories/order')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ categoryIds: reversedIds });
+
+    expect(response.status).toBe(200);
+    expect(response.body.map((category: { id: string }) => category.id)).toEqual(reversedIds);
+    const stored = await db.select().from(categories).orderBy(categories.sortOrder).all();
+    expect(stored.map((category) => category.id)).toEqual(reversedIds);
+    expect(stored.map((category) => category.sortOrder)).toEqual(reversedIds.map((_, index) => index));
+
+    for (const category of original) {
+      await db.update(categories).set({ sortOrder: category.sortOrder }).where(eq(categories.id, category.id)).run();
+    }
+  });
+
+  it('rejects a reorder that does not list every category exactly once', async () => {
+    const token = await managerToken();
+    const [catA, catB] = [randomUUID(), randomUUID()];
+    await db.insert(categories).values([
+      { id: catA, name: 'Test A', sortOrder: 1000 },
+      { id: catB, name: 'Test B', sortOrder: 1001 },
+    ]).run();
+    const ids = (await db.select().from(categories).all()).map((category) => category.id);
+
+    for (const categoryIds of [ids.slice(1), [...ids, ids[0]], [...ids.slice(1), 'does-not-exist']]) {
+      const response = await request(app)
+        .put('/api/categories/order')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ categoryIds });
+      expect(response.status).toBe(409);
+    }
+
+    await db.delete(categories).where(eq(categories.id, catA)).run();
+    await db.delete(categories).where(eq(categories.id, catB)).run();
+  });
+
   it('deletes an empty category and compacts the remaining sortOrder values', async () => {
     const token = await managerToken();
     // High sortOrder values, clear of the real seeded categories, so the

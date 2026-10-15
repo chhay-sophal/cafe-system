@@ -80,6 +80,11 @@ export const categorySchema = z.object({
   sortOrder: z.number().int().optional().default(0),
 });
 
+// The full category list in its new order - sortOrder becomes each id's index.
+export const categoryOrderSchema = z.object({
+  categoryIds: z.array(z.string().min(1)).min(1, 'At least one category is required'),
+});
+
 export const productSchema = z.object({
   categoryId: z.string().min(1, 'Category is required'),
   name: z.string().trim().min(1, 'Name is required'),

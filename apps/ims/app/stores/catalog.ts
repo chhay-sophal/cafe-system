@@ -62,6 +62,11 @@ export const useCatalogStore = defineStore("catalog", {
       await this.fetchCatalog();
     },
 
+    async reorderCategories(categoryIds: string[], token: string) {
+      const { reorderCategories } = useApi();
+      this.categories = await reorderCategories(categoryIds, token);
+    },
+
     async deleteCategory(id: string, token: string, reassignToCategoryId?: string) {
       const { deleteCategory } = useApi();
       await deleteCategory(id, token, reassignToCategoryId);

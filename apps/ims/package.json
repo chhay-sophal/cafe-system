@@ -12,6 +12,8 @@
     "typecheck": "nuxt typecheck"
   },
   "dependencies": {
+    "@dnd-kit/helpers": "0.5.0",
+    "@dnd-kit/vue": "0.5.0",
     "@lucide/vue": "^1.55.0",
     "@nuxtjs/i18n": "^10.6.0",
     "@pinia/nuxt": "^1.0.1",

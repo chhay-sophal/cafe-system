@@ -1,4 +1,5 @@
 export {
+  categoryOrderSchema,
   categorySchema,
   exchangeRateSchema,
   inventoryAdjustmentSchema,

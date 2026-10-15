@@ -161,6 +161,10 @@ export function useApi() {
     return sendJson<Category>("PUT", `/api/categories/${id}`, payload, token);
   }
 
+  function reorderCategories(categoryIds: string[], token: string): Promise<Category[]> {
+    return sendJson<Category[]>("PUT", "/api/categories/order", { categoryIds }, token);
+  }
+
   function deleteCategory(id: string, token: string, reassignToCategoryId?: string): Promise<{ success: boolean; reassignedCount: number }> {
     const query = reassignToCategoryId ? `?reassignToCategoryId=${reassignToCategoryId}` : "";
     return deleteJson<{ success: boolean; reassignedCount: number }>(`/api/categories/${id}${query}`, token);
@@ -266,6 +270,7 @@ export function useApi() {
     updateUser,
     createCategory,
     updateCategory,
+    reorderCategories,
     deleteCategory,
     createProduct,
     updateProduct,
