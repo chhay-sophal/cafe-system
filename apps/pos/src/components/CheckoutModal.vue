@@ -482,6 +482,7 @@ function handleDone() {
                     placeholder="0"
                     :value="tenderedUsdText"
                     @input="handleTenderedUsdInput"
+                    disabled
                   />
                 </span>
               </label>
@@ -513,6 +514,7 @@ function handleDone() {
                     placeholder="0"
                     :value="tenderedRielText"
                     @input="handleTenderedRielInput"
+                    disabled
                   />
                   <span>៛</span>
                 </span>

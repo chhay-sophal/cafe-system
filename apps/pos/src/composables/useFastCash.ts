@@ -9,8 +9,8 @@ export const FAST_CASH_MAX_BUTTONS = 10;
 
 // Common notes, as checkout always offered before this was configurable.
 const DEFAULT_AMOUNTS: Record<FastCashCurrency, number[]> = {
-  USD: [1, 5, 10, 20, 50],
-  KHR: [1000, 2000, 5000, 10000, 20000, 50000, 100000],
+  USD: [0.01, 0.1, 1, 5, 10, 20, 50],
+  KHR: [100, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000],
 };
 
 const STORAGE_KEYS: Record<FastCashCurrency, string> = {
