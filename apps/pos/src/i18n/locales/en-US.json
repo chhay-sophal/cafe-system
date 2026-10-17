@@ -5,7 +5,9 @@
     "clear": "Clear",
     "tryAgain": "Try Again",
     "close": "Close",
-    "requestFailed": "Request failed with status {status}"
+    "requestFailed": "Request failed with status {status}",
+    "requestTimedOut": "The server took too long to respond. Check the connection and try again.",
+    "serverUnreachable": "Can't reach the server. Check the connection and try again."
   },
   "app": {
     "title": "Cafe POS",
