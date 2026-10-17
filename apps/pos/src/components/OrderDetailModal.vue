@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { fetchOrderDetail, voidOrder } from "../lib/api";
+import { voidOrder } from "../lib/api";
 import { formatMain, formatRiel, formatSecondary, formatUsd } from "../lib/currency";
 import { useExchangeRate } from "../composables/useExchangeRate";
+import { useSalesHistory } from "../composables/useSalesHistory";
 import type { OrderDetail, OrderDetailItem } from "../types/order";
 
 const props = defineProps<{
@@ -13,7 +14,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: [];
-  voided: [orderId: string];
+  voided: [orderId: string, reason: string];
 }>();
 
 const { t } = useI18n({ useScope: "global" });
@@ -57,7 +58,9 @@ async function loadOrder() {
   isLoading.value = true;
   loadError.value = null;
   try {
-    order.value = await fetchOrderDetail(props.orderId, props.token);
+    // Cached after the first view - an invoice only changes by being voided
+    // here, which updates the cache too.
+    order.value = await useSalesHistory().loadOrderDetail(props.orderId, props.token);
   } catch (error) {
     loadError.value = error instanceof Error ? error.message : t("orderDetail.loadError");
   } finally {
@@ -84,8 +87,9 @@ async function confirmVoid() {
   isVoiding.value = true;
   voidError.value = null;
   try {
-    await voidOrder(props.orderId, voidReason.value.trim(), props.token);
-    emit("voided", props.orderId);
+    const reason = voidReason.value.trim();
+    await voidOrder(props.orderId, reason, props.token);
+    emit("voided", props.orderId, reason);
   } catch (error) {
     voidError.value = error instanceof Error ? error.message : t("orderDetail.voidError");
   } finally {

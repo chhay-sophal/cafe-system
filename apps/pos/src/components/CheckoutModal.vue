@@ -10,6 +10,7 @@ import { publishPaymentQr, publishSaleCompleted } from "../composables/useCustom
 import { useKhqrBanks } from "../composables/useKhqrBanks";
 import { useNetworkStatus } from "../composables/useNetworkStatus";
 import { useOfflineQueue } from "../composables/useOfflineQueue";
+import { useSalesHistory } from "../composables/useSalesHistory";
 import { usePaymentMethods } from "../composables/usePaymentMethods";
 import { useReceiptPrinter } from "../composables/useReceiptPrinter";
 import { storeFooterBlocks, storeHeaderBlocks } from "../composables/useStoreDetails";
@@ -49,6 +50,7 @@ const { amounts: fastCashAmounts } = useFastCash();
 
 const network = useNetworkStatus();
 const offlineQueue = useOfflineQueue();
+const salesHistory = useSalesHistory();
 const { exchangeRateRielPerUsd, mainCurrency } = useExchangeRate();
 const auth = useAuth();
 const receiptPrinter = useReceiptPrinter();
@@ -280,6 +282,7 @@ async function handleComplete() {
 
   try {
     const result = await submitOrder(payload, props.token);
+    salesHistory.invalidate();
     orderResult.value = result;
     isQueuedOffline.value = false;
     phase.value = "success";

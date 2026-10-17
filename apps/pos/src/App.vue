@@ -19,6 +19,7 @@ import {
   publishCartUpdate,
   publishLocaleChange,
   publishStoreNameChange,
+  publishStoreSettings,
   publishThemeChange,
   type CartUpdatePayload,
   type DisplayLocale,
@@ -28,9 +29,9 @@ import { useNetworkStatus } from "./composables/useNetworkStatus";
 import { useStoreName } from "./composables/useStoreName";
 import { useTheme } from "./composables/useTheme";
 import { useOfflineQueue } from "./composables/useOfflineQueue";
-import { fetchCategories, fetchProductModifiers, fetchProducts } from "./lib/api";
+import { fetchCategories, fetchModifierGroups, fetchProducts } from "./lib/api";
 import type { Category, Product } from "./types/catalog";
-import type { CartModifier, ModifierGroup } from "./types/cart";
+import type { CartModifier, ModifierGroup, ModifierGroupWithProducts } from "./types/cart";
 
 const SYNC_RETRY_INTERVAL_MS = 15000;
 
@@ -43,6 +44,9 @@ const isLoading = ref(true);
 const errorMessage = ref<string | null>(null);
 const activeModalProduct = ref<Product | null>(null);
 const activeModalGroups = ref<ModifierGroup[]>([]);
+// Each product's modifier groups, loaded once with the menu so tapping a
+// product needs no request (and works offline once the menu has loaded).
+const modifierGroupsByProduct = ref(new Map<string, ModifierGroup[]>());
 const isCheckoutOpen = ref(false);
 const activeView = ref<"register" | "salesHistory" | "settings">("register");
 
@@ -125,13 +129,8 @@ function selectCategory(categoryId: string | null) {
   selectedCategoryId.value = categoryId;
 }
 
-async function handleProductSelect(product: Product) {
-  let groups: ModifierGroup[] = [];
-  try {
-    groups = await fetchProductModifiers(product.id);
-  } catch (error) {
-    console.error("Failed to load modifiers for product", product.id, error);
-  }
+function handleProductSelect(product: Product) {
+  const groups = modifierGroupsByProduct.value.get(product.id) ?? [];
 
   if (groups.length === 0) {
     cart.addItem(product, []);
@@ -164,6 +163,16 @@ function handleCheckoutDone() {
   cart.reset();
 }
 
+function groupModifiersByProduct(groups: ModifierGroupWithProducts[]): Map<string, ModifierGroup[]> {
+  const byProduct = new Map<string, ModifierGroup[]>();
+  for (const { productIds, ...group } of groups) {
+    for (const productId of productIds) {
+      byProduct.set(productId, [...(byProduct.get(productId) ?? []), group]);
+    }
+  }
+  return byProduct;
+}
+
 let syncIntervalId: ReturnType<typeof setInterval> | undefined;
 
 function handleOnline() {
@@ -176,13 +185,15 @@ onMounted(async () => {
   checkForUpdateAndInstall();
 
   try {
-    const [categoryList, productList] = await Promise.all([
+    const [categoryList, productList, modifierGroups] = await Promise.all([
       fetchCategories(),
       fetchProducts(),
-      exchangeRate.refreshExchangeRate(),
+      fetchModifierGroups(),
+      exchangeRate.refreshExchangeRate().then(() => publishStoreSettings(exchangeRate.currentStoreSettings())),
     ]);
     categories.value = categoryList;
     products.value = productList;
+    modifierGroupsByProduct.value = groupModifiersByProduct(modifierGroups);
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : t("app.loadError");
   } finally {
@@ -192,7 +203,10 @@ onMounted(async () => {
   // A freshly (re)opened customer-display window has missed every prior
   // cart-update, so it asks for a resync on its own mount - answer with
   // the live cart instead of leaving it blank.
-  onRequestSync(() => publishCartUpdate(cartUpdatePayload.value)).then((unlisten) => {
+  onRequestSync(() => {
+    publishCartUpdate(cartUpdatePayload.value);
+    publishStoreSettings(exchangeRate.currentStoreSettings());
+  }).then((unlisten) => {
     unlistenRequestSync = unlisten;
   });
 

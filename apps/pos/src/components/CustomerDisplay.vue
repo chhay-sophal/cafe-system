@@ -6,6 +6,7 @@ import {
   onLocaleChange,
   onPaymentQr,
   onStoreNameChange,
+  onStoreSettings,
   onThemeChange,
   onSaleCompleted,
   requestSync,
@@ -21,7 +22,7 @@ import { formatMain, formatRiel, formatSecondary, formatUsd } from "../lib/curre
 type Mode = "idle" | "building" | "completed";
 
 const { t, locale } = useI18n({ useScope: "global" });
-const { exchangeRateRielPerUsd, mainCurrency, refreshExchangeRate } = useExchangeRate();
+const { exchangeRateRielPerUsd, mainCurrency, applyStoreSettings } = useExchangeRate();
 
 const mode = ref<Mode>("idle");
 const cartSnapshot = ref<CartUpdatePayload | null>(null);
@@ -80,8 +81,12 @@ function formatTenderOrChange(usd: number, riel: number): string {
   return formatUsd(usd);
 }
 
+let unlistenStoreSettings: (() => void) | undefined;
+
 onMounted(async () => {
-  refreshExchangeRate();
+  // Starts from the cashier window's cached values (shared localStorage);
+  // fresh ones arrive here after its fetch and in answer to requestSync().
+  unlistenStoreSettings = await onStoreSettings((settings) => applyStoreSettings(settings, { persist: false }));
   unlistenCartUpdate = await onCartUpdate(handleCartUpdate);
   unlistenSaleCompleted = await onSaleCompleted(handleSaleCompleted);
   // Only switches the in-memory locale - the cashier window already saved
@@ -104,6 +109,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  unlistenStoreSettings?.();
   unlistenCartUpdate?.();
   unlistenSaleCompleted?.();
   unlistenLocaleChange?.();

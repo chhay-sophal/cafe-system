@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { fetchMyOrdersToday } from "../lib/api";
 import { formatMain, formatSecondary } from "../lib/currency";
 import { useExchangeRate } from "../composables/useExchangeRate";
 import { useOfflineQueue } from "../composables/useOfflineQueue";
+import { useSalesHistory } from "../composables/useSalesHistory";
 import OrderDetailModal from "./OrderDetailModal.vue";
-import type { OrderListRow, PaymentMethod } from "../types/order";
+import type { PaymentMethod } from "../types/order";
 
 const props = defineProps<{
   token: string;
@@ -17,9 +17,11 @@ const PAYMENT_METHODS: PaymentMethod[] = ["CASH", "CARD", "QR_CODE"];
 const { t } = useI18n({ useScope: "global" });
 const { exchangeRateRielPerUsd, mainCurrency } = useExchangeRate();
 const offlineQueue = useOfflineQueue();
+const salesHistory = useSalesHistory();
 
-const orders = ref<OrderListRow[]>([]);
-const isLoading = ref(true);
+// Cached across tab switches - see useSalesHistory for when it refetches.
+const orders = salesHistory.orders;
+const isLoading = ref(false);
 const errorMessage = ref<string | null>(null);
 const selectedOrderId = ref<string | null>(null);
 
@@ -51,12 +53,17 @@ function formatTime(createdAt: string): string {
   return createdAt.slice(11, 16);
 }
 
-async function loadOrders() {
+// `force` is the Refresh button: always ask the backend, e.g. for sales the
+// same cashier made on another register.
+async function loadOrders(force = false) {
+  if (!force && !salesHistory.needsReload(props.token)) {
+    return;
+  }
   isLoading.value = true;
   errorMessage.value = null;
   try {
     // Already sorted newest first by the backend.
-    orders.value = await fetchMyOrdersToday(props.token);
+    await salesHistory.loadOrders(props.token, { force });
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : t("salesHistory.loadError");
   } finally {
@@ -64,21 +71,21 @@ async function loadOrders() {
   }
 }
 
-// Reload rather than patch the row locally, so the summary and status come
-// straight from the backend's record of the void.
-function handleVoided() {
+// A void only flips the status, so it's patched locally - the summary
+// cards recompute from the rows without another request.
+function handleVoided(orderId: string, reason: string) {
   selectedOrderId.value = null;
-  loadOrders();
+  salesHistory.markVoided(orderId, reason);
 }
 
-onMounted(loadOrders);
+onMounted(() => loadOrders());
 </script>
 
 <template>
   <section class="sales-history">
     <div class="sales-history__toolbar">
       <h2 class="sales-history__heading">{{ t("salesHistory.heading") }}</h2>
-      <button type="button" class="sales-history__refresh" :disabled="isLoading" @click="loadOrders">
+      <button type="button" class="sales-history__refresh" :disabled="isLoading" @click="loadOrders(true)">
         {{ t("salesHistory.refresh") }}
       </button>
     </div>

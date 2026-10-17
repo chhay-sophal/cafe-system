@@ -2,6 +2,7 @@ import { ref } from "vue";
 import { HttpError, submitOrder } from "../lib/api";
 import { enqueueOrder, getQueuedOrders, removeQueuedOrder, updateQueuedOrder } from "../lib/offlineDb";
 import { useAuth } from "./useAuth";
+import { useSalesHistory } from "./useSalesHistory";
 import type { OrderPayload } from "../types/order";
 
 const pendingCount = ref(0);
@@ -38,6 +39,7 @@ async function syncPending(): Promise<void> {
     for (const entry of queued) {
       try {
         await submitOrder(entry.payload, token);
+        useSalesHistory().invalidate();
         await removeQueuedOrder(entry.id);
       } catch (error) {
         if (error instanceof HttpError) {

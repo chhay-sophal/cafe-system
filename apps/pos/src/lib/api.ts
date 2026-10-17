@@ -1,7 +1,7 @@
 import { t } from "../i18n";
 import type { AuthSession } from "../types/auth";
 import type { Category, Product } from "../types/catalog";
-import type { ModifierGroup } from "../types/cart";
+import type { ModifierGroupWithProducts } from "../types/cart";
 import type { OrderDetail, OrderListRow, OrderPayload, OrderResult } from "../types/order";
 import type { StoreSettings } from "../types/settings";
 
@@ -104,8 +104,10 @@ export function fetchProducts(): Promise<Product[]> {
   return getJson<Product[]>("/api/products");
 }
 
-export function fetchProductModifiers(productId: string): Promise<ModifierGroup[]> {
-  return getJson<ModifierGroup[]>(`/api/products/${productId}/modifiers`);
+// Every modifier group, each listing the products it applies to - loaded once
+// with the menu instead of one request per product tap.
+export function fetchModifierGroups(): Promise<ModifierGroupWithProducts[]> {
+  return getJson<ModifierGroupWithProducts[]>("/api/modifiers");
 }
 
 export function login(pin: string): Promise<AuthSession> {

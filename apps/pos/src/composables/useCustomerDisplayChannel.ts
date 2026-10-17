@@ -1,5 +1,6 @@
 import { emit, emitTo, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { PaymentMethod } from "../types/order";
+import type { StoreSettings } from "../types/settings";
 import type { ThemePreference } from "./useTheme";
 
 // Tauri's event bus is the cross-window channel: the cashier ("main")
@@ -13,6 +14,7 @@ const LOCALE_CHANGE_EVENT = "customer-display:locale-change";
 const THEME_CHANGE_EVENT = "customer-display:theme-change";
 const STORE_NAME_CHANGE_EVENT = "customer-display:store-name-change";
 const PAYMENT_QR_EVENT = "customer-display:payment-qr";
+const STORE_SETTINGS_EVENT = "customer-display:store-settings";
 
 export type DisplayLocale = "en-US" | "km-KH";
 
@@ -83,6 +85,13 @@ export function publishStoreNameChange(customName: string): void {
   silently(emit(STORE_NAME_CHANGE_EVENT, customName));
 }
 
+// Exchange rate / main currency / tax, fetched by the cashier window only.
+// Sent after each fetch and in answer to the display's sync request, so the
+// display never needs its own request for them.
+export function publishStoreSettings(settings: StoreSettings): void {
+  silently(emit(STORE_SETTINGS_EVENT, settings));
+}
+
 export function publishPaymentQr(payload: PaymentQrPayload | null): void {
   silently(emit(PAYMENT_QR_EVENT, payload));
 }
@@ -109,6 +118,10 @@ export function onThemeChange(handler: (theme: ThemePreference) => void): Promis
 
 export function onStoreNameChange(handler: (customName: string) => void): Promise<UnlistenFn> {
   return listen<string>(STORE_NAME_CHANGE_EVENT, (event) => handler(event.payload));
+}
+
+export function onStoreSettings(handler: (settings: StoreSettings) => void): Promise<UnlistenFn> {
+  return listen<StoreSettings>(STORE_SETTINGS_EVENT, (event) => handler(event.payload));
 }
 
 export function onPaymentQr(handler: (payload: PaymentQrPayload | null) => void): Promise<UnlistenFn> {

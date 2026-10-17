@@ -13,6 +13,10 @@ export interface ModifierGroup {
   options: ModifierOption[];
 }
 
+export interface ModifierGroupWithProducts extends ModifierGroup {
+  productIds: string[];
+}
+
 export interface CartModifier {
   id: string;
   name: string;

@@ -1,6 +1,6 @@
 import { ref } from "vue";
 import { fetchExchangeRate as apiFetchExchangeRate } from "../lib/api";
-import type { MainCurrency } from "../types/settings";
+import type { MainCurrency, StoreSettings } from "../types/settings";
 
 const RATE_STORAGE_KEY = "pos.exchangeRateRielPerUsd";
 const CURRENCY_STORAGE_KEY = "pos.mainCurrency";
@@ -39,20 +39,37 @@ const exchangeRateRielPerUsd = ref(loadCachedRate());
 const mainCurrency = ref<MainCurrency>(loadCachedCurrency());
 const taxEnabled = ref(loadCachedTaxEnabled());
 
+// `persist: false` is for the customer display, which receives these from the
+// cashier window (which has already saved them to the shared localStorage).
+function applyStoreSettings(settings: StoreSettings, { persist = true } = {}): void {
+  exchangeRateRielPerUsd.value = settings.exchangeRateRielPerUsd;
+  mainCurrency.value = settings.mainCurrency;
+  taxEnabled.value = settings.taxEnabled;
+  if (persist) {
+    localStorage.setItem(RATE_STORAGE_KEY, String(settings.exchangeRateRielPerUsd));
+    localStorage.setItem(CURRENCY_STORAGE_KEY, settings.mainCurrency);
+    localStorage.setItem(TAX_ENABLED_STORAGE_KEY, String(settings.taxEnabled));
+  }
+}
+
+// Only the cashier window fetches; the customer display gets the result over
+// the window event bus (see publishStoreSettings) rather than asking again.
 async function refreshExchangeRate(): Promise<void> {
   try {
-    const result = await apiFetchExchangeRate();
-    exchangeRateRielPerUsd.value = result.exchangeRateRielPerUsd;
-    mainCurrency.value = result.mainCurrency;
-    taxEnabled.value = result.taxEnabled;
-    localStorage.setItem(RATE_STORAGE_KEY, String(result.exchangeRateRielPerUsd));
-    localStorage.setItem(CURRENCY_STORAGE_KEY, result.mainCurrency);
-    localStorage.setItem(TAX_ENABLED_STORAGE_KEY, String(result.taxEnabled));
+    applyStoreSettings(await apiFetchExchangeRate());
   } catch {
     // Unreachable/offline - keep using the cached values.
   }
 }
 
+function currentStoreSettings(): StoreSettings {
+  return {
+    exchangeRateRielPerUsd: exchangeRateRielPerUsd.value,
+    mainCurrency: mainCurrency.value,
+    taxEnabled: taxEnabled.value,
+  };
+}
+
 export function useExchangeRate() {
-  return { exchangeRateRielPerUsd, mainCurrency, taxEnabled, refreshExchangeRate };
+  return { exchangeRateRielPerUsd, mainCurrency, taxEnabled, refreshExchangeRate, applyStoreSettings, currentStoreSettings };
 }
