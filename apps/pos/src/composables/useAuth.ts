@@ -1,5 +1,5 @@
 import { ref } from "vue";
-import { login as apiLogin } from "../lib/api";
+import { login as apiLogin, onUnauthorized } from "../lib/api";
 import type { AuthSession } from "../types/auth";
 
 const STORAGE_KEY = "pos.session";
@@ -24,18 +24,36 @@ function loadStoredSession(): AuthSession | null {
 }
 
 const session = ref<AuthSession | null>(loadStoredSession());
+// Set when the server rejected the saved session, so the login screen can say
+// why the cashier was sent back to it.
+const sessionEnded = ref(false);
+
+function clearSession() {
+  session.value = null;
+  localStorage.removeItem(STORAGE_KEY);
+}
+
+// Only the current session's token counts: a late reply to a request sent
+// with an earlier token mustn't log out a cashier who has since logged in.
+onUnauthorized((token) => {
+  if (session.value?.token === token) {
+    sessionEnded.value = true;
+    clearSession();
+  }
+});
 
 export function useAuth() {
   async function login(pin: string) {
     const result = await apiLogin(pin);
     session.value = result;
+    sessionEnded.value = false;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(result));
   }
 
   function logout() {
-    session.value = null;
-    localStorage.removeItem(STORAGE_KEY);
+    sessionEnded.value = false;
+    clearSession();
   }
 
-  return { session, login, logout };
+  return { session, sessionEnded, login, logout };
 }

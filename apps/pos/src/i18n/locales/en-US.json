@@ -23,7 +23,8 @@
     "loggingIn": "Logging in...",
     "genericError": "Login failed.",
     "pinProgress": "PIN: {count} of {total} digits entered",
-    "keyboardHint": "Tap the keypad or type on the keyboard"
+    "keyboardHint": "Tap the keypad or type on the keyboard",
+    "sessionEnded": "Your session has ended. Enter your PIN to log in again."
   },
   "cart": {
     "ariaLabel": "Current order",

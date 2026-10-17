@@ -29,6 +29,23 @@ export class HttpError extends Error {
   }
 }
 
+// A 401 on a request that carried the login token means the saved session is
+// no longer valid - expired, the user was deactivated/deleted, or it was
+// issued by a different backend database. useAuth registers a handler that
+// logs out, instead of leaving the cashier stuck with a raw error.
+let unauthorizedHandler: ((token: string) => void) | null = null;
+
+export function onUnauthorized(handler: (token: string) => void): void {
+  unauthorizedHandler = handler;
+}
+
+async function throwHttpError(response: Response, token?: string): Promise<never> {
+  if (token && response.status === 401) {
+    unauthorizedHandler?.(token);
+  }
+  throw new HttpError(await parseErrorMessage(response), response.status);
+}
+
 async function parseErrorMessage(response: Response): Promise<string> {
   const body = await response.json().catch(() => null);
   return body?.error ?? t("common.requestFailed", { status: response.status });
@@ -71,7 +88,7 @@ async function getJson<T>(path: string, token?: string): Promise<T> {
   const response = await fetchWithTimeout(`${API_BASE_URL}${path}`, { headers });
 
   if (!response.ok) {
-    throw new HttpError(await parseErrorMessage(response), response.status);
+    await throwHttpError(response, token);
   }
 
   return response.json() as Promise<T>;
@@ -90,7 +107,7 @@ async function postJson<T>(path: string, body: unknown, token?: string, timeoutM
   }, timeoutMs);
 
   if (!response.ok) {
-    throw new HttpError(await parseErrorMessage(response), response.status);
+    await throwHttpError(response, token);
   }
 
   return response.json() as Promise<T>;

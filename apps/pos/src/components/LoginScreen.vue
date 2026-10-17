@@ -122,6 +122,7 @@ async function submit() {
 
       <p v-if="isSubmitting" class="login-card__status" aria-live="polite">{{ t("login.loggingIn") }}</p>
       <p v-else-if="errorMessage" class="login-card__error" aria-live="polite">{{ errorMessage }}</p>
+      <p v-else-if="auth.sessionEnded.value" class="login-card__error" aria-live="polite">{{ t("login.sessionEnded") }}</p>
       <p v-else class="login-card__status">{{ t("login.keyboardHint") }}</p>
 
       <div class="login-keypad">
