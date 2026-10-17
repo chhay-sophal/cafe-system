@@ -2,7 +2,7 @@
 import { computed, onUnmounted, ref, watch, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { HttpError, submitOrder } from "../lib/api";
-import { computeChange, formatMain, formatRiel, formatSecondary, formatUsd, round2 } from "../lib/currency";
+import { computeChange, formatMain, formatRiel, formatSecondary, formatUsd, round2, usdToRiel } from "../lib/currency";
 import { useAuth } from "../composables/useAuth";
 import { useExchangeRate } from "../composables/useExchangeRate";
 import { formatFastCashLabel, useFastCash } from "../composables/useFastCash";
@@ -80,6 +80,16 @@ const changeDueUsd = computed(() => Math.max(0, round2(tenderedTotalUsd.value - 
 const changeSplit = computed(() =>
   computeChange(changeDueUsd.value, exchangeRateRielPerUsd.value, amountTenderedUsd.value, amountTenderedRiel.value),
 );
+
+// The total as a Riel amount for the "exact" button: the usual nearest-100៛
+// figure when that covers the total, else rounded up to the next 100៛ - the
+// backend rejects tender below the USD total even by a cent, so rounding
+// down (e.g. $1.01 at 4,100 = 4,141៛ -> 4,100៛) would come up short.
+const exactTotalRiel = computed(() => {
+  const rate = exchangeRateRielPerUsd.value;
+  const nearest = usdToRiel(props.totalAmount, rate);
+  return round2(nearest / rate) >= round2(props.totalAmount) ? nearest : Math.ceil((props.totalAmount * rate) / 100) * 100;
+});
 
 const amountShort = computed(() => Math.max(0, round2(props.totalAmount - tenderedTotalUsd.value)));
 const isInsufficient = computed(() => isCash.value && round2(tenderedTotalUsd.value) < round2(props.totalAmount));
@@ -169,9 +179,16 @@ function addFastCashRiel(amount: number) {
   amountTenderedRiel.value = amountTenderedRiel.value + amount;
 }
 
-function setExactChange() {
+// Exact buttons replace the tender with the total paid entirely in that
+// currency, clearing the other one so the customer isn't over-tendered.
+function setExactUsd() {
   amountTenderedUsd.value = props.totalAmount;
   amountTenderedRiel.value = 0;
+}
+
+function setExactRiel() {
+  amountTenderedRiel.value = exactTotalRiel.value;
+  amountTenderedUsd.value = 0;
 }
 
 function clearTendered() {
@@ -183,7 +200,7 @@ function clearTendered() {
 // placeholder shows instead of a pre-filled 0), otherwise left exactly as
 // typed - binding the number directly would wipe a typed "0" on its way to
 // "0.5". Replaced only when the amount stops matching it, i.e. when the
-// fast-cash buttons, Exact, Clear or a payment method switch change it.
+// fast-cash buttons, the exact-amount buttons, Clear or a payment method switch change it.
 function amountText(amount: Ref<number>): Ref<string> {
   const text = ref("");
   watch(
@@ -489,6 +506,15 @@ function handleDone() {
 
               <div class="fast-cash">
                 <button
+                  type="button"
+                  class="fast-cash__button fast-cash__button--exact"
+                  :title="t('checkout.exactChange')"
+                  :aria-label="`${t('checkout.exactChange')}: ${formatUsd(totalAmount)}`"
+                  @click="setExactUsd"
+                >
+                  {{ formatUsd(totalAmount) }}
+                </button>
+                <button
                   v-for="amount in fastCashAmounts.USD.value"
                   :key="amount"
                   type="button"
@@ -496,9 +522,6 @@ function handleDone() {
                   @click="addFastCashUsd(amount)"
                 >
                   {{ formatFastCashLabel("USD", amount) }}
-                </button>
-                <button type="button" class="fast-cash__button fast-cash__button--exact" @click="setExactChange">
-                  {{ t("checkout.exactChange") }}
                 </button>
               </div>
             </div>
@@ -520,7 +543,16 @@ function handleDone() {
                 </span>
               </label>
 
-              <div v-if="fastCashAmounts.KHR.value.length > 0" class="fast-cash">
+              <div class="fast-cash">
+                <button
+                  type="button"
+                  class="fast-cash__button fast-cash__button--exact"
+                  :title="t('checkout.exactChange')"
+                  :aria-label="`${t('checkout.exactChange')}: ${formatRiel(exactTotalRiel)}`"
+                  @click="setExactRiel"
+                >
+                  {{ formatRiel(exactTotalRiel) }}
+                </button>
                 <button
                   v-for="amount in fastCashAmounts.KHR.value"
                   :key="amount"
@@ -877,7 +909,9 @@ function handleDone() {
 }
 
 .fast-cash__button--exact {
-  font-size: 0.8rem;
+  color: #409c64;
+  border-color: #409c64;
+  background: #e6f6ec;
 }
 
 .tendered-clear {
