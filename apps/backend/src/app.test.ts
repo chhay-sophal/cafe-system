@@ -306,6 +306,44 @@ describe('order payments in mixed USD/Riel', () => {
     expect(response.body.changeGivenRiel).toBe(8200);
   });
 
+  it('accepts the total as displayed in Riel even when rounding put it a cent under the USD total', async () => {
+    const token = await cashierToken();
+
+    // total = 1.01 -> 1.01 * 4100 = 4141 riel, displayed (nearest 100) as 4,100 riel,
+    // which is only $1.00 - still accepted, with no change due.
+    const response = await request(app)
+      .post('/api/orders')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        items: [{ productId: await testProductId(), productName: 'Water', quantity: 1, unitPrice: 1.01 }],
+        paymentMethod: 'CASH',
+        amountTenderedUsd: 0,
+        amountTenderedRiel: 4100,
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.changeGivenUsd).toBe(0);
+    expect(response.body.changeGivenRiel).toBe(0);
+  });
+
+  it('still rejects Riel below the displayed Riel total, and pure USD short by a cent', async () => {
+    const token = await cashierToken();
+    const items = [{ productId: await testProductId(), productName: 'Water', quantity: 1, unitPrice: 1.01 }];
+
+    for (const tender of [
+      { amountTenderedUsd: 0, amountTenderedRiel: 4000 },
+      { amountTenderedUsd: 1, amountTenderedRiel: 0 },
+    ]) {
+      const response = await request(app)
+        .post('/api/orders')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ items, paymentMethod: 'CASH', ...tender });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Insufficient payment');
+    }
+  });
+
   it('rejects a cash order whose combined USD+Riel tender is insufficient', async () => {
     const token = await cashierToken();
 

@@ -2,7 +2,7 @@
 import { computed, onUnmounted, ref, watch, type Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { HttpError, submitOrder } from "../lib/api";
-import { computeChange, formatMain, formatRiel, formatSecondary, formatUsd, round2, usdToRiel } from "../lib/currency";
+import { computeChange, formatMain, formatRiel, formatSecondary, formatUsd, isTenderSufficient, round2, usdToRiel } from "../lib/currency";
 import { useAuth } from "../composables/useAuth";
 import { useExchangeRate } from "../composables/useExchangeRate";
 import { formatFastCashLabel, useFastCash } from "../composables/useFastCash";
@@ -81,18 +81,15 @@ const changeSplit = computed(() =>
   computeChange(changeDueUsd.value, exchangeRateRielPerUsd.value, amountTenderedUsd.value, amountTenderedRiel.value),
 );
 
-// The total as a Riel amount for the "exact" button: the usual nearest-100៛
-// figure when that covers the total, else rounded up to the next 100៛ - the
-// backend rejects tender below the USD total even by a cent, so rounding
-// down (e.g. $1.01 at 4,100 = 4,141៛ -> 4,100៛) would come up short.
-const exactTotalRiel = computed(() => {
-  const rate = exchangeRateRielPerUsd.value;
-  const nearest = usdToRiel(props.totalAmount, rate);
-  return round2(nearest / rate) >= round2(props.totalAmount) ? nearest : Math.ceil((props.totalAmount * rate) / 100) * 100;
-});
+// The total as shown in Riel - always accepted as payment (see isTenderSufficient).
+const exactTotalRiel = computed(() => usdToRiel(props.totalAmount, exchangeRateRielPerUsd.value));
 
 const amountShort = computed(() => Math.max(0, round2(props.totalAmount - tenderedTotalUsd.value)));
-const isInsufficient = computed(() => isCash.value && round2(tenderedTotalUsd.value) < round2(props.totalAmount));
+const isInsufficient = computed(
+  () =>
+    isCash.value
+    && !isTenderSufficient(props.totalAmount, exchangeRateRielPerUsd.value, amountTenderedUsd.value, amountTenderedRiel.value),
+);
 const khqrBanks = useKhqrBanks();
 const selectedBankId = ref<string | null>(null);
 const selectedBank = computed(() => khqrBanks.banks.value.find((bank) => bank.id === selectedBankId.value) ?? null);

@@ -64,3 +64,23 @@ export function computeChange(
   }
   return { usd: 0, riel: usdToRiel(changeDueUsd, exchangeRate) };
 }
+
+// Cash covers the total if it does to the cent - or, when any Riel was
+// tendered, if it reaches the total as shown in Riel (rounded to the nearest
+// 100៛). Otherwise paying exactly the displayed Riel total could be rejected:
+// $1.01 at 4,100 shows as 4,100៛, which is only $1.00. Pure-USD tender gets no
+// such allowance - there the cents are real.
+export function isTenderSufficient(
+  totalUsd: number,
+  exchangeRate: number,
+  amountTenderedUsd: number,
+  amountTenderedRiel: number,
+): boolean {
+  if (round2(amountTenderedUsd + amountTenderedRiel / exchangeRate) >= round2(totalUsd)) {
+    return true;
+  }
+  return (
+    amountTenderedRiel > 0
+    && Math.round(amountTenderedUsd * exchangeRate) + amountTenderedRiel >= usdToRiel(totalUsd, exchangeRate)
+  );
+}
