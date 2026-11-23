@@ -1110,7 +1110,7 @@ function createApp() {
     }
   });
 
-  app.get('/api/inventory', async (_req, res) => {
+  app.get('/api/inventory', authenticate, requireRole(['MANAGER', 'ADMIN']), async (_req, res) => {
     try {
       const items = await db.select().from(inventoryItems).all();
       const result = items.map((item) => ({ ...item, isLowStock: item.stockQuantity <= item.reorderThreshold }));
@@ -1224,7 +1224,7 @@ function createApp() {
     }
   });
 
-  app.get('/api/recipes/summary', async (_req, res) => {
+  app.get('/api/recipes/summary', authenticate, requireRole(['MANAGER', 'ADMIN']), async (_req, res) => {
     try {
       const productCounts = await db.select({
         id: recipes.productId,
@@ -1258,7 +1258,7 @@ function createApp() {
     }
   });
 
-  app.get('/api/recipes', async (req, res) => {
+  app.get('/api/recipes', authenticate, requireRole(['MANAGER', 'ADMIN']), async (req, res) => {
     const { productId, modifierId } = req.query;
 
     if (!productId && !modifierId) {

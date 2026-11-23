@@ -105,8 +105,8 @@ export function useApi() {
     return response.json() as Promise<T>;
   }
 
-  function fetchInventory(): Promise<InventoryItem[]> {
-    return getJson<InventoryItem[]>("/api/inventory");
+  function fetchInventory(token: string): Promise<InventoryItem[]> {
+    return getJson<InventoryItem[]>("/api/inventory", token);
   }
 
   function login(pin: string): Promise<AuthSession> {
@@ -188,17 +188,17 @@ export function useApi() {
     return postForm<ImageUploadResult>("/api/upload", formData, token);
   }
 
-  function fetchRecipe(target: RecipeTarget): Promise<RecipeIngredientRecord[]> {
+  function fetchRecipe(target: RecipeTarget, token: string): Promise<RecipeIngredientRecord[]> {
     const query = target.kind === "product" ? `productId=${target.id}` : `modifierId=${target.id}`;
-    return getJson<RecipeIngredientRecord[]>(`/api/recipes?${query}`);
+    return getJson<RecipeIngredientRecord[]>(`/api/recipes?${query}`, token);
   }
 
   function saveRecipe(payload: RecipeUpdatePayload, token: string): Promise<{ success: boolean }> {
     return sendJson<{ success: boolean }>("PUT", "/api/recipes", payload, token);
   }
 
-  function fetchRecipeSummary(): Promise<RecipeSummary> {
-    return getJson<RecipeSummary>("/api/recipes/summary");
+  function fetchRecipeSummary(token: string): Promise<RecipeSummary> {
+    return getJson<RecipeSummary>("/api/recipes/summary", token);
   }
 
   function deleteRecipe(productId: string, token: string): Promise<{ success: boolean }> {

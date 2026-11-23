@@ -17,18 +17,11 @@ export const useReportsStore = defineStore("reports", {
   actions: {
     async fetchReport() {
       const { fetchDailySummary } = useApi();
-      // The report needs a manager login (it's revenue data).
-      const token = useAuth().session.value?.token;
-      if (!token) {
-        this.error = useNuxtApp().$i18n.t("common.sessionExpired");
-        return;
-      }
-
       this.isLoading = true;
       this.error = null;
 
       try {
-        this.report = await fetchDailySummary(this.startDate, this.endDate, token);
+        this.report = await fetchDailySummary(this.startDate, this.endDate, useAuth().requireToken());
         this.hasLoadedOnce = true;
       } catch (error) {
         this.error = error instanceof Error ? error.message : "Failed to load report.";

@@ -53,5 +53,16 @@ export function useAuth() {
     }
   }
 
-  return { session, login, logout };
+  // The current login's token for requests that need one, from store actions
+  // - throws a "session expired" error (shown like any failed load) if there
+  // isn't one.
+  function requireToken(): string {
+    const token = session.value?.token;
+    if (!token) {
+      throw new Error(useNuxtApp().$i18n.t("common.sessionExpired"));
+    }
+    return token;
+  }
+
+  return { session, login, logout, requireToken };
 }

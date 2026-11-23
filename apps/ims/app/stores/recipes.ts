@@ -29,7 +29,7 @@ export const useRecipeStore = defineStore("recipes", {
 
       try {
         const [summary] = await Promise.all([
-          fetchRecipeSummary(),
+          fetchRecipeSummary(useAuth().requireToken()),
           catalogStore.hasLoadedOnce ? Promise.resolve(undefined) : catalogStore.fetchCatalog(),
         ] as const);
 
@@ -45,7 +45,7 @@ export const useRecipeStore = defineStore("recipes", {
 
     fetchRecipe(target: RecipeTarget): Promise<RecipeIngredientRecord[]> {
       const { fetchRecipe } = useApi();
-      return fetchRecipe(target);
+      return fetchRecipe(target, useAuth().requireToken());
     },
 
     async saveRecipe(payload: RecipeUpdatePayload, token: string) {

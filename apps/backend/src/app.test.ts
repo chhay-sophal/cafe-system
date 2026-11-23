@@ -573,6 +573,37 @@ describe('daily summary date range (store-local timezone)', () => {
   });
 });
 
+describe('inventory and recipe reads', () => {
+  beforeEach(async () => {
+    await db.delete(payments).run();
+    await db.delete(orderItemModifiers).run();
+    await db.delete(orderItems).run();
+    await db.delete(orders).run();
+    await db.delete(stockAdjustments).run();
+    await db.delete(users).run();
+  });
+
+  async function tokenFor(role: 'CASHIER' | 'MANAGER') {
+    const id = `${role.toLowerCase()}-1`;
+    await db.insert(users).values({ id, name: role, pinHash: await hashPin(role === 'MANAGER' ? '9999' : '1234'), role, isActive: true }).run();
+    return signToken({ id, name: role, role });
+  }
+
+  it.each([
+    '/api/inventory',
+    '/api/recipes/summary',
+    `/api/recipes?productId=${randomUUID()}`,
+  ])('%s requires a manager or admin login', async (path) => {
+    const noLogin = await request(app).get(path);
+    const cashier = await request(app).get(path).set('Authorization', `Bearer ${await tokenFor('CASHIER')}`);
+    const manager = await request(app).get(path).set('Authorization', `Bearer ${await tokenFor('MANAGER')}`);
+
+    expect(noLogin.status).toBe(401);
+    expect(cashier.status).toBe(403);
+    expect(manager.status).toBe(200);
+  });
+});
+
 describe('order list and detail', () => {
   beforeEach(async () => {
     await db.delete(payments).run();

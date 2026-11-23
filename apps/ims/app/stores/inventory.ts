@@ -20,7 +20,7 @@ export const useInventoryStore = defineStore("inventory", {
       this.error = null;
 
       try {
-        this.items = await fetchInventory();
+        this.items = await fetchInventory(useAuth().requireToken());
       } catch (error) {
         this.error = error instanceof Error ? error.message : "Failed to load inventory.";
       } finally {
