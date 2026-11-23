@@ -1475,3 +1475,78 @@ describe('POS settings', () => {
   });
 });
 
+describe('combined reads and save responses', () => {
+  beforeEach(async () => {
+    await db.delete(posSettings).run();
+    await db.delete(payments).run();
+    await db.delete(orderItemModifiers).run();
+    await db.delete(orderItems).run();
+    await db.delete(orders).run();
+    await db.delete(stockAdjustments).run();
+    await db.delete(users).run();
+  });
+
+  async function managerToken() {
+    await db.insert(users).values({ id: 'manager-1', name: 'Manager', pinHash: await hashPin('9999'), role: 'MANAGER', isActive: true }).run();
+    return signToken({ id: 'manager-1', name: 'Manager', role: 'MANAGER' });
+  }
+
+  it('GET /api/catalog returns exactly what the three separate endpoints do', async () => {
+    const [catalog, categoryList, productList, modifierList] = await Promise.all([
+      request(app).get('/api/catalog'),
+      request(app).get('/api/categories'),
+      request(app).get('/api/products'),
+      request(app).get('/api/modifiers'),
+    ]);
+
+    expect(catalog.status).toBe(200);
+    expect(catalog.body.categories).toEqual(categoryList.body);
+    expect(catalog.body.products).toEqual(productList.body);
+    expect(catalog.body.modifierGroups).toEqual(modifierList.body);
+  });
+
+  it('GET /api/pos/bootstrap adds the store and POS settings, without logging in', async () => {
+    const [bootstrap, exchangeRate, pos] = await Promise.all([
+      request(app).get('/api/pos/bootstrap'),
+      request(app).get('/api/settings/exchange-rate'),
+      request(app).get('/api/settings/pos'),
+    ]);
+
+    expect(bootstrap.status).toBe(200);
+    expect(bootstrap.body.storeSettings).toEqual(exchangeRate.body);
+    expect(bootstrap.body.posSettings).toEqual(pos.body);
+    expect(Object.keys(bootstrap.body).sort()).toEqual(['categories', 'modifierGroups', 'posSettings', 'products', 'storeSettings']);
+  });
+
+  it('a stock adjustment returns the updated item', async () => {
+    const token = await managerToken();
+    const id = randomUUID();
+    await db.insert(inventoryItems).values({ id, name: 'Adjust Test Milk', unit: 'ml', stockQuantity: 1000, reorderThreshold: 500 }).run();
+
+    try {
+      const response = await request(app)
+        .post('/api/inventory/adjust')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ inventoryItemId: id, quantityChanged: -600, type: 'WASTAGE' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.item).toMatchObject({ id, stockQuantity: 400, isLowStock: true });
+    } finally {
+      await db.delete(stockAdjustments).run();
+      await db.delete(inventoryItems).where(eq(inventoryItems.id, id)).run();
+    }
+  });
+
+  it('deleting a category returns the remaining categories as renumbered', async () => {
+    const token = await managerToken();
+    const id = randomUUID();
+    await db.insert(categories).values({ id, name: 'Delete Test Category', sortOrder: 999 }).run();
+
+    const response = await request(app).delete(`/api/categories/${id}`).set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.categories).toEqual((await request(app).get('/api/categories')).body);
+    expect(response.body.categories.some((category: { id: string }) => category.id === id)).toBe(false);
+  });
+});
+

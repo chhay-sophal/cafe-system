@@ -106,6 +106,33 @@ async function findOrderResultByClientOrderId(clientOrderId: string) {
   return existing ? { success: true, ...existing } : null;
 }
 
+// Every modifier group with its options and linked product ids - the shape
+// GET /api/modifiers has always returned - in three queries for the whole
+// menu rather than three per group.
+async function loadAllModifierGroups() {
+  const [groups, options, links] = await Promise.all([
+    db.select().from(modifierGroups).all(),
+    db.select().from(modifiers).all(),
+    db.select().from(productModifiers).all(),
+  ]);
+  return groups.map((group) => ({
+    ...group,
+    options: options.filter((option) => option.groupId === group.id),
+    productIds: links.filter((link) => link.groupId === group.id).map((link) => link.productId),
+  }));
+}
+
+// The whole menu in one response: what GET /api/categories, /api/products
+// and /api/modifiers return separately.
+async function loadCatalog() {
+  const [categoryRows, productRows, modifierGroupRows] = await Promise.all([
+    db.select().from(categories).orderBy(categories.sortOrder).all(),
+    db.select().from(products).all(),
+    loadAllModifierGroups(),
+  ]);
+  return { categories: categoryRows, products: productRows, modifierGroups: modifierGroupRows };
+}
+
 type PosSettings = z.infer<typeof posSettingsSchema>;
 
 // What a register uses before POS settings are first saved - the defaults the
@@ -424,6 +451,30 @@ function createApp() {
     }
   });
 
+  // One request for the menu (IMS's Menu, Modifiers and Recipes tabs) instead
+  // of three. The separate endpoints stay for older clients.
+  app.get('/api/catalog', async (_req, res) => {
+    try {
+      res.json(await loadCatalog());
+    } catch (error) {
+      console.error('Fetch catalog error:', error);
+      res.status(500).json({ error: 'Failed to fetch catalog' });
+    }
+  });
+
+  // Everything the POS loads at start, login and Refresh menu - the menu,
+  // store settings (exchange rate, currency, tax) and POS settings - in one
+  // request instead of five. Public, like each of those parts.
+  app.get('/api/pos/bootstrap', async (_req, res) => {
+    try {
+      const [catalog, storeSettings, posSettingsResult] = await Promise.all([loadCatalog(), getStoreSettings(), loadPosSettings()]);
+      res.json({ ...catalog, storeSettings, posSettings: posSettingsResult });
+    } catch (error) {
+      console.error('Fetch POS bootstrap error:', error);
+      res.status(500).json({ error: 'Failed to load POS data' });
+    }
+  });
+
   app.get('/api/categories', async (_req, res) => {
     try {
       const result = await db.select().from(categories).orderBy(categories.sortOrder).all();
@@ -548,7 +599,10 @@ function createApp() {
         }
       });
 
-      res.json({ success: true, reassignedCount: productsInCategory.length });
+      // The remaining categories as renumbered, so the client can update its
+      // list without reloading the menu.
+      const remaining = await db.select().from(categories).orderBy(categories.sortOrder).all();
+      res.json({ success: true, reassignedCount: productsInCategory.length, categories: remaining });
     } catch (error) {
       console.error('Delete category error:', error);
       res.status(500).json({ error: 'Failed to delete category' });
@@ -701,10 +755,7 @@ function createApp() {
 
   app.get('/api/modifiers', async (_req, res) => {
     try {
-      const groups = await db.select().from(modifierGroups).all();
-      const result = await Promise.all(groups.map((group) => loadModifierGroup(group.id)));
-
-      res.json(result);
+      res.json(await loadAllModifierGroups());
     } catch (error) {
       res.status(500).json({ error: 'Failed to fetch modifiers' });
     }
@@ -1502,7 +1553,10 @@ function createApp() {
           .run();
       });
 
-      res.json({ success: true });
+      // The item as it now stands, so the client can update its row without
+      // reloading the whole inventory.
+      const updated = await db.select().from(inventoryItems).where(eq(inventoryItems.id, inventoryItemId)).get();
+      res.json({ success: true, item: updated ? { ...updated, isLowStock: updated.stockQuantity <= updated.reorderThreshold } : null });
     } catch (error) {
       res.status(500).json({ error: 'Failed to update stock adjustment' });
     }
