@@ -70,6 +70,7 @@ The backend uses SQLite via Drizzle ORM. From `apps/backend`:
 ```bash
 pnpm --filter @cafe-system/backend db:migrate   # apply schema
 pnpm --filter @cafe-system/backend db:seed      # load sample staff/catalog data
+pnpm --filter @cafe-system/backend db:mock-orders  # optional: 30 days of mock sales (--replace / --remove / --days N)
 ```
 
 ### Run the apps
