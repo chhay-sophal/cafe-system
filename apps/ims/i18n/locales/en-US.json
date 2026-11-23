@@ -389,7 +389,8 @@
       "cashier": "Cashier",
       "items": "Items",
       "payment": "Payment",
-      "total": "Total"
+      "total": "Total",
+      "status": "Status"
     },
     "detail": {
       "heading": "Order #{number}",
@@ -403,6 +404,51 @@
     },
     "searchPlaceholder": "Search order #, cashier, payment...",
     "totalUsd": "Total (USD)",
-    "noMatches": "No orders match your search or filters."
+    "noMatches": "No orders match your search or filters.",
+    "status": {
+      "COMPLETED": "Completed",
+      "VOIDED": "Voided",
+      "REFUNDED": "Refunded"
+    },
+    "edited": "Edited",
+    "void": {
+      "button": "Void",
+      "confirm": "Void this order? It stays in Sales History as voided, its stock goes back, and reports leave it out.",
+      "reasonLabel": "Reason",
+      "reasonPlaceholder": "e.g. Rung up by mistake",
+      "confirmButton": "Void order",
+      "voiding": "Voiding...",
+      "error": "Couldn't void the order.",
+      "voidedBy": "Voided by {name} on {time}"
+    },
+    "edit": {
+      "button": "Edit",
+      "heading": "Edit order #{number}",
+      "items": "Items",
+      "each": "each",
+      "increase": "One more {name}",
+      "decrease": "One fewer {name}",
+      "remove": "Remove {name}",
+      "addItem": "Add an item",
+      "chooseProduct": "Choose a product",
+      "loadingMenu": "Loading menu...",
+      "quantity": "Quantity",
+      "required": "Required",
+      "optional": "Optional",
+      "upTo": "up to {count}",
+      "chooseFrom": "Choose an option for {name}",
+      "add": "Add",
+      "discountUsd": "Discount (USD)",
+      "cashNote": "If the cash already recorded still covers the new total, its change is worked out again. If not, the sale is recorded as paid exactly.",
+      "was": "Was {total} ({usd})",
+      "reasonLabel": "Reason for the change",
+      "reasonPlaceholder": "e.g. Customer actually had two lattes",
+      "needsItem": "An order needs at least one item.",
+      "discountInvalid": "Enter the discount as a number.",
+      "discountTooHigh": "The discount can't be more than the subtotal.",
+      "save": "Save changes",
+      "error": "Couldn't save the changes.",
+      "editedBy": "Last edited by {name} on {time}"
+    }
   }
 }

@@ -47,6 +47,13 @@ const columns = columnHelper.columns([
     },
     filterFn: "equals",
   }),
+  // Rendered via slot as badges; this text is what search matches.
+  columnHelper.accessor("status", {
+    header: () => t("orders.columns.status"),
+    cell: ({ row }) =>
+      [t(`orders.status.${row.original.status}`), row.original.isEdited ? t("orders.edited") : null].filter(Boolean).join(" · "),
+    filterFn: "equals",
+  }),
   // Rendered via slot - shows the total in both currencies.
   columnHelper.accessor("totalAmount", {
     header: () => t("orders.columns.total"),
@@ -92,6 +99,12 @@ const filters = computed<TableFilterDef[]>(() => [
     columnId: "paymentMethod",
     label: t("orders.columns.payment"),
     options: PAYMENT_METHODS.map((method) => ({ value: method, label: t(`paymentBreakdown.methods.${method}`) })),
+  },
+  {
+    type: "select",
+    columnId: "status",
+    label: t("orders.columns.status"),
+    options: (["COMPLETED", "VOIDED"] as const).map((status) => ({ value: status, label: t(`orders.status.${status}`) })),
   },
   { type: "numberRange", columnId: "itemCount", label: t("orders.columns.items") },
   // Totals are stored in USD whatever the display currency (see
@@ -148,9 +161,22 @@ function openDetail(order: OrderSummary) {
         :empty-text="emptyText"
         :cell-class="cellClass"
         :header-class="headerClass"
-        :row-class="() => 'cursor-pointer hover:bg-slate-50'"
+        :row-class="(row) => ['cursor-pointer hover:bg-slate-50', row.original.status === 'VOIDED' && 'text-slate-400']"
         @row-click="openDetail"
       >
+        <template #cell-status="{ item }">
+          <span class="inline-flex flex-wrap gap-1">
+            <span
+              class="rounded-full px-2 py-0.5 text-xs font-semibold"
+              :class="item.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'"
+            >
+              {{ t(`orders.status.${item.status}`) }}
+            </span>
+            <span v-if="item.isEdited" class="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">
+              {{ t("orders.edited") }}
+            </span>
+          </span>
+        </template>
         <template #cell-totalAmount="{ item }">
           {{ formatMain(item.totalAmount) }}
           <span class="block text-xs text-slate-400">{{ formatSecondary(item.totalAmount) }}</span>

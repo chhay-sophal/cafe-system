@@ -3,7 +3,7 @@ import type {
   Category, CategoryPayload, ImageUploadResult, ModifierGroup, ModifierGroupPayload, Product, ProductPayload,
 } from "~/types/catalog";
 import type { InventoryItem, InventoryItemPayload, StockAdjustmentPayload } from "~/types/inventory";
-import type { OrderDetail, OrderSummary } from "~/types/orders";
+import type { OrderDetail, OrderEditPayload, OrderSummary } from "~/types/orders";
 import type { RecipeIngredientRecord, RecipeSummary, RecipeTarget, RecipeUpdatePayload } from "~/types/recipe";
 import type { DailySummaryReport } from "~/types/reports";
 import type { ExchangeRateSetting, MainCurrencySetting, StoreSettings, TaxSetting } from "~/types/settings";
@@ -217,6 +217,15 @@ export function useApi() {
     return getJson<OrderDetail>(`/api/orders/${id}`, token);
   }
 
+  function voidOrder(id: string, reason: string, token: string): Promise<{ success: boolean }> {
+    return sendJson<{ success: boolean }>("POST", `/api/orders/${encodeURIComponent(id)}/void`, { reason }, token);
+  }
+
+  // Returns the order as saved, for the detail view.
+  function updateOrder(id: string, payload: OrderEditPayload, token: string): Promise<OrderDetail> {
+    return sendJson<OrderDetail>("PUT", `/api/orders/${encodeURIComponent(id)}`, payload, token);
+  }
+
   function fetchUsers(token: string): Promise<StaffUser[]> {
     return getJson<StaffUser[]>("/api/users", token);
   }
@@ -265,6 +274,8 @@ export function useApi() {
     fetchDailySummary,
     fetchOrders,
     fetchOrderDetail,
+    voidOrder,
+    updateOrder,
     fetchUsers,
     createUser,
     updateUser,

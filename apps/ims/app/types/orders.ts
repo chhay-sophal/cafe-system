@@ -12,15 +12,19 @@ export interface OrderSummary {
   cashierName: string | null;
   paymentMethod: PaymentMethod | null;
   itemCount: number;
+  // Corrected in IMS since it was rung up (see OrderDetail.edited*).
+  isEdited: boolean;
 }
 
 export interface OrderDetailItemModifier {
+  modifierId: string;
   modifierName: string;
   priceExtra: number;
 }
 
 export interface OrderDetailItem {
   id: string;
+  productId: string;
   productName: string;
   quantity: number;
   unitPrice: number;
@@ -49,4 +53,25 @@ export interface OrderDetail {
   cashierName: string | null;
   items: OrderDetailItem[];
   payment: OrderPaymentDetail | null;
+  // Store-local "YYYY-MM-DD HH:MM:SS" times; null until voided / edited.
+  voidReason: string | null;
+  voidedAt: string | null;
+  voidedByName: string | null;
+  editReason: string | null;
+  editedAt: string | null;
+  editedByName: string | null;
+}
+
+// PUT /api/orders/:id - the whole corrected order, and why.
+export interface OrderEditPayload {
+  items: Array<{
+    productId: string;
+    productName: string;
+    quantity: number;
+    unitPrice: number;
+    selectedModifiers: Array<{ id: string; name: string; priceExtra: number }>;
+  }>;
+  paymentMethod: PaymentMethod;
+  discountAmount: number;
+  reason: string;
 }

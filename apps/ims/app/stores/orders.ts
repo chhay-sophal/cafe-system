@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import type { OrderDetail, OrderSummary } from "~/types/orders";
+import type { OrderDetail, OrderEditPayload, OrderSummary } from "~/types/orders";
 
 export const useOrdersStore = defineStore("orders", {
   state: () => ({
@@ -41,6 +41,30 @@ export const useOrdersStore = defineStore("orders", {
       } finally {
         this.isDetailLoading = false;
       }
+    },
+
+    // Both replace the open order with its saved state, then reload the list
+    // and mark the Analytics report stale, since totals may have changed.
+    // Errors are left to the caller, which shows them in its form.
+    async voidOrder(id: string, reason: string) {
+      const { voidOrder, fetchOrderDetail } = useApi();
+      const token = useAuth().requireToken();
+      await voidOrder(id, reason, token);
+      this.selectedOrder = await fetchOrderDetail(id, token);
+      this.afterOrderChange(token);
+    },
+
+    async updateOrder(id: string, payload: OrderEditPayload) {
+      const { updateOrder } = useApi();
+      const token = useAuth().requireToken();
+      this.selectedOrder = await updateOrder(id, payload, token);
+      this.afterOrderChange(token);
+    },
+
+    afterOrderChange(token: string) {
+      const period = useSalesPeriodStore();
+      this.fetchOrders(period.startDate, period.endDate, token);
+      useReportsStore().loadedRange = null;
     },
 
     clearSelectedOrder() {
