@@ -44,11 +44,17 @@ const DEFAULT_TAX_ENABLED = false;
 const STORE_UTC_OFFSET_SQL_MODIFIER = '+7 hours';
 const STORE_UTC_OFFSET_HOURS = 7;
 
-// The store's current local calendar date (YYYY-MM-DD), used as the default
-// "today" for date-range filters and the daily order-number counter.
-function storeTodayDateString(): string {
-  const shifted = new Date(Date.now() + STORE_UTC_OFFSET_HOURS * 60 * 60 * 1000);
+// The store's local calendar date (YYYY-MM-DD) at `at` - by default now, the
+// "today" for date-range filters - also the day an order's number counts in.
+function storeTodayDateString(at: Date = new Date()): string {
+  const shifted = new Date(at.getTime() + STORE_UTC_OFFSET_HOURS * 60 * 60 * 1000);
   return shifted.toISOString().slice(0, 10);
+}
+
+// `at` in the format SQLite's CURRENT_TIMESTAMP produces (UTC, "YYYY-MM-DD
+// HH:MM:SS"), for createdAt values set explicitly rather than by default.
+function toSqliteTimestamp(at: Date): string {
+  return at.toISOString().slice(0, 19).replace('T', ' ');
 }
 
 async function getStoreSettings(): Promise<{ exchangeRateRielPerUsd: number; mainCurrency: 'USD' | 'KHR'; taxEnabled: boolean }> {
@@ -721,7 +727,7 @@ function createApp() {
 
   app.post('/api/orders', authenticate, validateBody(orderSchema), async (req, res) => {
     const {
-      clientOrderId, items, paymentMethod, amountTenderedUsd = 0, amountTenderedRiel = 0, taxAmount: requestedTaxAmount = 0, discountAmount = 0,
+      clientOrderId, soldAt, exchangeRateRielPerUsd: saleExchangeRate, items, paymentMethod, amountTenderedUsd = 0, amountTenderedRiel = 0, taxAmount: requestedTaxAmount = 0, discountAmount = 0,
     } = req.body;
     const actingUserId = req.user?.id;
 
@@ -740,12 +746,18 @@ function createApp() {
         }
       }
 
-      const today = storeTodayDateString();
-      const todayOrdersCount = (await db.select({ count: sql<number>`count(*)` })
+      // A sale rung up offline is recorded at the time it happened, not when it
+      // finally synced - but never in the future, so a register whose clock
+      // runs fast can't stamp a sale ahead of now.
+      const saleTime = new Date(Math.min(soldAt ? Date.parse(soldAt) : Infinity, Date.now()));
+      // Numbered within the day it was sold, which for an offline sale synced
+      // the next morning is the previous day.
+      const saleDay = storeTodayDateString(saleTime);
+      const lastOrderNumber = (await db.select({ max: sql<number | null>`max(${orders.orderNumber})` })
         .from(orders)
-        .where(gte(sql`datetime(${orders.createdAt}, ${STORE_UTC_OFFSET_SQL_MODIFIER})`, today))
-        .get())?.count || 0;
-      const orderNumber = todayOrdersCount + 1;
+        .where(eq(sql`date(${orders.createdAt}, ${STORE_UTC_OFFSET_SQL_MODIFIER})`, saleDay))
+        .get())?.max ?? 0;
+      const orderNumber = lastOrderNumber + 1;
       const orderId = randomUUID();
 
       let subtotal = 0;
@@ -759,7 +771,11 @@ function createApp() {
         subtotal += itemPrice * item.quantity;
       }
 
-      const { exchangeRateRielPerUsd: exchangeRate, taxEnabled } = await getStoreSettings();
+      const { exchangeRateRielPerUsd: storeExchangeRate, taxEnabled } = await getStoreSettings();
+      // An offline sale's cash changed hands at the rate the register had then,
+      // so tender and change are checked and recorded at that rate - otherwise
+      // a rate change before it syncs could reject a sale already paid for.
+      const exchangeRate = saleExchangeRate ?? storeExchangeRate;
       // A manager can disable tax store-wide - enforced here, not just
       // trusted from the client, so a stale/misbehaving POS can't still
       // charge it once disabled.
@@ -789,6 +805,7 @@ function createApp() {
         await tx.insert(orders).values({
           id: orderId,
           clientOrderId,
+          createdAt: toSqliteTimestamp(saleTime),
           userId: actingUserId,
           orderNumber,
           subtotal,

@@ -317,6 +317,68 @@ describe('order payments in mixed USD/Riel', () => {
     expect(response.status).toBe(400);
   });
 
+  it('records an offline sale at the time it was sold and numbers it within that day', async () => {
+    const token = await cashierToken();
+    const productId = await testProductId();
+    const sale = { items: [{ productId, productName: 'Latte', quantity: 1, unitPrice: 3.25 }], paymentMethod: 'CARD' };
+    const post = (body: object) => request(app).post('/api/orders').set('Authorization', `Bearer ${token}`).send(body);
+
+    const today1 = await post(sale);
+    const today2 = await post(sale);
+    // Rung up a day earlier and only synced now.
+    const soldAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    soldAt.setMilliseconds(0);
+    const offline = await post({ ...sale, soldAt: soldAt.toISOString() });
+    const today3 = await post(sale);
+
+    expect([today1, today2, offline, today3].map((response) => response.status)).toEqual([201, 201, 201, 201]);
+    expect([today1, today2, today3].map((response) => response.body.orderNumber)).toEqual([1, 2, 3]);
+    expect(offline.body.orderNumber).toBe(1);
+
+    const saved = await db.select().from(orders).where(eq(orders.id, offline.body.orderId)).get();
+    expect(saved?.createdAt).toBe(soldAt.toISOString().slice(0, 19).replace('T', ' '));
+  });
+
+  it('never records a sale in the future, even if the register clock is ahead', async () => {
+    const token = await cashierToken();
+
+    const response = await request(app)
+      .post('/api/orders')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        soldAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        items: [{ productId: await testProductId(), productName: 'Latte', quantity: 1, unitPrice: 3.25 }],
+        paymentMethod: 'CARD',
+      });
+
+    expect(response.status).toBe(201);
+    const saved = await db.select().from(orders).where(eq(orders.id, response.body.orderId)).get();
+    expect(saved?.createdAt && saved.createdAt <= new Date().toISOString().slice(0, 19).replace('T', ' ')).toBe(true);
+  });
+
+  it('checks and records an offline sale at the exchange rate the register charged', async () => {
+    const token = await cashierToken();
+
+    // 3.25 at the register's 4000 riel/USD is 13000 riel - short of the 13325
+    // the store's current 4100 rate would ask for.
+    const response = await request(app)
+      .post('/api/orders')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        soldAt: new Date().toISOString(),
+        exchangeRateRielPerUsd: 4000,
+        items: [{ productId: await testProductId(), productName: 'Latte', quantity: 1, unitPrice: 3.25 }],
+        paymentMethod: 'CASH',
+        amountTenderedUsd: 0,
+        amountTenderedRiel: 13000,
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.exchangeRateRielPerUsd).toBe(4000);
+    const payment = await db.select().from(payments).where(eq(payments.orderId, response.body.orderId)).get();
+    expect(payment?.exchangeRateRielPerUsd).toBe(4000);
+  });
+
   it('gives change for a pure-USD tender as whole dollars plus a Riel remainder', async () => {
     const token = await cashierToken();
 

@@ -15,6 +15,10 @@ export const orderSchema = z.object({
   // has already recorded instead of saving it twice. Optional so older POS
   // builds still in the field keep working.
   clientOrderId: z.uuid().optional(),
+  // Only sent for a sale rung up offline and synced later: when it actually
+  // happened, and the exchange rate the register charged it at.
+  soldAt: z.iso.datetime().optional(),
+  exchangeRateRielPerUsd: z.number().positive().optional(),
   items: z.array(z.object({
     productId: z.string().min(1),
     productName: z.string().min(1),
