@@ -1,4 +1,5 @@
 import { computed, ref } from "vue";
+import { i18n, setLocale } from "../i18n";
 import { fetchPosSettings, HttpError, savePosSettings, uploadImage } from "../lib/api";
 import { onPosSettingChanged, type PosSettingsSection } from "../lib/settingsEvents";
 import type { PosSettings } from "../types/settings";
@@ -10,7 +11,8 @@ import { useStoreDetails } from "./useStoreDetails";
 import { useStoreName } from "./useStoreName";
 
 // Keeps the store-wide POS settings (store name & details, payment methods,
-// fast cash, KHQR banks) in step with the server, where IMS edits them too.
+// fast cash, KHQR banks, language) in step with the server, where IMS edits
+// them too.
 // The composables keep their local copies, so checkout works offline; this
 // moves changes both ways:
 //   - from the server (syncPosSettings): on start, login, Refresh menu - the
@@ -19,12 +21,12 @@ import { useStoreName } from "./useStoreName";
 //   - to the server: every change made here is queued ("pending", kept
 //     across restarts) and sent right away when a manager or admin is logged
 //     in and the server is reachable, otherwise retried later.
-// Before the server has ever had these settings (configured: false), the
-// register's own are queued for upload rather than replaced by defaults -
-// nothing set up on this register is lost.
+// Sections the server has never had (all of them on first run, or one added
+// later, like language) are queued for upload from this register rather than
+// replaced by defaults - nothing set up on this register is lost.
 
 const PENDING_STORAGE_KEY = "pos.settingsPending";
-const ALL_SECTIONS: PosSettingsSection[] = ["storeName", "storeDetails", "paymentMethods", "fastCash", "khqrBanks"];
+const ALL_SECTIONS: PosSettingsSection[] = ["storeName", "storeDetails", "paymentMethods", "fastCash", "khqrBanks", "language"];
 // PUT /api/settings/pos is for managers and admins only.
 const SAVE_ROLES = ["MANAGER", "ADMIN"];
 
@@ -84,6 +86,8 @@ async function sectionValue(section: PosSettingsSection, token: string): Promise
       const { amounts } = useFastCash();
       return { fastCash: { USD: [...amounts.USD.value], KHR: [...amounts.KHR.value] } };
     }
+    case "language":
+      return { language: i18n.global.locale.value as PosSettings["language"] };
     case "khqrBanks": {
       const khqr = useKhqrBanks();
       for (const bank of khqr.banks.value) {
@@ -144,19 +148,22 @@ async function syncPosSettings(): Promise<void> {
     return; // Unreachable - keep the local copies.
   }
 
-  if (!response.configured) {
-    // First time: the server has nothing yet, so this register's settings
-    // become the shared ones (sent once a manager/admin is logged in).
-    markPending(ALL_SECTIONS.filter((section) => !pending.value.has(section)));
-  } else {
-    const { settings } = response;
-    const skip = pending.value;
-    if (!skip.has("storeName")) useStoreName().setStoreName(settings.storeName, { fromServer: true });
-    if (!skip.has("storeDetails")) useStoreDetails().applyFromServer(settings.storeDetails);
-    if (!skip.has("paymentMethods")) usePaymentMethods().applyFromServer(settings.paymentMethods);
-    if (!skip.has("fastCash")) useFastCash().applyFromServer(settings.fastCash);
-    if (!skip.has("khqrBanks")) await useKhqrBanks().applyFromServer(settings.khqrBanks).catch(() => {});
-  }
+  // Never saved on the server: this register's value becomes the shared one
+  // (sent once a manager/admin is logged in). Older servers don't list them,
+  // so fall back to "all" when unconfigured.
+  const unset = new Set<PosSettingsSection>(response.unsetSections ?? (response.configured ? [] : ALL_SECTIONS));
+  markPending(ALL_SECTIONS.filter((section) => unset.has(section) && !pending.value.has(section)));
+
+  // Everything else comes from the server - except sections with changes
+  // made here that haven't been sent yet.
+  const { settings } = response;
+  const take = (section: PosSettingsSection) => !pending.value.has(section);
+  if (take("storeName")) useStoreName().setStoreName(settings.storeName, { fromServer: true });
+  if (take("storeDetails")) useStoreDetails().applyFromServer(settings.storeDetails);
+  if (take("paymentMethods")) usePaymentMethods().applyFromServer(settings.paymentMethods);
+  if (take("fastCash")) useFastCash().applyFromServer(settings.fastCash);
+  if (take("language")) setLocale(settings.language, { fromServer: true });
+  if (take("khqrBanks")) await useKhqrBanks().applyFromServer(settings.khqrBanks).catch(() => {});
 
   await pushPending();
 }

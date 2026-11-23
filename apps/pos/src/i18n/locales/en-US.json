@@ -168,7 +168,7 @@
       "storeName": "Store name",
       "storeNameHint": "Shown on the header, receipts and customer display. Leave empty to use \"{default}\".",
       "language": "Language",
-      "languageHint": "Language used on this register's screens and receipts.",
+      "languageHint": "Used on the register's screens, receipts and customer display.",
       "appearance": "Appearance",
       "appearanceHint": "Light or dark screens, or follow this computer's setting. Also applies to the customer display.",
       "themeSystem": "System",

@@ -1,6 +1,7 @@
 import { createI18n } from "vue-i18n";
 import enUS from "./locales/en-US.json";
 import kmKH from "./locales/km-KH.json";
+import { notifyPosSettingChanged } from "../lib/settingsEvents";
 
 const STORAGE_KEY = "pos.locale";
 
@@ -25,7 +26,14 @@ export const i18n = createI18n({
 // this instance has no such restriction, so lib code reaches for this.
 export const t = i18n.global.t;
 
-export function setLocale(locale: "en-US" | "km-KH") {
+// Shared with the server and IMS like the store name (usePosSettingsSync):
+// a change here - in Settings or on the login screen - is sent; `fromServer`
+// applies the shared value without announcing it back.
+export function setLocale(locale: "en-US" | "km-KH", { fromServer = false } = {}) {
+  const changed = i18n.global.locale.value !== locale;
   i18n.global.locale.value = locale;
   localStorage.setItem(STORAGE_KEY, locale);
+  if (changed && !fromServer) {
+    notifyPosSettingChanged("language");
+  }
 }

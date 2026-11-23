@@ -20,10 +20,14 @@ export interface PosSettings {
   paymentMethods: Array<"CASH" | "CARD" | "QR_CODE">;
   fastCash: { USD: number[]; KHR: number[] };
   khqrBanks: Array<{ id: string; name: string; imageUrl: string }>;
+  language: "en-US" | "km-KH";
 }
 
 export interface PosSettingsResponse {
   // false until first saved - the register then uploads its own settings.
   configured: boolean;
   settings: PosSettings;
+  // Sections never saved on the server - this register's value is uploaded
+  // for those rather than the default in `settings` applied.
+  unsetSections?: Array<keyof PosSettings>;
 }
