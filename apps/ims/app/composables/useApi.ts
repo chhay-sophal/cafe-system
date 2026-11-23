@@ -205,8 +205,8 @@ export function useApi() {
     return deleteJson<{ success: boolean }>(`/api/recipes/${productId}`, token);
   }
 
-  function fetchDailySummary(startDate: string, endDate: string): Promise<DailySummaryReport> {
-    return getJson<DailySummaryReport>(`/api/reports/daily-summary?startDate=${startDate}&endDate=${endDate}`);
+  function fetchDailySummary(startDate: string, endDate: string, token: string): Promise<DailySummaryReport> {
+    return getJson<DailySummaryReport>(`/api/reports/daily-summary?startDate=${startDate}&endDate=${endDate}`, token);
   }
 
   function fetchOrders(startDate: string, endDate: string, token: string): Promise<OrderSummary[]> {

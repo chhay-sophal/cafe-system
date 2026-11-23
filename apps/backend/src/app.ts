@@ -1315,7 +1315,8 @@ function createApp() {
     }
   });
 
-  app.get('/api/reports/daily-summary', async (req, res) => {
+  // Revenue figures - managers and admins only (every IMS login is one).
+  app.get('/api/reports/daily-summary', authenticate, requireRole(['MANAGER', 'ADMIN']), async (req, res) => {
     const startDate = (req.query.startDate as string) || storeTodayDateString();
     const endDate = (req.query.endDate as string) || startDate;
     // startDate/endDate are store-local calendar days (see storeTodayDateString),

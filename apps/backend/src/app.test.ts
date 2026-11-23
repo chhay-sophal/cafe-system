@@ -432,7 +432,10 @@ describe('order payments in mixed USD/Riel', () => {
         amountTenderedRiel: 20000,
       });
 
-    const report = await request(app).get('/api/reports/daily-summary');
+    await db.insert(users).values({ id: 'manager-1', name: 'Manager', pinHash: await hashPin('9999'), role: 'MANAGER', isActive: true }).run();
+    const report = await request(app)
+      .get('/api/reports/daily-summary')
+      .set('Authorization', `Bearer ${signToken({ id: 'manager-1', name: 'Manager', role: 'MANAGER' })}`);
 
     expect(report.body.paymentBreakdown).toEqual([{ method: 'CASH', totalAmount: 3.24 }]);
     expect(report.body.metrics.netRevenue).toBe(3.25);
@@ -525,9 +528,25 @@ describe('daily summary date range (store-local timezone)', () => {
     await db.delete(users).run();
   });
 
+  async function tokenFor(role: 'CASHIER' | 'MANAGER') {
+    const id = `${role.toLowerCase()}-1`;
+    await db.insert(users).values({ id, name: role, pinHash: await hashPin(role === 'MANAGER' ? '9999' : '1234'), role, isActive: true }).run();
+    return signToken({ id, name: role, role });
+  }
+
+  it('requires a manager or admin login', async () => {
+    const noLogin = await request(app).get('/api/reports/daily-summary');
+    const cashier = await request(app).get('/api/reports/daily-summary').set('Authorization', `Bearer ${await tokenFor('CASHIER')}`);
+    const manager = await request(app).get('/api/reports/daily-summary').set('Authorization', `Bearer ${await tokenFor('MANAGER')}`);
+
+    expect(noLogin.status).toBe(401);
+    expect(cashier.status).toBe(403);
+    expect(manager.status).toBe(200);
+  });
+
   it('buckets an order by the store-local calendar day, not its UTC calendar day', async () => {
-    const pinHash = await hashPin('1234');
-    await db.insert(users).values({ id: 'cashier-1', name: 'Cashier', pinHash, role: 'CASHIER', isActive: true }).run();
+    await tokenFor('CASHIER');
+    const token = await tokenFor('MANAGER');
 
     // 18:30 UTC on the 29th is 01:30 local (store is UTC+7) on the 30th - a
     // report for local "the 30th" must include this order; a report for
@@ -541,11 +560,15 @@ describe('daily summary date range (store-local timezone)', () => {
       createdAt: '2026-08-29 18:30:00',
     }).run();
 
-    const sameLocalDay = await request(app).get('/api/reports/daily-summary?startDate=2026-08-30&endDate=2026-08-30');
+    const sameLocalDay = await request(app)
+      .get('/api/reports/daily-summary?startDate=2026-08-30&endDate=2026-08-30')
+      .set('Authorization', `Bearer ${token}`);
     expect(sameLocalDay.body.metrics.totalOrders).toBe(1);
     expect(sameLocalDay.body.hourlyVolume.find((h: { hour: number }) => h.hour === 1)?.orderCount).toBe(1);
 
-    const previousUtcDay = await request(app).get('/api/reports/daily-summary?startDate=2026-08-29&endDate=2026-08-29');
+    const previousUtcDay = await request(app)
+      .get('/api/reports/daily-summary?startDate=2026-08-29&endDate=2026-08-29')
+      .set('Authorization', `Bearer ${token}`);
     expect(previousUtcDay.body.metrics.totalOrders).toBe(0);
   });
 });
