@@ -50,6 +50,13 @@
       "when": 1795400773804,
       "tag": "0006_order_client_id",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1795405767509,
+      "tag": "0007_order_edit_audit",
+      "breakpoints": true
     }
   ]
 }

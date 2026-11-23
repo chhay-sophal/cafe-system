@@ -7,6 +7,7 @@ export {
   mainCurrencySchema,
   managerApprovalSchema,
   modifierGroupSchema,
+  orderEditSchema,
   orderSchema,
   pinLoginSchema,
   productSchema,

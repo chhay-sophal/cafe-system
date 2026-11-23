@@ -756,7 +756,7 @@ describe('order list and detail', () => {
     expect(detailResponse.body.cashierName).toBe('Cashier');
     expect(detailResponse.body.items).toHaveLength(1);
     expect(detailResponse.body.items[0]).toMatchObject({ productName: 'Latte', quantity: 2 });
-    expect(detailResponse.body.items[0].modifiers).toEqual([{ modifierName: 'Oat Milk', priceExtra: 0.5 }]);
+    expect(detailResponse.body.items[0].modifiers).toEqual([{ modifierId: expect.any(String), modifierName: 'Oat Milk', priceExtra: 0.5 }]);
     expect(detailResponse.body.payment).toMatchObject({ paymentMethod: 'CASH', amountTenderedUsd: 10 });
   });
 
@@ -1274,5 +1274,128 @@ describe('order void', () => {
 
     const missing = await request(app).post('/api/orders/does-not-exist/void').set('Authorization', `Bearer ${token}`).send({ reason: 'Mistake' });
     expect(missing.status).toBe(404);
+  });
+});
+
+describe('order edit', () => {
+  beforeEach(async () => {
+    await db.delete(payments).run();
+    await db.delete(orderItemModifiers).run();
+    await db.delete(orderItems).run();
+    await db.delete(orders).run();
+    await db.delete(stockAdjustments).run();
+    await db.delete(users).run();
+    await db.delete(storeSettings).run();
+  });
+
+  async function userToken(id: string, role: 'CASHIER' | 'MANAGER') {
+    await db.insert(users).values({ id, name: id, pinHash: await hashPin(id), role, isActive: true }).run();
+    return signToken({ id, name: id, role });
+  }
+
+  // A $2 product whose recipe uses 18g of a fresh 1000g inventory item.
+  async function productWithRecipe() {
+    const categoryId = randomUUID();
+    const productId = randomUUID();
+    const inventoryItemId = randomUUID();
+    await db.insert(categories).values({ id: categoryId, name: 'Edit Test Category' }).run();
+    await db.insert(products).values({ id: productId, categoryId, name: 'Edit Test Espresso', basePrice: 2 }).run();
+    await db.insert(inventoryItems).values({ id: inventoryItemId, name: 'Edit Test Beans', unit: 'g', stockQuantity: 1000 }).run();
+    await db.insert(recipes).values({ id: randomUUID(), productId, inventoryItemId, quantityRequired: 18 }).run();
+    return { productId, inventoryItemId };
+  }
+
+  async function stockOf(inventoryItemId: string) {
+    return (await db.select().from(inventoryItems).where(eq(inventoryItems.id, inventoryItemId)).get())?.stockQuantity;
+  }
+
+  async function placeOrder(token: string, productId: string, extra: object = {}) {
+    const response = await request(app)
+      .post('/api/orders')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ items: [{ productId, productName: 'Espresso', quantity: 2, unitPrice: 2 }], paymentMethod: 'CARD', ...extra });
+    expect(response.status).toBe(201);
+    return response.body.orderId as string;
+  }
+
+  const edit = (token: string, orderId: string, body: object) =>
+    request(app).put(`/api/orders/${orderId}`).set('Authorization', `Bearer ${token}`).send(body);
+
+  it('lets a manager change items, payment method and discount, recalculating totals and stock', async () => {
+    const cashier = await userToken('cashier-1', 'CASHIER');
+    const manager = await userToken('manager-1', 'MANAGER');
+    const { productId, inventoryItemId } = await productWithRecipe();
+    const orderId = await placeOrder(cashier, productId); // 2 x $2, 36g out
+    expect(await stockOf(inventoryItemId)).toBe(964);
+
+    const response = await edit(manager, orderId, {
+      items: [{ productId, productName: 'Espresso', quantity: 3, unitPrice: 2 }],
+      paymentMethod: 'QR_CODE',
+      discountAmount: 1,
+      reason: 'Customer had three',
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      subtotal: 6,
+      discountAmount: 1,
+      totalAmount: 5,
+      cashierName: 'cashier-1', // still the cashier who rang it up
+      editedByName: 'manager-1',
+      editReason: 'Customer had three',
+      payment: { paymentMethod: 'QR_CODE', amountTenderedUsd: 5, changeGivenUsd: 0 },
+    });
+    expect(response.body.items).toHaveLength(1);
+    expect(response.body.items[0]).toMatchObject({ productId, quantity: 3 });
+    expect(await stockOf(inventoryItemId)).toBe(946); // 3 x 18g out now, not 2
+
+    const list = await request(app).get('/api/orders').set('Authorization', `Bearer ${manager}`);
+    expect(list.body.find((row: { id: string }) => row.id === orderId)?.isEdited).toBe(true);
+  });
+
+  it('keeps cash that still covers the new total, and records cash that no longer does as paid exactly', async () => {
+    const manager = await userToken('manager-1', 'MANAGER');
+    const { productId } = await productWithRecipe();
+    const orderId = await placeOrder(manager, productId, { paymentMethod: 'CASH', amountTenderedUsd: 10, amountTenderedRiel: 0 });
+    const items = (quantity: number) => [{ productId, productName: 'Espresso', quantity, unitPrice: 2 }];
+
+    const stillCovered = await edit(manager, orderId, { items: items(3), paymentMethod: 'CASH', discountAmount: 0, reason: 'Fix' });
+    expect(stillCovered.body.payment).toMatchObject({ amountTenderedUsd: 10, changeGivenUsd: 4, changeGivenRiel: 0 });
+
+    const noLongerCovered = await edit(manager, orderId, { items: items(6), paymentMethod: 'CASH', discountAmount: 0, reason: 'Fix' });
+    expect(noLongerCovered.body.totalAmount).toBe(12);
+    expect(noLongerCovered.body.payment).toMatchObject({ amountTenderedUsd: 12, amountTenderedRiel: 0, changeGivenUsd: 0 });
+  });
+
+  it('applies the tax rate the sale was charged to the new subtotal', async () => {
+    await db.insert(storeSettings).values({ id: 'default', taxEnabled: true }).run();
+    const manager = await userToken('manager-1', 'MANAGER');
+    const { productId } = await productWithRecipe();
+    const orderId = await placeOrder(manager, productId, { taxAmount: 0.32 }); // 8% of $4
+
+    const response = await edit(manager, orderId, {
+      items: [{ productId, productName: 'Espresso', quantity: 3, unitPrice: 2 }],
+      paymentMethod: 'CARD',
+      discountAmount: 0,
+      reason: 'Fix',
+    });
+
+    expect(response.body).toMatchObject({ subtotal: 6, taxAmount: 0.48, totalAmount: 6.48 });
+  });
+
+  it('rejects cashiers, voided orders, a discount above the subtotal, and a missing reason', async () => {
+    const cashier = await userToken('cashier-1', 'CASHIER');
+    const manager = await userToken('manager-1', 'MANAGER');
+    const { productId } = await productWithRecipe();
+    const orderId = await placeOrder(cashier, productId);
+    const body = { items: [{ productId, productName: 'Espresso', quantity: 1, unitPrice: 2 }], paymentMethod: 'CARD', discountAmount: 0, reason: 'Fix' };
+
+    expect((await edit(cashier, orderId, body)).status).toBe(403);
+    expect((await edit(manager, orderId, { ...body, discountAmount: 5 })).status).toBe(400);
+    expect((await edit(manager, orderId, { ...body, reason: '  ' })).status).toBe(400);
+    expect((await edit(manager, 'does-not-exist', body)).status).toBe(404);
+
+    await request(app).post(`/api/orders/${orderId}/void`).set('Authorization', `Bearer ${manager}`).send({ reason: 'Mistake' });
+    expect((await edit(manager, orderId, body)).status).toBe(409);
   });
 });

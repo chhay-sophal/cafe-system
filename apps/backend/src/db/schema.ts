@@ -113,6 +113,10 @@ export const orders = sqliteTable('orders', {
   voidedAt: text('voided_at'),
   voidedBy: text('voided_by').references(() => users.id),
   voidReason: text('void_reason'),
+  // The latest correction made in IMS (PUT /api/orders/:id) - who, when, why.
+  editedAt: text('edited_at'),
+  editedBy: text('edited_by').references(() => users.id),
+  editReason: text('edit_reason'),
   createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
   // Idempotency key from the POS (see orderSchema.clientOrderId). Null for
   // orders from clients that don't send one - SQLite's unique index allows

@@ -3,6 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
+import { alias, type SQLiteColumn } from 'drizzle-orm/sqlite-core';
 import { eq, sql, gte, lte, and, inArray, isNotNull, desc } from 'drizzle-orm';
 import { db } from './db/index.js';
 import {
@@ -23,6 +24,7 @@ import {
   mainCurrencySchema,
   managerApprovalSchema,
   modifierGroupSchema,
+  orderEditSchema,
   orderSchema,
   pinLoginSchema,
   productSchema,
@@ -99,6 +101,131 @@ async function findOrderResultByClientOrderId(clientOrderId: string) {
     .get();
 
   return existing ? { success: true, ...existing } : null;
+}
+
+type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+// One sold line, as far as stock is concerned.
+interface StockLine {
+  productId: string;
+  quantity: number;
+  modifierIds: string[];
+}
+
+// Moves the recipe stock for sold lines: -1 takes it out (a sale), +1 puts it
+// back (a void, or the old lines of an edit). Uses the recipes as they are
+// now - recipes aren't snapshotted per order.
+async function applyRecipeStock(tx: Transaction, lines: StockLine[], direction: 1 | -1) {
+  for (const line of lines) {
+    const recipeRows = [
+      ...(await tx.select().from(recipes).where(eq(recipes.productId, line.productId)).all()),
+      ...(line.modifierIds.length
+        ? await tx.select().from(recipes).where(inArray(recipes.modifierId, line.modifierIds)).all()
+        : []),
+    ];
+    for (const recipe of recipeRows) {
+      await tx.update(inventoryItems)
+        .set({
+          stockQuantity: sql`${inventoryItems.stockQuantity} + ${direction * recipe.quantityRequired * line.quantity}`,
+          updatedAt: sql`CURRENT_TIMESTAMP`,
+        })
+        .where(eq(inventoryItems.id, recipe.inventoryItemId))
+        .run();
+    }
+  }
+}
+
+// An order's current lines, for putting their stock back.
+async function stockLinesOf(orderId: string): Promise<{ itemIds: string[]; lines: StockLine[] }> {
+  const items = await db.select({ id: orderItems.id, productId: orderItems.productId, quantity: orderItems.quantity })
+    .from(orderItems).where(eq(orderItems.orderId, orderId)).all();
+  const itemModifiers = items.length
+    ? await db.select({ orderItemId: orderItemModifiers.orderItemId, modifierId: orderItemModifiers.modifierId })
+      .from(orderItemModifiers).where(inArray(orderItemModifiers.orderItemId, items.map((item) => item.id))).all()
+    : [];
+  return {
+    itemIds: items.map((item) => item.id),
+    lines: items.map((item) => ({
+      productId: item.productId,
+      quantity: item.quantity,
+      modifierIds: itemModifiers.filter((m) => m.orderItemId === item.id).map((m) => m.modifierId),
+    })),
+  };
+}
+
+// GET /api/orders/:id's body (also returned after an edit), or null. Times
+// are store-local "YYYY-MM-DD HH:MM:SS".
+async function loadOrderDetail(id: string) {
+  const local = (column: SQLiteColumn) => sql<string | null>`datetime(${column}, ${STORE_UTC_OFFSET_SQL_MODIFIER})`;
+  const voider = alias(users, 'voider');
+  const editor = alias(users, 'editor');
+  const order = await db.select({
+    id: orders.id,
+    orderNumber: orders.orderNumber,
+    createdAt: local(orders.createdAt),
+    status: orders.status,
+    subtotal: orders.subtotal,
+    taxAmount: orders.taxAmount,
+    discountAmount: orders.discountAmount,
+    totalAmount: orders.totalAmount,
+    cashierName: users.name,
+    voidReason: orders.voidReason,
+    voidedAt: local(orders.voidedAt),
+    voidedByName: voider.name,
+    editReason: orders.editReason,
+    editedAt: local(orders.editedAt),
+    editedByName: editor.name,
+  })
+    .from(orders)
+    .leftJoin(users, eq(orders.userId, users.id))
+    .leftJoin(voider, eq(orders.voidedBy, voider.id))
+    .leftJoin(editor, eq(orders.editedBy, editor.id))
+    .where(eq(orders.id, id))
+    .get();
+
+  if (!order) {
+    return null;
+  }
+
+  const items = await db.select({
+    id: orderItems.id,
+    productId: orderItems.productId,
+    productName: orderItems.productName,
+    quantity: orderItems.quantity,
+    unitPrice: orderItems.unitPrice,
+    totalPrice: orderItems.totalPrice,
+  }).from(orderItems).where(eq(orderItems.orderId, id)).all();
+
+  const itemModifiers = await db.select({
+    orderItemId: orderItemModifiers.orderItemId,
+    modifierId: orderItemModifiers.modifierId,
+    modifierName: orderItemModifiers.modifierName,
+    priceExtra: orderItemModifiers.priceExtra,
+  })
+    .from(orderItemModifiers)
+    .innerJoin(orderItems, eq(orderItemModifiers.orderItemId, orderItems.id))
+    .where(eq(orderItems.orderId, id))
+    .all();
+
+  const payment = await db.select({
+    paymentMethod: payments.paymentMethod,
+    amountTenderedUsd: payments.amountTenderedUsd,
+    amountTenderedRiel: payments.amountTenderedRiel,
+    changeGivenUsd: payments.changeGivenUsd,
+    changeGivenRiel: payments.changeGivenRiel,
+    exchangeRateRielPerUsd: payments.exchangeRateRielPerUsd,
+  }).from(payments).where(eq(payments.orderId, id)).get();
+
+  return {
+    ...order,
+    items: items.map((item) => ({
+      ...item,
+      modifiers: itemModifiers
+        .filter((m) => m.orderItemId === item.id)
+        .map(({ modifierId, modifierName, priceExtra }) => ({ modifierId, modifierName, priceExtra })),
+    })),
+    payment: payment ?? null,
+  };
 }
 
 const USER_PUBLIC_COLUMNS = {
@@ -888,6 +1015,7 @@ function createApp() {
         cashierName: users.name,
         paymentMethod: payments.paymentMethod,
         itemCount: sql<number>`(select count(*) from ${orderItems} where ${orderItems.orderId} = ${orders.id})`,
+        isEdited: sql<boolean>`${orders.editedAt} is not null`.mapWith(Boolean),
       })
         .from(orders)
         .leftJoin(users, eq(orders.userId, users.id))
@@ -904,69 +1032,161 @@ function createApp() {
   });
 
   app.get('/api/orders/:id', authenticate, async (req, res) => {
-    const id = String(req.params.id);
-    const localCreatedAt = sql`datetime(${orders.createdAt}, ${STORE_UTC_OFFSET_SQL_MODIFIER})`;
-
     try {
-      const order = await db.select({
-        id: orders.id,
-        orderNumber: orders.orderNumber,
-        createdAt: localCreatedAt,
-        status: orders.status,
-        subtotal: orders.subtotal,
-        taxAmount: orders.taxAmount,
-        discountAmount: orders.discountAmount,
-        totalAmount: orders.totalAmount,
-        cashierName: users.name,
-        voidReason: orders.voidReason,
-      })
-        .from(orders)
-        .leftJoin(users, eq(orders.userId, users.id))
-        .where(eq(orders.id, id))
-        .get();
-
+      const order = await loadOrderDetail(String(req.params.id));
       if (!order) {
         return res.status(404).json({ error: 'Order not found' });
       }
-
-      const items = await db.select({
-        id: orderItems.id,
-        productName: orderItems.productName,
-        quantity: orderItems.quantity,
-        unitPrice: orderItems.unitPrice,
-        totalPrice: orderItems.totalPrice,
-      }).from(orderItems).where(eq(orderItems.orderId, id)).all();
-
-      const itemModifiers = await db.select({
-        orderItemId: orderItemModifiers.orderItemId,
-        modifierName: orderItemModifiers.modifierName,
-        priceExtra: orderItemModifiers.priceExtra,
-      })
-        .from(orderItemModifiers)
-        .innerJoin(orderItems, eq(orderItemModifiers.orderItemId, orderItems.id))
-        .where(eq(orderItems.orderId, id))
-        .all();
-
-      const itemsWithModifiers = items.map((item) => ({
-        ...item,
-        modifiers: itemModifiers
-          .filter((m) => m.orderItemId === item.id)
-          .map(({ modifierName, priceExtra }) => ({ modifierName, priceExtra })),
-      }));
-
-      const payment = await db.select({
-        paymentMethod: payments.paymentMethod,
-        amountTenderedUsd: payments.amountTenderedUsd,
-        amountTenderedRiel: payments.amountTenderedRiel,
-        changeGivenUsd: payments.changeGivenUsd,
-        changeGivenRiel: payments.changeGivenRiel,
-        exchangeRateRielPerUsd: payments.exchangeRateRielPerUsd,
-      }).from(payments).where(eq(payments.orderId, id)).get();
-
-      res.json({ ...order, items: itemsWithModifiers, payment: payment ?? null });
+      res.json(order);
     } catch (error) {
       console.error('Fetch order detail error:', error);
       res.status(500).json({ error: 'Failed to fetch order detail' });
+    }
+  });
+
+  // Managers and admins correct a completed sale from IMS: its items, payment
+  // method and discount, with a reason. Totals are recalculated, stock moves
+  // with the items (the old lines' recipes go back, the new ones come out),
+  // and the latest edit's who/when/why is kept on the order. The order
+  // number, time and cashier stay as rung up.
+  app.put('/api/orders/:id', authenticate, requireRole(['MANAGER', 'ADMIN']), validateBody(orderEditSchema), async (req, res) => {
+    const id = String(req.params.id);
+    const { items, paymentMethod, discountAmount, reason } = req.body as {
+      items: Array<{ productId: string; productName: string; quantity: number; unitPrice: number; selectedModifiers?: Array<{ id: string; name: string; priceExtra: number }> }>;
+      paymentMethod: 'CASH' | 'CARD' | 'QR_CODE';
+      discountAmount: number;
+      reason: string;
+    };
+    const actingUserId = req.user!.id;
+
+    try {
+      const order = await db.select({ status: orders.status, subtotal: orders.subtotal, taxAmount: orders.taxAmount })
+        .from(orders).where(eq(orders.id, id)).get();
+      if (!order) {
+        return res.status(404).json({ error: 'Order not found' });
+      }
+      if (order.status !== 'COMPLETED') {
+        return res.status(409).json({ error: 'Only completed orders can be edited' });
+      }
+      const payment = await db.select().from(payments).where(eq(payments.orderId, id)).get();
+      if (!payment) {
+        return res.status(409).json({ error: 'This order has no payment record to update' });
+      }
+
+      // Checked up front so a bad id is a clear 400, not a foreign key error.
+      const productIds = [...new Set(items.map((item) => item.productId))];
+      const modifierIds = [...new Set(items.flatMap((item) => item.selectedModifiers?.map((m) => m.id) ?? []))];
+      const knownProducts = await db.select({ id: products.id }).from(products).where(inArray(products.id, productIds)).all();
+      const knownModifiers = modifierIds.length
+        ? await db.select({ id: modifiers.id }).from(modifiers).where(inArray(modifiers.id, modifierIds)).all()
+        : [];
+      if (knownProducts.length !== productIds.length || knownModifiers.length !== modifierIds.length) {
+        return res.status(400).json({ error: 'An item or option on this order no longer exists' });
+      }
+
+      const subtotal = round2(items.reduce(
+        (sum, item) => sum + (item.unitPrice + (item.selectedModifiers ?? []).reduce((extras, m) => extras + m.priceExtra, 0)) * item.quantity,
+        0,
+      ));
+      if (discountAmount > subtotal) {
+        return res.status(400).json({ error: "The discount can't be more than the subtotal" });
+      }
+      // The tax rate the sale was actually charged (the POS adds tax as a
+      // share of the subtotal while tax is on), applied to the new subtotal -
+      // so turning tax on or off since doesn't rewrite an old sale's tax.
+      const taxAmount = order.taxAmount > 0 && order.subtotal > 0 ? round2(subtotal * (order.taxAmount / order.subtotal)) : 0;
+      const totalAmount = round2(subtotal + taxAmount - discountAmount);
+
+      // Cash that still covers the new total is kept as handed over, with the
+      // change worked out again. Otherwise - another method, or cash that no
+      // longer covers it (the original record was the mistake) - the sale is
+      // recorded as paid exactly, so takings always match the total.
+      const rate = payment.exchangeRateRielPerUsd;
+      let tendered = { usd: totalAmount, riel: 0 };
+      let change = { usd: 0, riel: 0 };
+      if (paymentMethod === 'CASH' && payment.paymentMethod === 'CASH'
+        && isTenderSufficient(totalAmount, rate, payment.amountTenderedUsd, payment.amountTenderedRiel)) {
+        tendered = { usd: payment.amountTenderedUsd, riel: payment.amountTenderedRiel };
+        const changeDueUsd = Math.max(0, round2(tendered.usd + tendered.riel / rate - totalAmount));
+        change = computeChange(changeDueUsd, rate, tendered.usd, tendered.riel);
+      }
+
+      const previous = await stockLinesOf(id);
+      const newLines = items.map((item) => ({
+        productId: item.productId,
+        quantity: item.quantity,
+        modifierIds: (item.selectedModifiers ?? []).map((m) => m.id),
+      }));
+
+      const wasEdited = await db.transaction(async (tx) => {
+        // Conditional on status, so an order voided meanwhile isn't edited.
+        const update = await tx.update(orders)
+          .set({
+            subtotal,
+            taxAmount,
+            discountAmount,
+            totalAmount,
+            editedAt: sql`CURRENT_TIMESTAMP`,
+            editedBy: actingUserId,
+            editReason: reason,
+          })
+          .where(and(eq(orders.id, id), eq(orders.status, 'COMPLETED')))
+          .run();
+        if (update.rowsAffected === 0) {
+          return false;
+        }
+
+        await applyRecipeStock(tx, previous.lines, 1);
+        if (previous.itemIds.length) {
+          await tx.delete(orderItemModifiers).where(inArray(orderItemModifiers.orderItemId, previous.itemIds)).run();
+        }
+        await tx.delete(orderItems).where(eq(orderItems.orderId, id)).run();
+
+        for (const item of items) {
+          const orderItemId = randomUUID();
+          await tx.insert(orderItems).values({
+            id: orderItemId,
+            orderId: id,
+            productId: item.productId,
+            productName: item.productName,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            totalPrice: item.unitPrice * item.quantity,
+          }).run();
+          for (const modifier of item.selectedModifiers ?? []) {
+            await tx.insert(orderItemModifiers).values({
+              id: randomUUID(),
+              orderItemId,
+              modifierId: modifier.id,
+              modifierName: modifier.name,
+              priceExtra: modifier.priceExtra,
+            }).run();
+          }
+        }
+        await applyRecipeStock(tx, newLines, -1);
+
+        await tx.update(payments)
+          .set({
+            paymentMethod,
+            amountTenderedUsd: tendered.usd,
+            amountTenderedRiel: tendered.riel,
+            changeGivenUsd: change.usd,
+            changeGivenRiel: change.riel,
+          })
+          .where(eq(payments.id, payment.id))
+          .run();
+
+        return true;
+      });
+
+      if (!wasEdited) {
+        return res.status(409).json({ error: 'Only completed orders can be edited' });
+      }
+
+      res.json(await loadOrderDetail(id));
+    } catch (error) {
+      console.error('Edit order error:', error);
+      res.status(500).json({ error: 'Failed to edit order' });
     }
   });
 
@@ -1004,12 +1224,7 @@ function createApp() {
         return res.status(409).json({ error: 'Only completed orders can be voided' });
       }
 
-      const items = await db.select({ id: orderItems.id, productId: orderItems.productId, quantity: orderItems.quantity })
-        .from(orderItems).where(eq(orderItems.orderId, id)).all();
-      const itemModifiers = items.length
-        ? await db.select({ orderItemId: orderItemModifiers.orderItemId, modifierId: orderItemModifiers.modifierId })
-          .from(orderItemModifiers).where(inArray(orderItemModifiers.orderItemId, items.map((item) => item.id))).all()
-        : [];
+      const { lines: soldLines } = await stockLinesOf(id);
 
       const wasVoided = await db.transaction(async (tx) => {
         // Conditional on status so two simultaneous voids can't both
@@ -1022,28 +1237,9 @@ function createApp() {
           return false;
         }
 
-        // Mirrors the deduction in POST /api/orders. Uses the recipes as they
-        // are now, not as they were at sale time (recipes aren't snapshotted
-        // per order) - normally the same, since voids happen the same day.
-        const restock = async (recipeRows: Array<{ inventoryItemId: string; quantityRequired: number }>, quantity: number) => {
-          for (const recipe of recipeRows) {
-            await tx.update(inventoryItems)
-              .set({
-                stockQuantity: sql`${inventoryItems.stockQuantity} + ${recipe.quantityRequired * quantity}`,
-                updatedAt: sql`CURRENT_TIMESTAMP`,
-              })
-              .where(eq(inventoryItems.id, recipe.inventoryItemId))
-              .run();
-          }
-        };
-
-        for (const item of items) {
-          await restock(await tx.select().from(recipes).where(eq(recipes.productId, item.productId)).all(), item.quantity);
-          for (const modifier of itemModifiers.filter((m) => m.orderItemId === item.id)) {
-            await restock(await tx.select().from(recipes).where(eq(recipes.modifierId, modifier.modifierId)).all(), item.quantity);
-          }
-        }
-
+        // Puts back what the sale took - normally with the same recipes, since
+        // voids happen the same day.
+        await applyRecipeStock(tx, soldLines, 1);
         return true;
       });
 

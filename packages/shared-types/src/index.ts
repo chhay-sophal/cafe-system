@@ -37,6 +37,15 @@ export const orderSchema = z.object({
   discountAmount: z.number().nonnegative().optional(),
 });
 
+// A manager's correction of a completed sale (PUT /api/orders/:id): the full
+// new list of items, payment method and discount, and why.
+export const orderEditSchema = z.object({
+  items: orderSchema.shape.items,
+  paymentMethod: orderSchema.shape.paymentMethod,
+  discountAmount: z.number().nonnegative(),
+  reason: z.string().trim().min(1, 'A reason is required').max(200),
+});
+
 export const voidOrderSchema = z.object({
   reason: z.string().trim().min(1, 'A reason is required').max(200),
 });
