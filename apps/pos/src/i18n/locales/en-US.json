@@ -16,7 +16,13 @@
     "online": "Online",
     "offline": "Offline",
     "loadError": "Failed to load menu.",
-    "register": "Register"
+    "register": "Register",
+    "refreshMenu": {
+      "idle": "Refresh menu",
+      "refreshing": "Refreshing...",
+      "done": "Menu updated",
+      "failed": "Couldn't refresh"
+    }
   },
   "login": {
     "subtitle": "Enter your PIN to start a shift",

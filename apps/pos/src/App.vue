@@ -188,14 +188,19 @@ function applyCatalog(catalog: Catalog) {
 // session - while it's false (started offline, on the saved menu), coming
 // back online or the retry timer tries again.
 let serverDataLoaded = false;
-let isLoadingServerData = false;
+let serverDataLoadedAt = 0;
+let serverDataRequest: Promise<boolean> | null = null;
 
-async function loadServerData() {
-  if (isLoadingServerData) {
-    return;
-  }
-  isLoadingServerData = true;
+// Resolves true if the menu and store settings were loaded fresh from the
+// backend. Callers that overlap share the request already in flight.
+function loadServerData(): Promise<boolean> {
+  serverDataRequest ??= fetchServerData().finally(() => {
+    serverDataRequest = null;
+  });
+  return serverDataRequest;
+}
 
+async function fetchServerData(): Promise<boolean> {
   try {
     const [categoryList, productList, modifierGroups] = await Promise.all([
       fetchCategories(),
@@ -207,17 +212,51 @@ async function loadServerData() {
     applyCatalog(catalog);
     saveCachedCatalog(catalog);
     serverDataLoaded = true;
+    serverDataLoadedAt = Date.now();
     errorMessage.value = null;
+    return true;
   } catch (error) {
     // With a saved menu on screen the register keeps selling from it; only a
     // first launch with nothing saved has no menu to show.
     if (products.value.length === 0) {
       errorMessage.value = error instanceof Error ? error.message : t("app.loadError");
     }
+    return false;
   } finally {
-    isLoadingServerData = false;
     isLoading.value = false;
   }
+}
+
+// The menu otherwise only loads when the app opens, and a register can stay
+// open for days - so each new login (e.g. a shift change) picks up price and
+// menu changes made in IMS since. Skipped right after a load, e.g. logging in
+// moments after the app opened.
+const LOGIN_RELOAD_MIN_AGE_MS = 60_000;
+
+watch(
+  () => auth.session.value?.token,
+  (token, previousToken) => {
+    if (token && token !== previousToken && Date.now() - serverDataLoadedAt > LOGIN_RELOAD_MIN_AGE_MS) {
+      loadServerData();
+    }
+  },
+);
+
+// Header "Refresh menu" button - for picking up an IMS change straight away.
+// The result shows on the button briefly, then it goes back to idle.
+const menuRefreshState = ref<"idle" | "refreshing" | "done" | "failed">("idle");
+let menuRefreshResetId: ReturnType<typeof setTimeout> | undefined;
+
+async function refreshMenu() {
+  if (menuRefreshState.value === "refreshing") {
+    return;
+  }
+  clearTimeout(menuRefreshResetId);
+  menuRefreshState.value = "refreshing";
+  menuRefreshState.value = (await loadServerData()) ? "done" : "failed";
+  menuRefreshResetId = setTimeout(() => {
+    menuRefreshState.value = "idle";
+  }, 3000);
 }
 
 let syncIntervalId: ReturnType<typeof setInterval> | undefined;
@@ -278,6 +317,7 @@ onUnmounted(() => {
     clearInterval(syncIntervalId);
   }
   unlistenRequestSync?.();
+  clearTimeout(menuRefreshResetId);
 });
 </script>
 
@@ -329,6 +369,15 @@ onUnmounted(() => {
         >
           {{ network.isOnline.value ? t("app.online") : t("app.offline") }}
         </span>
+        <button
+          type="button"
+          class="pos-header__refresh"
+          :class="`pos-header__refresh--${menuRefreshState}`"
+          :disabled="menuRefreshState === 'refreshing'"
+          @click="refreshMenu"
+        >
+          {{ t(`app.refreshMenu.${menuRefreshState}`) }}
+        </button>
         <span class="pos-header__cashier">{{ auth.session.value.user.name }}</span>
         <button type="button" class="pos-header__logout" @click="auth.logout()">{{ t("app.logout") }}</button>
       </div>
@@ -484,6 +533,7 @@ onUnmounted(() => {
   color: #ff8a7a;
 }
 
+.pos-header__refresh,
 .pos-header__logout {
   border: 2px solid #cccccc;
   background: transparent;
@@ -493,6 +543,19 @@ onUnmounted(() => {
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
+}
+
+.pos-header__refresh:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.pos-header__refresh--done {
+  border-color: #27ae60;
+}
+
+.pos-header__refresh--failed {
+  border-color: #e74c3c;
 }
 
 .pos-body {
@@ -531,6 +594,8 @@ onUnmounted(() => {
   color: #aaaaaa;
 }
 
+:where(:root[data-theme="dark"]) .pos-header__refresh--idle,
+:where(:root[data-theme="dark"]) .pos-header__refresh--refreshing,
 :where(:root[data-theme="dark"]) .pos-header__logout {
   border-color: #444444;
   color: #f2f2f2;
