@@ -2,14 +2,16 @@ import { ref } from "vue";
 import { fetchMyOrdersToday, fetchOrderDetail } from "../lib/api";
 import type { OrderDetail, OrderListRow } from "../types/order";
 
-// Sales History lists only the logged-in cashier's own sales for today, and
-// nothing outside this register changes them (sales are rung up and voided
-// here; IMS can't void). So the list and opened invoices are kept in memory
-// across tab switches and only fetched again when:
+// Sales History lists only the logged-in cashier's own sales for today, which
+// almost always change only here (rung up and voided at this register). So
+// the list and opened invoices are kept in memory across tab switches and
+// only fetched again when:
 //   - this register completed or synced a sale since (invalidate()),
 //   - the cashier (session) or the day changed, or
-//   - the cashier pressed Refresh (e.g. they also sold on another register).
-// Voids are applied locally (markVoided) instead of refetching.
+//   - the cashier pressed Refresh - e.g. they also sold on another register,
+//     or a manager voided or corrected one of their sales in IMS. Refresh
+//     also drops the opened invoices, so those show the change too.
+// Voids made here are applied locally (markVoided) instead of refetching.
 const orders = ref<OrderListRow[]>([]);
 let loadedForToken: string | null = null;
 let loadedForDay: string | null = null;
@@ -32,6 +34,8 @@ async function loadOrders(token: string, { force = false } = {}): Promise<void> 
   if (loadedForToken !== token) {
     // A different cashier - don't show the previous one's sales meanwhile.
     orders.value = [];
+    orderDetails.clear();
+  } else if (force) {
     orderDetails.clear();
   }
   const day = today();
