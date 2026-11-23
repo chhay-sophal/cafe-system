@@ -544,6 +544,70 @@ describe('daily summary date range (store-local timezone)', () => {
     expect(manager.status).toBe(200);
   });
 
+  it('reports a zero-filled daily trend, top products with modifiers, and the previous period', async () => {
+    await tokenFor('CASHIER');
+    const token = await tokenFor('MANAGER');
+    const categoryId = randomUUID();
+    const productId = randomUUID();
+    const groupId = randomUUID();
+    const modifierId = randomUUID();
+    await db.insert(categories).values({ id: categoryId, name: 'Report Drinks' }).run();
+    await db.insert(products).values({ id: productId, categoryId, name: 'Report Latte', basePrice: 4 }).run();
+    await db.insert(modifierGroups).values({ id: groupId, name: 'Report Milk' }).run();
+    await db.insert(modifiers).values({ id: modifierId, groupId, name: 'Report Oat', priceExtra: 0.5 }).run();
+
+    // Store-local days (UTC+7): the range is Aug 30 - Sep 1, so the previous
+    // period is Aug 27 - 29.
+    const sale = async (id: string, createdAt: string, unitPrice: number, withModifier: boolean, status: 'COMPLETED' | 'VOIDED' = 'COMPLETED') => {
+      const total = unitPrice + (withModifier ? 0.5 : 0);
+      await db.insert(orders).values({ id, userId: 'cashier-1', orderNumber: 1, subtotal: total, totalAmount: total, status, createdAt }).run();
+      await db.insert(orderItems).values({ id: `${id}-item`, orderId: id, productId, productName: 'Report Latte', quantity: 1, unitPrice, totalPrice: unitPrice }).run();
+      if (withModifier) {
+        await db.insert(orderItemModifiers).values({ id: `${id}-mod`, orderItemId: `${id}-item`, modifierId, modifierName: 'Report Oat', priceExtra: 0.5 }).run();
+      }
+    };
+
+    try {
+      await sale('report-a', '2026-08-30 03:00:00', 4, true); // Aug 30 local
+      await sale('report-voided', '2026-08-31 03:00:00', 4, false, 'VOIDED'); // ignored
+      await sale('report-b', '2026-09-01 03:00:00', 3, false); // Sep 1 local
+      await sale('report-previous', '2026-08-27 03:00:00', 2, false); // previous period
+
+      const report = await request(app)
+        .get('/api/reports/daily-summary?startDate=2026-08-30&endDate=2026-09-01')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(report.status).toBe(200);
+      expect(report.body.dailyVolume).toEqual([
+        { date: '2026-08-30', orderCount: 1, revenue: 4.5 },
+        { date: '2026-08-31', orderCount: 0, revenue: 0 },
+        { date: '2026-09-01', orderCount: 1, revenue: 3 },
+      ]);
+      expect(report.body.topProducts).toEqual([
+        { productId, productName: 'Report Latte', categoryName: 'Report Drinks', quantity: 2, revenue: 7.5 },
+      ]);
+      expect(report.body.previousPeriod.startDate).toBe('2026-08-27');
+      expect(report.body.previousPeriod.endDate).toBe('2026-08-29');
+      expect(report.body.previousPeriod.metrics).toMatchObject({ totalOrders: 1, netRevenue: 2 });
+    } finally {
+      await db.delete(orderItemModifiers).run();
+      await db.delete(orderItems).run();
+      await db.delete(orders).run();
+      await db.delete(modifiers).where(eq(modifiers.id, modifierId)).run();
+      await db.delete(modifierGroups).where(eq(modifierGroups.id, groupId)).run();
+      await db.delete(products).where(eq(products.id, productId)).run();
+      await db.delete(categories).where(eq(categories.id, categoryId)).run();
+    }
+  });
+
+  it('rejects malformed or reversed dates', async () => {
+    const token = await tokenFor('MANAGER');
+    const get = (query: string) => request(app).get(`/api/reports/daily-summary?${query}`).set('Authorization', `Bearer ${token}`);
+
+    expect((await get('startDate=2026-13-40')).status).toBe(400);
+    expect((await get('startDate=2026-09-02&endDate=2026-09-01')).status).toBe(400);
+  });
+
   it('buckets an order by the store-local calendar day, not its UTC calendar day', async () => {
     await tokenFor('CASHIER');
     const token = await tokenFor('MANAGER');

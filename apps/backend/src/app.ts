@@ -52,6 +52,20 @@ function storeTodayDateString(at: Date = new Date()): string {
   return shifted.toISOString().slice(0, 10);
 }
 
+function isDateString(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
+}
+
+// Calendar arithmetic on "YYYY-MM-DD" strings (done in UTC, so no DST or
+// local-timezone surprises).
+function shiftDate(date: string, days: number): string {
+  return new Date(Date.parse(`${date}T00:00:00Z`) + days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function daysBetween(from: string, to: string): number {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / (24 * 60 * 60 * 1000));
+}
+
 // `at` in the format SQLite's CURRENT_TIMESTAMP produces (UTC, "YYYY-MM-DD
 // HH:MM:SS"), for createdAt values set explicitly rather than by default.
 function toSqliteTimestamp(at: Date): string {
@@ -1319,27 +1333,53 @@ function createApp() {
   app.get('/api/reports/daily-summary', authenticate, requireRole(['MANAGER', 'ADMIN']), async (req, res) => {
     const startDate = (req.query.startDate as string) || storeTodayDateString();
     const endDate = (req.query.endDate as string) || startDate;
+    if (!isDateString(startDate) || !isDateString(endDate) || startDate > endDate) {
+      return res.status(400).json({ error: 'startDate and endDate must be YYYY-MM-DD, startDate first' });
+    }
+    // The same number of days immediately before, for the "vs previous period"
+    // comparison on the summary cards.
+    const periodDays = daysBetween(startDate, endDate) + 1;
+    const previousEndDate = shiftDate(startDate, -1);
+    const previousStartDate = shiftDate(startDate, -periodDays);
+
     // startDate/endDate are store-local calendar days (see storeTodayDateString),
     // but createdAt is stored in UTC - shift it to local time before comparing,
     // otherwise the boundary is off by the store's UTC offset.
     const localCreatedAt = sql`datetime(${orders.createdAt}, ${STORE_UTC_OFFSET_SQL_MODIFIER})`;
-    const dateCondition = and(
-      gte(localCreatedAt, `${startDate} 00:00:00`),
-      lte(localCreatedAt, `${endDate} 23:59:59`),
+    const completedBetween = (from: string, to: string) => and(
+      gte(localCreatedAt, `${from} 00:00:00`),
+      lte(localCreatedAt, `${to} 23:59:59`),
       eq(orders.status, 'COMPLETED'),
     );
+    const dateCondition = completedBetween(startDate, endDate);
 
-    try {
-      // SUM() over zero matching rows returns NULL, not 0 - coalesce so an
-      // empty date range reports clean zeros instead of nulls the frontend
-      // would have to guard against.
-      const summary = await db.select({
+    // SUM() over zero matching rows returns NULL, not 0 - coalesce so an empty
+    // date range reports clean zeros instead of nulls the frontend would have
+    // to guard against. Money sums come out of SQLite as raw floats (Riel
+    // converted back to USD rarely lands on whole cents), so they're rounded
+    // to cents before being sent.
+    const summarize = async (from: string, to: string) => {
+      const row = await db.select({
         totalOrders: sql<number>`count(${orders.id})`,
         grossRevenue: sql<number>`coalesce(sum(${orders.subtotal}), 0)`,
         totalTax: sql<number>`coalesce(sum(${orders.taxAmount}), 0)`,
         totalDiscounts: sql<number>`coalesce(sum(${orders.discountAmount}), 0)`,
         netRevenue: sql<number>`coalesce(sum(${orders.totalAmount}), 0)`,
-      }).from(orders).where(dateCondition).get();
+      }).from(orders).where(completedBetween(from, to)).get();
+      return {
+        totalOrders: row?.totalOrders ?? 0,
+        grossRevenue: round2(row?.grossRevenue ?? 0),
+        totalTax: round2(row?.totalTax ?? 0),
+        totalDiscounts: round2(row?.totalDiscounts ?? 0),
+        netRevenue: round2(row?.netRevenue ?? 0),
+      };
+    };
+
+    try {
+      const [metrics, previousMetrics] = await Promise.all([
+        summarize(startDate, endDate),
+        summarize(previousStartDate, previousEndDate),
+      ]);
 
       // Riel legs are converted back to USD via each row's own snapshotted
       // rate, since the store's rate can change between orders.
@@ -1361,25 +1401,64 @@ function createApp() {
       const hourlyVolume = Array.from({ length: 24 }, (_, hour) => ({
         hour,
         orderCount: hourlyByHour.get(hour)?.orderCount ?? 0,
-        revenue: hourlyByHour.get(hour)?.revenue ?? 0,
+        revenue: round2(hourlyByHour.get(hour)?.revenue ?? 0),
       }));
 
-      // Money sums come out of SQLite as raw floats - Riel converted back to
-      // USD rarely lands on whole cents - so round them to cents here.
-      const metrics = summary || { totalOrders: 0, grossRevenue: 0, totalTax: 0, totalDiscounts: 0, netRevenue: 0 };
+      // One entry per store-local day in the range - days without sales
+      // included, as zeros, so the trend shows the gaps.
+      const localDay = sql<string>`date(${orders.createdAt}, ${STORE_UTC_OFFSET_SQL_MODIFIER})`;
+      const dailyRows = await db.select({
+        date: localDay,
+        orderCount: sql<number>`count(${orders.id})`,
+        revenue: sql<number>`coalesce(sum(${orders.totalAmount}), 0)`,
+      }).from(orders).where(dateCondition).groupBy(localDay).all();
+      const dailyByDate = new Map(dailyRows.map((row) => [row.date, row]));
+      const dailyVolume = Array.from({ length: periodDays }, (_, offset) => {
+        const date = shiftDate(startDate, offset);
+        return {
+          date,
+          orderCount: dailyByDate.get(date)?.orderCount ?? 0,
+          revenue: round2(dailyByDate.get(date)?.revenue ?? 0),
+        };
+      });
+
+      // Every product sold in the range, best-selling (by revenue) first.
+      // Revenue is the item's price plus its modifiers, times quantity - before
+      // order-level discounts, which aren't attributable to one item. Named
+      // and categorised as the product is now, falling back to the name saved
+      // on the sale.
+      const modifierExtras = sql`coalesce((
+        select sum(${orderItemModifiers.priceExtra}) from ${orderItemModifiers}
+        where ${orderItemModifiers.orderItemId} = ${orderItems.id}
+      ), 0)`;
+      const productRevenue = sql<number>`sum((${orderItems.unitPrice} + ${modifierExtras}) * ${orderItems.quantity})`;
+      const productRows = await db.select({
+        productId: orderItems.productId,
+        productName: sql<string>`coalesce(${products.name}, max(${orderItems.productName}))`,
+        categoryName: categories.name,
+        quantity: sql<number>`sum(${orderItems.quantity})`,
+        revenue: productRevenue,
+      }).from(orderItems)
+        .innerJoin(orders, eq(orderItems.orderId, orders.id))
+        .leftJoin(products, eq(orderItems.productId, products.id))
+        .leftJoin(categories, eq(products.categoryId, categories.id))
+        .where(dateCondition)
+        .groupBy(orderItems.productId)
+        .orderBy(desc(productRevenue))
+        .all();
+      const topProducts = productRows.map((row) => ({ ...row, revenue: round2(row.revenue) }));
+
       res.json({
         dateRange: { startDate, endDate },
-        metrics: {
-          ...metrics,
-          grossRevenue: round2(metrics.grossRevenue),
-          totalTax: round2(metrics.totalTax),
-          totalDiscounts: round2(metrics.totalDiscounts),
-          netRevenue: round2(metrics.netRevenue),
-        },
+        metrics,
+        previousPeriod: { startDate: previousStartDate, endDate: previousEndDate, metrics: previousMetrics },
         paymentBreakdown: paymentBreakdown.map((entry) => ({ ...entry, totalAmount: round2(entry.totalAmount) })),
-        hourlyVolume: hourlyVolume.map((entry) => ({ ...entry, revenue: round2(entry.revenue) })),
+        hourlyVolume,
+        dailyVolume,
+        topProducts,
       });
     } catch (error) {
+      console.error('Daily summary report error:', error);
       res.status(500).json({ error: 'Failed to generate report' });
     }
   });
