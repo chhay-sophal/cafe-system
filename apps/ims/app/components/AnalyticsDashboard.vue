@@ -24,9 +24,12 @@ watch(() => [period.startDate, period.endDate], () => store.fetchReport());
     <template v-else>
       <DailySummaryCards class="mb-6" />
 
+      <SalesTrendChart class="mb-4" />
+
       <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <TopProductsChart />
         <PaymentBreakdownChart />
-        <HourlyVolumeChart />
+        <HourlyVolumeChart class="lg:col-span-2" />
       </div>
     </template>
   </div>

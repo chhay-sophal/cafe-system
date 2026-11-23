@@ -56,6 +56,16 @@ export function formatDateLabel(dateStr: string, locale: string): string {
   return date.toLocaleDateString(locale, { month: "short", day: "numeric", year: "numeric" });
 }
 
+// A "YYYY-MM-DD" day without the year, for chart axes: "Nov 1" / "1 វិច្ឆិកា".
+export function formatShortDate(dateStr: string, locale: string): string {
+  const [year = 0, month = 1, day = 1] = dateStr.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  if (isKhmer(locale)) {
+    return `${date.getDate()} ${KHMER_MONTHS[date.getMonth()]}`;
+  }
+  return date.toLocaleDateString(locale, { month: "short", day: "numeric" });
+}
+
 // A backend timestamp as date and time.
 export function formatDateTime(value: string, locale: string): string {
   const date = parseTimestamp(value);

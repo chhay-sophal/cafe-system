@@ -64,7 +64,30 @@
     "grossRevenue": "Gross revenue",
     "netRevenue": "Net revenue",
     "orders": "Orders",
-    "averageOrderValue": "Average order value"
+    "averageOrderValue": "Average order value",
+    "vsPrevious": "vs previous day | vs previous {count} days"
+  },
+  "salesTrend": {
+    "heading": "Revenue Over Time",
+    "noData": "No sales recorded for this period.",
+    "singleDay": "Pick a range of two or more days to see the daily trend. Hourly Volume below shows a single day.",
+    "date": "Date",
+    "revenue": "Revenue"
+  },
+  "topProducts": {
+    "heading": "Top Products",
+    "noData": "No products sold in this period.",
+    "products": "Products",
+    "categories": "Categories",
+    "revenue": "Revenue",
+    "quantity": "Quantity",
+    "product": "Product",
+    "category": "Category",
+    "groupBy": "Group by",
+    "rankBy": "Rank by",
+    "uncategorized": "Uncategorized",
+    "sold": "{count} sold | {count} sold",
+    "note": "Top 10. Revenue includes add-ons, before order discounts."
   },
   "dateRange": {
     "today": "Today",
