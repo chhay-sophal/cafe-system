@@ -17,7 +17,9 @@
     "dash": "-",
     "sort": "Sort",
     "sortedAscending": "Sorted ascending",
-    "sortedDescending": "Sorted descending"
+    "sortedDescending": "Sorted descending",
+    "showPin": "Show PIN",
+    "hidePin": "Hide PIN"
   },
   "tableFilters": {
     "button": "Filters",

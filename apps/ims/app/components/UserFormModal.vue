@@ -126,14 +126,7 @@ async function submit() {
         <label class="block text-sm font-medium text-slate-700">
           {{ $t("staff.pinLabel") }} {{ isEditMode ? $t("staff.pinKeepCurrent") : "" }}
         </label>
-        <input
-          v-model="pin"
-          type="password"
-          inputmode="numeric"
-          maxlength="4"
-          :placeholder="$t('staff.pinPlaceholder')"
-          class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm tracking-widest focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
-        />
+        <PinInput v-model="pin" class="mt-1" input-class="text-sm" :placeholder="$t('staff.pinPlaceholder')" />
         <p v-if="pin.length > 0 && pinError" class="mt-1 text-xs font-medium text-red-600">{{ pinError }}</p>
       </div>
 

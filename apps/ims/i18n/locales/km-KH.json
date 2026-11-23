@@ -17,7 +17,9 @@
     "dash": "-",
     "sort": "តម្រៀប",
     "sortedAscending": "តម្រៀបពីតូចទៅធំ",
-    "sortedDescending": "តម្រៀបពីធំទៅតូច"
+    "sortedDescending": "តម្រៀបពីធំទៅតូច",
+    "showPin": "បង្ហាញលេខ PIN",
+    "hidePin": "លាក់លេខ PIN"
   },
   "tableFilters": {
     "button": "តម្រង",

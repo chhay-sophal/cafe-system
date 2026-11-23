@@ -44,15 +44,7 @@ async function submit() {
       </div>
 
       <label for="pin" class="mt-6 block text-sm font-medium text-slate-700">{{ $t("login.pinLabel") }}</label>
-      <input
-        id="pin"
-        v-model="pin"
-        type="password"
-        inputmode="numeric"
-        autocomplete="off"
-        class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-lg tracking-widest focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
-        placeholder="••••"
-      />
+      <PinInput id="pin" v-model="pin" class="mt-1" input-class="text-lg" placeholder="••••" />
 
       <p v-if="errorMessage" class="mt-3 text-sm font-medium text-red-600">{{ errorMessage }}</p>
 
