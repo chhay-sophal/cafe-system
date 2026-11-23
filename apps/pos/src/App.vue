@@ -29,6 +29,7 @@ import { useNetworkStatus } from "./composables/useNetworkStatus";
 import { useStoreName } from "./composables/useStoreName";
 import { useTheme } from "./composables/useTheme";
 import { useOfflineQueue } from "./composables/useOfflineQueue";
+import { usePosSettingsSync } from "./composables/usePosSettingsSync";
 import { fetchCategories, fetchModifierGroups, fetchProducts } from "./lib/api";
 import { loadCachedCatalog, saveCachedCatalog, type Catalog } from "./lib/catalogCache";
 import type { Category, Product } from "./types/catalog";
@@ -70,6 +71,7 @@ const cart = useCart();
 const network = useNetworkStatus();
 const offlineQueue = useOfflineQueue();
 const exchangeRate = useExchangeRate();
+const posSettingsSync = usePosSettingsSync();
 
 // Mirrored to the customer-facing display over Tauri's event bus (see
 // composables/useCustomerDisplayChannel.ts) - the second window has no
@@ -201,6 +203,10 @@ function loadServerData(): Promise<boolean> {
 }
 
 async function fetchServerData(): Promise<boolean> {
+  // Store name, receipt header, payment methods, fast cash and KHQR banks -
+  // alongside the menu, but on their own: failing to sync them mustn't make
+  // the menu look unloaded.
+  void posSettingsSync.syncPosSettings();
   try {
     const [categoryList, productList, modifierGroups] = await Promise.all([
       fetchCategories(),
@@ -239,6 +245,11 @@ watch(
     if (token && token !== previousToken && Date.now() - serverDataLoadedAt > LOGIN_RELOAD_MIN_AGE_MS) {
       loadServerData();
     }
+    // A manager/admin login can send settings changes queued while nobody
+    // allowed to save them was logged in (e.g. the first-time upload).
+    if (token) {
+      posSettingsSync.pushPending();
+    }
   },
 );
 
@@ -263,6 +274,7 @@ let syncIntervalId: ReturnType<typeof setInterval> | undefined;
 
 function handleOnline() {
   offlineQueue.syncPending();
+  posSettingsSync.pushPending();
   if (!serverDataLoaded) {
     loadServerData();
   }
@@ -304,6 +316,9 @@ onMounted(async () => {
   syncIntervalId = setInterval(() => {
     if (offlineQueue.pendingCount.value > 0) {
       offlineQueue.syncPending();
+    }
+    if (posSettingsSync.pendingCount.value > 0) {
+      posSettingsSync.pushPending();
     }
     if (!serverDataLoaded && network.isOnline.value) {
       loadServerData();

@@ -8,6 +8,7 @@ import { checkForUpdate, installUpdate, updatesEnabled } from "../composables/us
 import { useKhqrBanks } from "../composables/useKhqrBanks";
 import { useNetworkStatus } from "../composables/useNetworkStatus";
 import { ALL_PAYMENT_METHODS, usePaymentMethods } from "../composables/usePaymentMethods";
+import { usePosSettingsSync } from "../composables/usePosSettingsSync";
 import { useReceiptPrinter } from "../composables/useReceiptPrinter";
 import { STORE_NAME_MAX_LENGTH, useStoreName } from "../composables/useStoreName";
 import FastCashSettings from "./FastCashSettings.vue";
@@ -64,6 +65,9 @@ function saveStoreName() {
 }
 
 const paymentMethods = usePaymentMethods();
+// Store name & details, payments and KHQR are shared with IMS; the line under
+// those panels' headings says whether changes made here have reached it.
+const { pendingCount: settingsPendingCount, lastPushError: settingsPushError } = usePosSettingsSync();
 
 const activeSection = ref<SectionId>("general");
 
@@ -192,6 +196,10 @@ function handleRemoveBank(id: string) {
     <div class="settings__panel">
       <template v-if="activeSection === 'general'">
         <h3 class="settings__panel-heading">{{ t("settings.sections.general") }}</h3>
+        <p class="settings__sync" :class="{ 'settings__sync--pending': settingsPendingCount > 0 }">
+          {{ settingsPendingCount > 0 ? t("settings.sync.pending") : t("settings.sync.synced") }}
+          <template v-if="settingsPushError"> – {{ settingsPushError }}</template>
+        </p>
 
         <div class="settings-field">
           <div class="settings-field__text">
@@ -326,6 +334,10 @@ function handleRemoveBank(id: string) {
 
       <template v-else-if="activeSection === 'payments'">
         <h3 class="settings__panel-heading">{{ t("settings.sections.payments") }}</h3>
+        <p class="settings__sync" :class="{ 'settings__sync--pending': settingsPendingCount > 0 }">
+          {{ settingsPendingCount > 0 ? t("settings.sync.pending") : t("settings.sync.synced") }}
+          <template v-if="settingsPushError"> – {{ settingsPushError }}</template>
+        </p>
 
         <div class="settings-field">
           <div class="settings-field__text">
@@ -356,6 +368,10 @@ function handleRemoveBank(id: string) {
 
       <template v-else-if="activeSection === 'khqr'">
         <h3 class="settings__panel-heading">{{ t("settings.sections.khqr") }}</h3>
+        <p class="settings__sync" :class="{ 'settings__sync--pending': settingsPendingCount > 0 }">
+          {{ settingsPendingCount > 0 ? t("settings.sync.pending") : t("settings.sync.synced") }}
+          <template v-if="settingsPushError"> – {{ settingsPushError }}</template>
+        </p>
         <p class="settings__intro">{{ t("settings.khqr.intro") }}</p>
 
         <p v-if="khqrBanks.banks.value.length === 0" class="settings__empty">{{ t("settings.khqr.empty") }}</p>
@@ -530,6 +546,17 @@ function handleRemoveBank(id: string) {
 .settings__panel-heading {
   margin: 0;
   font-size: 1.15rem;
+}
+
+.settings__sync {
+  margin: -0.25rem 0 0;
+  font-size: 0.8rem;
+  color: #6b6b6b;
+}
+
+.settings__sync--pending {
+  color: #b9770e;
+  font-weight: 600;
 }
 
 .settings-field {

@@ -1,6 +1,7 @@
 import { ref, type Ref } from "vue";
 import { t } from "../i18n";
 import type { ReceiptBlock } from "../lib/receipt";
+import { notifyPosSettingChanged } from "../lib/settingsEvents";
 
 const STORAGE_KEY = "pos.storeDetails";
 
@@ -39,36 +40,53 @@ function strings(value: unknown): string[] {
 
 function load(): StoreDetails {
   try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null") as Partial<StoreDetails> | null;
-    if (!parsed || typeof parsed !== "object") {
-      return emptyDetails();
-    }
-    const socials = Array.isArray(parsed.socials)
-      ? parsed.socials
-          .filter(
-            (link): link is SocialLink =>
-              typeof link?.handle === "string" && (SOCIAL_PLATFORMS as readonly string[]).includes(link?.platform),
-          )
-          .slice(0, CONTACT_MAX_ENTRIES)
-      : [];
-    return {
-      address: typeof parsed.address === "string" ? parsed.address : "",
-      phones: strings(parsed.phones),
-      emails: strings(parsed.emails),
-      socials,
-    };
+    return normalize(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null"));
   } catch {
     return emptyDetails();
   }
+}
+
+// Keeps only well-formed parts - for what was saved locally and for what the
+// server sends alike.
+function normalize(value: unknown): StoreDetails {
+  const parsed = value as Partial<StoreDetails> | null;
+  if (!parsed || typeof parsed !== "object") {
+    return emptyDetails();
+  }
+  const socials = Array.isArray(parsed.socials)
+    ? parsed.socials
+        .filter(
+          (link): link is SocialLink =>
+            typeof link?.handle === "string" && (SOCIAL_PLATFORMS as readonly string[]).includes(link?.platform),
+        )
+        .slice(0, CONTACT_MAX_ENTRIES)
+    : [];
+  return {
+    address: typeof parsed.address === "string" ? parsed.address : "",
+    phones: strings(parsed.phones),
+    emails: strings(parsed.emails),
+    socials,
+  };
 }
 
 // Per register, like the store name: each branch prints its own address and
 // contacts. Everything is optional - empty parts are left off the receipt.
 const details: Ref<StoreDetails> = ref(load());
 
-function save(next: StoreDetails) {
+function store(next: StoreDetails) {
   details.value = next;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+}
+
+// A change made here - shared with the server (settingsEvents).
+function save(next: StoreDetails) {
+  store(next);
+  notifyPosSettingChanged("storeDetails");
+}
+
+// The shared setting as the server has it.
+function applyFromServer(value: unknown) {
+  store(normalize(value));
 }
 
 function setAddress(address: string) {
@@ -169,5 +187,5 @@ export function storeFooterBlocks(): ReceiptBlock[] {
 }
 
 export function useStoreDetails() {
-  return { details, setAddress, addContact, removeContact, addSocial, removeSocial };
+  return { details, setAddress, addContact, removeContact, addSocial, removeSocial, applyFromServer };
 }

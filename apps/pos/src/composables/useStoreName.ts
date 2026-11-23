@@ -1,5 +1,6 @@
 import { computed, ref } from "vue";
 import { t } from "../i18n";
+import { notifyPosSettingChanged } from "../lib/settingsEvents";
 
 const STORAGE_KEY = "pos.storeName";
 
@@ -16,12 +17,17 @@ const customName = ref(localStorage.getItem(STORAGE_KEY) ?? "");
 const storeName = computed(() => customName.value || t("app.title"));
 
 // `persist: false` is for the customer display, which only mirrors the
-// cashier window's choice - that window has already saved it.
-function setStoreName(name: string, { persist = true } = {}) {
+// cashier window's choice - that window has already saved it. `fromServer`
+// applies the shared setting without announcing it back (settingsEvents).
+function setStoreName(name: string, { persist = true, fromServer = false } = {}) {
   const next = name.trim().slice(0, STORE_NAME_MAX_LENGTH);
+  const changed = next !== customName.value;
   customName.value = next;
   if (!persist) {
     return;
+  }
+  if (changed && !fromServer) {
+    notifyPosSettingChanged("storeName");
   }
   if (next) {
     localStorage.setItem(STORAGE_KEY, next);

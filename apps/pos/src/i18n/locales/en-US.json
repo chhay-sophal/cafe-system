@@ -166,7 +166,7 @@
     },
     "general": {
       "storeName": "Store name",
-      "storeNameHint": "This branch's name on this register's header, receipts and customer display. Leave empty to use \"{default}\".",
+      "storeNameHint": "Shown on the header, receipts and customer display. Leave empty to use \"{default}\".",
       "language": "Language",
       "languageHint": "Language used on this register's screens and receipts.",
       "appearance": "Appearance",
@@ -240,7 +240,7 @@
     },
     "payments": {
       "methods": "Payment methods",
-      "methodsHint": "Methods shown at checkout on this register. Turn off any this till can't take. Saved on this register only.",
+      "methodsHint": "Methods offered at checkout. Turn off any the shop can't take.",
       "lastMethod": "At least one payment method must stay on.",
       "fastCash": {
         "heading": {
@@ -297,6 +297,10 @@
       "install": "Install and Restart",
       "installing": "Downloading and installing - the app will restart.",
       "updateError": "Couldn't update: {error}"
+    },
+    "sync": {
+      "synced": "Shared with IMS - changes here or in IMS apply to both.",
+      "pending": "Saved on this register; waiting to reach the server (needs a connection and a manager or admin login)."
     }
   },
   "customerDisplay": {

@@ -1,5 +1,6 @@
 import { ref, type Ref } from "vue";
 import { formatRiel } from "../lib/currency";
+import { notifyPosSettingChanged } from "../lib/settingsEvents";
 
 export type FastCashCurrency = "USD" | "KHR";
 
@@ -52,16 +53,30 @@ function load(currency: FastCashCurrency): number[] {
   return [...DEFAULT_AMOUNTS[currency]];
 }
 
-// Per register, like the payment methods: each till can match the notes its
-// customers actually hand over. An empty list is allowed (no quick buttons).
+// Store-wide, shared with the server and IMS (usePosSettingsSync), and kept
+// here too for offline checkout. An empty list is allowed (no quick buttons).
 const amounts: Record<FastCashCurrency, Ref<number[]>> = {
   USD: ref(load("USD")),
   KHR: ref(load("KHR")),
 };
 
-function save(currency: FastCashCurrency, next: number[]) {
+function store(currency: FastCashCurrency, next: number[]) {
   amounts[currency].value = next;
   localStorage.setItem(STORAGE_KEYS[currency], JSON.stringify(next));
+}
+
+// A change made here - shared with the server (settingsEvents).
+function save(currency: FastCashCurrency, next: number[]) {
+  store(currency, next);
+  notifyPosSettingChanged("fastCash");
+}
+
+// The shared setting as the server has it.
+function applyFromServer(value: { USD?: unknown; KHR?: unknown } | null | undefined) {
+  for (const currency of ["USD", "KHR"] as const) {
+    const list = value?.[currency];
+    store(currency, Array.isArray(list) ? normalize(currency, list) : [...DEFAULT_AMOUNTS[currency]]);
+  }
 }
 
 function addAmount(currency: FastCashCurrency, amount: number): FastCashAddError | null {
@@ -84,8 +99,7 @@ function removeAmount(currency: FastCashCurrency, amount: number) {
 }
 
 function resetAmounts(currency: FastCashCurrency) {
-  amounts[currency].value = [...DEFAULT_AMOUNTS[currency]];
-  localStorage.removeItem(STORAGE_KEYS[currency]);
+  save(currency, [...DEFAULT_AMOUNTS[currency]]);
 }
 
 function isDefault(currency: FastCashCurrency): boolean {
@@ -104,5 +118,5 @@ export function formatFastCashLabel(currency: FastCashCurrency, amount: number):
 }
 
 export function useFastCash() {
-  return { amounts, addAmount, removeAmount, resetAmounts, isDefault };
+  return { amounts, addAmount, removeAmount, resetAmounts, isDefault, applyFromServer };
 }

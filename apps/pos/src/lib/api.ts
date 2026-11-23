@@ -3,7 +3,7 @@ import type { AuthSession } from "../types/auth";
 import type { Category, Product } from "../types/catalog";
 import type { ModifierGroupWithProducts } from "../types/cart";
 import type { OrderDetail, OrderListRow, OrderPayload, OrderResult } from "../types/order";
-import type { StoreSettings } from "../types/settings";
+import type { PosSettings, PosSettingsResponse, StoreSettings } from "../types/settings";
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
 // Short by default so checkout falls back to the offline queue quickly when
@@ -94,14 +94,14 @@ async function getJson<T>(path: string, token?: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-async function postJson<T>(path: string, body: unknown, token?: string, timeoutMs?: number): Promise<T> {
+async function postJson<T>(path: string, body: unknown, token?: string, timeoutMs?: number, method: "POST" | "PUT" = "POST"): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
 
   const response = await fetchWithTimeout(`${API_BASE_URL}${path}`, {
-    method: "POST",
+    method,
     headers,
     body: JSON.stringify(body),
   }, timeoutMs);
@@ -150,4 +150,31 @@ export async function voidOrder(orderId: string, reason: string, token: string):
 
 export function fetchExchangeRate(): Promise<StoreSettings> {
   return getJson<StoreSettings>("/api/settings/exchange-rate");
+}
+
+// Public, like the exchange rate - the login screen shows the store name.
+export function fetchPosSettings(): Promise<PosSettingsResponse> {
+  return getJson<PosSettingsResponse>("/api/settings/pos");
+}
+
+// Saves the given sections only; the server keeps the rest.
+export function savePosSettings(update: Partial<PosSettings>, token: string): Promise<PosSettingsResponse> {
+  return postJson<PosSettingsResponse>("/api/settings/pos", update, token, undefined, "PUT");
+}
+
+// Same upload IMS uses for product images; returns the stored image's URL.
+const UPLOAD_TIMEOUT_MS = 30000;
+
+export async function uploadImage(image: Blob, filename: string, token: string): Promise<string> {
+  const body = new FormData();
+  body.append("image", image, filename);
+  const response = await fetchWithTimeout(`${API_BASE_URL}/api/upload`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body,
+  }, UPLOAD_TIMEOUT_MS);
+  if (!response.ok) {
+    await throwHttpError(response, token);
+  }
+  return ((await response.json()) as { url: string }).url;
 }

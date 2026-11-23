@@ -1,4 +1,6 @@
 import { ref } from "vue";
+import { resolveImageUrl } from "../lib/image";
+import { notifyPosSettingChanged } from "../lib/settingsEvents";
 
 const STORAGE_KEY = "pos.khqrBanks";
 // Plenty for a phone camera to scan off the customer screen, while keeping
@@ -8,8 +10,13 @@ const MAX_QR_SIZE_PX = 600;
 export interface KhqrBank {
   id: string;
   name: string;
-  // PNG data URL of the bank's static KHQR code.
+  // What checkout shows: a PNG data URL kept on this register, so the QR
+  // still shows offline. (Falls back to the server URL if it couldn't be
+  // downloaded.)
   qrImage: string;
+  // The image's copy on the server, once uploaded (see usePosSettingsSync) -
+  // what the shared setting and IMS refer to.
+  imageUrl?: string;
 }
 
 function loadBanks(): KhqrBank[] {
@@ -21,15 +28,21 @@ function loadBanks(): KhqrBank[] {
   }
 }
 
-// Per-register, like the receipt printer: the QR images live with the
-// register that shows them, with no backend round trip at checkout.
+// Store-wide, shared with the server and IMS (usePosSettingsSync), with each
+// QR image also kept here so checkout needs no server round trip.
 const banks = ref<KhqrBank[]>(loadBanks());
 
-function save(next: KhqrBank[]) {
+function store(next: KhqrBank[]) {
   // Write first so a full localStorage throws before the UI shows a bank
   // that wouldn't survive a restart.
   localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   banks.value = next;
+}
+
+// A change made here - shared with the server (settingsEvents).
+function save(next: KhqrBank[]) {
+  store(next);
+  notifyPosSettingChanged("khqrBanks");
 }
 
 function loadImage(file: File): Promise<HTMLImageElement> {
@@ -74,6 +87,40 @@ function removeBank(id: string) {
   save(banks.value.filter((bank) => bank.id !== id));
 }
 
+// After the sync uploads a bank's image - not a change to announce.
+function setImageUrl(id: string, imageUrl: string) {
+  store(banks.value.map((bank) => (bank.id === id ? { ...bank, imageUrl } : bank)));
+}
+
+async function downloadAsDataUrl(url: string): Promise<string> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Image download failed (${response.status})`);
+  }
+  const blob = await response.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+// The shared setting as the server has it. Images already kept here for the
+// same server copy are reused; new ones are downloaded once.
+async function applyFromServer(serverBanks: Array<{ id: string; name: string; imageUrl: string }>) {
+  const next = await Promise.all(serverBanks.map(async (bank): Promise<KhqrBank> => {
+    const kept = banks.value.find((existing) => existing.id === bank.id && existing.imageUrl === bank.imageUrl);
+    if (kept) {
+      return { ...kept, name: bank.name };
+    }
+    const resolved = resolveImageUrl(bank.imageUrl) ?? bank.imageUrl;
+    const qrImage = await downloadAsDataUrl(resolved).catch(() => resolved);
+    return { id: bank.id, name: bank.name, qrImage, imageUrl: bank.imageUrl };
+  }));
+  store(next);
+}
+
 export function useKhqrBanks() {
-  return { banks, addBank, removeBank };
+  return { banks, addBank, removeBank, setImageUrl, applyFromServer };
 }
