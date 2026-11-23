@@ -1363,11 +1363,20 @@ function createApp() {
         revenue: hourlyByHour.get(hour)?.revenue ?? 0,
       }));
 
+      // Money sums come out of SQLite as raw floats - Riel converted back to
+      // USD rarely lands on whole cents - so round them to cents here.
+      const metrics = summary || { totalOrders: 0, grossRevenue: 0, totalTax: 0, totalDiscounts: 0, netRevenue: 0 };
       res.json({
         dateRange: { startDate, endDate },
-        metrics: summary || { totalOrders: 0, grossRevenue: 0, totalTax: 0, totalDiscounts: 0, netRevenue: 0 },
-        paymentBreakdown,
-        hourlyVolume,
+        metrics: {
+          ...metrics,
+          grossRevenue: round2(metrics.grossRevenue),
+          totalTax: round2(metrics.totalTax),
+          totalDiscounts: round2(metrics.totalDiscounts),
+          netRevenue: round2(metrics.netRevenue),
+        },
+        paymentBreakdown: paymentBreakdown.map((entry) => ({ ...entry, totalAmount: round2(entry.totalAmount) })),
+        hourlyVolume: hourlyVolume.map((entry) => ({ ...entry, revenue: round2(entry.revenue) })),
       });
     } catch (error) {
       res.status(500).json({ error: 'Failed to generate report' });

@@ -419,6 +419,25 @@ describe('order payments in mixed USD/Riel', () => {
     expect(response.body.changeGivenRiel).toBe(6700);
   });
 
+  it('reports cash collected rounded to cents', async () => {
+    const token = await cashierToken();
+    // 20,000 riel tendered, 6,700 riel change -> 13,300 riel kept = $3.2439... at 4100
+    await request(app)
+      .post('/api/orders')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        items: [{ productId: await testProductId(), productName: 'Latte', quantity: 1, unitPrice: 3.25 }],
+        paymentMethod: 'CASH',
+        amountTenderedUsd: 0,
+        amountTenderedRiel: 20000,
+      });
+
+    const report = await request(app).get('/api/reports/daily-summary');
+
+    expect(report.body.paymentBreakdown).toEqual([{ method: 'CASH', totalAmount: 3.24 }]);
+    expect(report.body.metrics.netRevenue).toBe(3.25);
+  });
+
   it('gives change for a mixed USD+Riel tender entirely in Riel, not split into USD notes', async () => {
     const token = await cashierToken();
 
