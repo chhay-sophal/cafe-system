@@ -82,7 +82,7 @@
     "orderCount": "{count} order | {count} orders"
   },
   "paymentBreakdown": {
-    "heading": "Payment Breakdown",
+    "heading": "Payments Collected",
     "noData": "No payments recorded for this period.",
     "method": "Method",
     "amount": "Amount",
@@ -91,7 +91,8 @@
       "CASH": "Cash",
       "CARD": "Card",
       "QR_CODE": "Mobile Pay"
-    }
+    },
+    "collectedNote": "Amounts actually received, after change. Riel change is rounded to the nearest 100៛, so the cash total can differ slightly from Net revenue."
   },
   "categories": {
     "manage": "Manage Categories",

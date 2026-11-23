@@ -115,5 +115,11 @@ const chartOptions = {
     >
       <Pie :data="chartData" :options="chartOptions" />
     </div>
+
+    <!-- These are amounts collected, not order totals, so their sum can be a
+         little off Net revenue - say why rather than leave it looking wrong. -->
+    <p v-if="hasData" class="mt-3 text-xs leading-relaxed text-slate-400">
+      {{ $t("paymentBreakdown.collectedNote") }}
+    </p>
   </div>
 </template>
