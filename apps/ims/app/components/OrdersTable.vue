@@ -12,7 +12,7 @@ const ordersStore = useOrdersStore();
 const { orders } = storeToRefs(ordersStore);
 const { formatMain, formatSecondary } = useCurrency();
 
-const features = tableFeatures({ ...sortingFeatures, ...filteringFeatures });
+const features = tableFeatures({ ...sortingFeatures, ...filteringFeatures, ...paginationFeatures });
 const columnHelper = createColumnHelper<typeof features, OrderSummary>();
 
 const columns = columnHelper.columns([
@@ -64,7 +64,15 @@ const headerClass = {
   totalAmount: "px-4 py-3 text-right font-semibold text-slate-600",
 };
 
-const table = useTable({ features, columns, data: orders, globalFilterFn: "includesDisplayText" });
+const table = useTable({
+  features,
+  columns,
+  data: orders,
+  globalFilterFn: "includesDisplayText",
+  initialState: { pagination: { pageIndex: 0, pageSize: DEFAULT_PAGE_SIZE } },
+  // Page resets are TablePagination's job - see its rowCount watcher.
+  autoResetPageIndex: false,
+});
 
 const PAYMENT_METHODS: PaymentMethod[] = ["CASH", "CARD", "QR_CODE"];
 
@@ -149,6 +157,8 @@ function openDetail(order: OrderSummary) {
         </template>
       </DataTable>
     </div>
+
+    <TablePagination :table="table" />
 
     <OrderDetailModal />
   </div>

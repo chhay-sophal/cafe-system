@@ -2,12 +2,14 @@ import {
   columnFilteringFeature,
   constructFilterFn,
   createFilteredRowModel,
+  createPaginatedRowModel,
   createSortedRowModel,
   filterFn_equals,
   filterFn_equalsString,
   filterFn_includesString,
   filterFn_inNumberRange,
   globalFilteringFeature,
+  rowPaginationFeature,
   rowSortingFeature,
   sortFn_alphanumeric,
   sortFn_basic,
@@ -99,3 +101,15 @@ export const filteringFeatures = {
     inDayRange: filterFn_inDayRange,
   },
 };
+
+// Spread into tableFeatures({...}) for client-side pages of rows - pass
+// `initialState: { pagination: { pageIndex: 0, pageSize } }` and
+// `autoResetPageIndex: false` to useTable, and put a
+// <TablePagination :table="table" /> under the table, which returns to page 1
+// when search, filters or new data change the row count.
+export const paginationFeatures = {
+  rowPaginationFeature,
+  paginatedRowModel: createPaginatedRowModel(),
+};
+
+export const DEFAULT_PAGE_SIZE = 50;

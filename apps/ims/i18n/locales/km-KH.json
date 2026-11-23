@@ -21,6 +21,15 @@
     "showPin": "បង្ហាញលេខ PIN",
     "hidePin": "លាក់លេខ PIN"
   },
+  "pagination": {
+    "showing": "បង្ហាញ {from}–{to} នៃ {total}",
+    "rowsPerPage": "ជួរក្នុងមួយទំព័រ",
+    "page": "ទំព័រ {page} នៃ {pages}",
+    "first": "ទំព័រដំបូង",
+    "previous": "ទំព័រមុន",
+    "next": "ទំព័របន្ទាប់",
+    "last": "ទំព័រចុងក្រោយ"
+  },
   "tableFilters": {
     "button": "តម្រង",
     "heading": "តម្រង",

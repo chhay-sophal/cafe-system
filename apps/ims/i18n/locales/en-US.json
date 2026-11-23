@@ -21,6 +21,15 @@
     "showPin": "Show PIN",
     "hidePin": "Hide PIN"
   },
+  "pagination": {
+    "showing": "Showing {from}–{to} of {total}",
+    "rowsPerPage": "Rows per page",
+    "page": "Page {page} of {pages}",
+    "first": "First page",
+    "previous": "Previous page",
+    "next": "Next page",
+    "last": "Last page"
+  },
   "tableFilters": {
     "button": "Filters",
     "heading": "Filters",

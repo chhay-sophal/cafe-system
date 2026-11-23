@@ -41,7 +41,7 @@ const categoryNameById = computed(() => {
 
 const { formatMain, formatSecondary } = useCurrency();
 
-const features = tableFeatures({ ...sortingFeatures, ...filteringFeatures });
+const features = tableFeatures({ ...sortingFeatures, ...filteringFeatures, ...paginationFeatures });
 const columnHelper = createColumnHelper<typeof features, Product>();
 
 const columns = columnHelper.columns([
@@ -78,7 +78,15 @@ const cellClass = {
   actions: "px-4 py-3 text-right",
 };
 
-const table = useTable({ features, columns, data: products, globalFilterFn: "includesDisplayText" });
+const table = useTable({
+  features,
+  columns,
+  data: products,
+  globalFilterFn: "includesDisplayText",
+  initialState: { pagination: { pageIndex: 0, pageSize: DEFAULT_PAGE_SIZE } },
+  // Page resets are TablePagination's job - see its rowCount watcher.
+  autoResetPageIndex: false,
+});
 
 const filters = computed<TableFilterDef[]>(() => [
   {
@@ -214,5 +222,7 @@ async function toggleAvailability(product: Product) {
         </template>
       </DataTable>
     </div>
+
+    <TablePagination :table="table" />
   </div>
 </template>

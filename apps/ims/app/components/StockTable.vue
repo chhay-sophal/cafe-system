@@ -20,7 +20,7 @@ const { items, isLoading, error } = storeToRefs(store);
 
 const togglingIds = ref<Set<string>>(new Set());
 
-const features = tableFeatures({ ...sortingFeatures, ...filteringFeatures });
+const features = tableFeatures({ ...sortingFeatures, ...filteringFeatures, ...paginationFeatures });
 
 const columnHelper = createColumnHelper<typeof features, InventoryItem>();
 
@@ -69,7 +69,15 @@ const cellClass = {
   actions: "px-4 py-3 text-right",
 };
 
-const table = useTable({ features, columns, data: items, globalFilterFn: "includesDisplayText" });
+const table = useTable({
+  features,
+  columns,
+  data: items,
+  globalFilterFn: "includesDisplayText",
+  initialState: { pagination: { pageIndex: 0, pageSize: DEFAULT_PAGE_SIZE } },
+  // Page resets are TablePagination's job - see its rowCount watcher.
+  autoResetPageIndex: false,
+});
 
 const filters = computed<TableFilterDef[]>(() => [
   { type: "numberRange", columnId: "stockQuantity", label: t("stockTable.columns.stock") },
@@ -208,5 +216,7 @@ function formatUpdatedAt(value: string | null): string {
         </template>
       </DataTable>
     </div>
+
+    <TablePagination :table="table" />
   </div>
 </template>
