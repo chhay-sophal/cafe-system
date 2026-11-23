@@ -245,6 +245,78 @@ describe('order payments in mixed USD/Riel', () => {
     expect(savedOrder?.taxAmount).toBe(0);
   });
 
+  it('records a resent sale with the same clientOrderId only once', async () => {
+    const token = await cashierToken();
+    const sale = {
+      clientOrderId: randomUUID(),
+      items: [{ productId: await testProductId(), productName: 'Latte', quantity: 1, unitPrice: 3.25 }],
+      paymentMethod: 'CASH',
+      amountTenderedUsd: 5,
+      amountTenderedRiel: 0,
+    };
+
+    const first = await request(app).post('/api/orders').set('Authorization', `Bearer ${token}`).send(sale);
+    // e.g. the offline queue replaying it after the first response was lost
+    const resent = await request(app).post('/api/orders').set('Authorization', `Bearer ${token}`).send(sale);
+
+    expect(first.status).toBe(201);
+    expect(resent.status).toBe(200);
+    expect(resent.body).toEqual(first.body);
+
+    const saved = await db.select().from(orders).where(eq(orders.clientOrderId, sale.clientOrderId)).all();
+    expect(saved).toHaveLength(1);
+    expect(await db.select().from(payments).where(eq(payments.orderId, saved[0].id)).all()).toHaveLength(1);
+  });
+
+  it('records two concurrent copies of the same sale only once', async () => {
+    const token = await cashierToken();
+    const sale = {
+      clientOrderId: randomUUID(),
+      items: [{ productId: await testProductId(), productName: 'Latte', quantity: 1, unitPrice: 3.25 }],
+      paymentMethod: 'CARD',
+    };
+
+    const responses = await Promise.all([1, 2].map(() => (
+      request(app).post('/api/orders').set('Authorization', `Bearer ${token}`).send(sale)
+    )));
+
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 201]);
+    expect(responses[0].body.orderId).toBe(responses[1].body.orderId);
+    expect(await db.select().from(orders).where(eq(orders.clientOrderId, sale.clientOrderId)).all()).toHaveLength(1);
+  });
+
+  it('records sales with different or no clientOrderId separately', async () => {
+    const token = await cashierToken();
+    const productId = await testProductId();
+    const sale = {
+      items: [{ productId, productName: 'Latte', quantity: 1, unitPrice: 3.25 }],
+      paymentMethod: 'CARD',
+    };
+
+    const responses = [];
+    for (const body of [sale, sale, { ...sale, clientOrderId: randomUUID() }, { ...sale, clientOrderId: randomUUID() }]) {
+      responses.push(await request(app).post('/api/orders').set('Authorization', `Bearer ${token}`).send(body));
+    }
+
+    expect(responses.map((response) => response.status)).toEqual([201, 201, 201, 201]);
+    expect(new Set(responses.map((response) => response.body.orderId)).size).toBe(4);
+  });
+
+  it('rejects a clientOrderId that is not a UUID', async () => {
+    const token = await cashierToken();
+
+    const response = await request(app)
+      .post('/api/orders')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        clientOrderId: 'not-a-uuid',
+        items: [{ productId: await testProductId(), productName: 'Latte', quantity: 1, unitPrice: 3.25 }],
+        paymentMethod: 'CARD',
+      });
+
+    expect(response.status).toBe(400);
+  });
+
   it('gives change for a pure-USD tender as whole dollars plus a Riel remainder', async () => {
     const token = await cashierToken();
 

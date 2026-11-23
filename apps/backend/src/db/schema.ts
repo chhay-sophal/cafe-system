@@ -114,9 +114,14 @@ export const orders = sqliteTable('orders', {
   voidedBy: text('voided_by').references(() => users.id),
   voidReason: text('void_reason'),
   createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
+  // Idempotency key from the POS (see orderSchema.clientOrderId). Null for
+  // orders from clients that don't send one - SQLite's unique index allows
+  // any number of NULLs.
+  clientOrderId: text('client_order_id'),
 }, (table) => ({
   createdAtIndex: index('idx_orders_created_at').on(table.createdAt),
   userIndex: index('idx_orders_user').on(table.userId),
+  clientOrderIdIndex: uniqueIndex('idx_orders_client_order_id').on(table.clientOrderId),
 }));
 
 export const orderItems = sqliteTable('order_items', {

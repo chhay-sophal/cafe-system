@@ -118,6 +118,26 @@ function isTenderSufficient(
   );
 }
 
+// The POST /api/orders response for a sale already recorded under this
+// clientOrderId, rebuilt from what was saved - so a retried request gets the
+// original order number and change instead of a second copy of the sale.
+async function findOrderResultByClientOrderId(clientOrderId: string) {
+  const existing = await db.select({
+    orderId: orders.id,
+    orderNumber: orders.orderNumber,
+    subtotal: orders.subtotal,
+    totalAmount: orders.totalAmount,
+    changeGivenUsd: payments.changeGivenUsd,
+    changeGivenRiel: payments.changeGivenRiel,
+    exchangeRateRielPerUsd: payments.exchangeRateRielPerUsd,
+  }).from(orders)
+    .innerJoin(payments, eq(payments.orderId, orders.id))
+    .where(eq(orders.clientOrderId, clientOrderId))
+    .get();
+
+  return existing ? { success: true, ...existing } : null;
+}
+
 const USER_PUBLIC_COLUMNS = {
   id: users.id,
   name: users.name,
@@ -701,7 +721,7 @@ function createApp() {
 
   app.post('/api/orders', authenticate, validateBody(orderSchema), async (req, res) => {
     const {
-      items, paymentMethod, amountTenderedUsd = 0, amountTenderedRiel = 0, taxAmount: requestedTaxAmount = 0, discountAmount = 0,
+      clientOrderId, items, paymentMethod, amountTenderedUsd = 0, amountTenderedRiel = 0, taxAmount: requestedTaxAmount = 0, discountAmount = 0,
     } = req.body;
     const actingUserId = req.user?.id;
 
@@ -710,6 +730,16 @@ function createApp() {
     }
 
     try {
+      // A retry of a sale that already went through - typically the POS timed
+      // out waiting for the first response and queued the sale offline. Not
+      // scoped to the caller: the queue may replay it after a cashier change.
+      if (clientOrderId) {
+        const existing = await findOrderResultByClientOrderId(clientOrderId);
+        if (existing) {
+          return res.status(200).json(existing);
+        }
+      }
+
       const today = storeTodayDateString();
       const todayOrdersCount = (await db.select({ count: sql<number>`count(*)` })
         .from(orders)
@@ -758,6 +788,7 @@ function createApp() {
       await db.transaction(async (tx) => {
         await tx.insert(orders).values({
           id: orderId,
+          clientOrderId,
           userId: actingUserId,
           orderNumber,
           subtotal,
@@ -840,6 +871,14 @@ function createApp() {
         exchangeRateRielPerUsd: exchangeRate,
       });
     } catch (error) {
+      // Lost a race with a concurrent copy of the same sale (the unique index
+      // on client_order_id rejected this insert) - answer with the one that won.
+      if (clientOrderId) {
+        const existing = await findOrderResultByClientOrderId(clientOrderId).catch(() => null);
+        if (existing) {
+          return res.status(200).json(existing);
+        }
+      }
       console.error('Order creation error:', error);
       res.status(500).json({ error: 'Failed to process sale' });
     }
