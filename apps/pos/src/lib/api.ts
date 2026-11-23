@@ -178,3 +178,33 @@ export async function uploadImage(image: Blob, filename: string, token: string):
   }
   return ((await response.json()) as { url: string }).url;
 }
+
+// Everything loaded at start, login and Refresh menu, in one request: the
+// menu, store settings and POS settings.
+export interface PosBootstrap {
+  categories: Category[];
+  products: Product[];
+  modifierGroups: ModifierGroupWithProducts[];
+  storeSettings: StoreSettings;
+  // Absent when loaded the old way (see loadPosBootstrap).
+  posSettings?: PosSettingsResponse;
+}
+
+export async function loadPosBootstrap(): Promise<PosBootstrap> {
+  try {
+    return await getJson<PosBootstrap>("/api/pos/bootstrap");
+  } catch (error) {
+    // A backend from before /api/pos/bootstrap - e.g. an on-prem install
+    // whose register auto-updated first: the separate requests it does have.
+    if (!(error instanceof HttpError) || error.status !== 404) {
+      throw error;
+    }
+    const [categories, products, modifierGroups, storeSettings] = await Promise.all([
+      fetchCategories(),
+      fetchProducts(),
+      fetchModifierGroups(),
+      fetchExchangeRate(),
+    ]);
+    return { categories, products, modifierGroups, storeSettings };
+  }
+}

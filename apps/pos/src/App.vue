@@ -30,7 +30,7 @@ import { useStoreName } from "./composables/useStoreName";
 import { useTheme } from "./composables/useTheme";
 import { useOfflineQueue } from "./composables/useOfflineQueue";
 import { usePosSettingsSync } from "./composables/usePosSettingsSync";
-import { fetchCategories, fetchModifierGroups, fetchProducts } from "./lib/api";
+import { loadPosBootstrap } from "./lib/api";
 import { loadCachedCatalog, saveCachedCatalog, type Catalog } from "./lib/catalogCache";
 import type { Category, Product } from "./types/catalog";
 import type { CartModifier, ModifierGroup, ModifierGroupWithProducts } from "./types/cart";
@@ -202,19 +202,19 @@ function loadServerData(): Promise<boolean> {
   return serverDataRequest;
 }
 
+// Menu, store settings and POS settings in one request (the POS bootstrap).
 async function fetchServerData(): Promise<boolean> {
-  // Store name, receipt header, payment methods, fast cash and KHQR banks -
-  // alongside the menu, but on their own: failing to sync them mustn't make
-  // the menu look unloaded.
-  void posSettingsSync.syncPosSettings();
   try {
-    const [categoryList, productList, modifierGroups] = await Promise.all([
-      fetchCategories(),
-      fetchProducts(),
-      fetchModifierGroups(),
-      exchangeRate.refreshExchangeRate().then(() => publishStoreSettings(exchangeRate.currentStoreSettings())),
-    ]);
-    const catalog = { categories: categoryList, products: productList, modifierGroups };
+    const data = await loadPosBootstrap();
+
+    exchangeRate.applyStoreSettings(data.storeSettings);
+    publishStoreSettings(exchangeRate.currentStoreSettings());
+    // Store name, receipt header, payments, KHQR, language - on their own, so
+    // a problem applying them can't make the menu look unloaded. An older
+    // backend's response has no POS settings; the sync fetches them itself.
+    void posSettingsSync.syncPosSettings(data.posSettings);
+
+    const catalog = { categories: data.categories, products: data.products, modifierGroups: data.modifierGroups };
     applyCatalog(catalog);
     saveCachedCatalog(catalog);
     serverDataLoaded = true;

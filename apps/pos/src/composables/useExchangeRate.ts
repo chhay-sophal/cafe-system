@@ -1,5 +1,4 @@
 import { ref } from "vue";
-import { fetchExchangeRate as apiFetchExchangeRate } from "../lib/api";
 import type { MainCurrency, StoreSettings } from "../types/settings";
 
 const RATE_STORAGE_KEY = "pos.exchangeRateRielPerUsd";
@@ -52,15 +51,8 @@ function applyStoreSettings(settings: StoreSettings, { persist = true } = {}): v
   }
 }
 
-// Only the cashier window fetches; the customer display gets the result over
-// the window event bus (see publishStoreSettings) rather than asking again.
-async function refreshExchangeRate(): Promise<void> {
-  try {
-    applyStoreSettings(await apiFetchExchangeRate());
-  } catch {
-    // Unreachable/offline - keep using the cached values.
-  }
-}
+// The cashier window applies these from the POS bootstrap (App.vue); the
+// customer display gets them over the window event bus (publishStoreSettings).
 
 function currentStoreSettings(): StoreSettings {
   return {
@@ -71,5 +63,5 @@ function currentStoreSettings(): StoreSettings {
 }
 
 export function useExchangeRate() {
-  return { exchangeRateRielPerUsd, mainCurrency, taxEnabled, refreshExchangeRate, applyStoreSettings, currentStoreSettings };
+  return { exchangeRateRielPerUsd, mainCurrency, taxEnabled, applyStoreSettings, currentStoreSettings };
 }

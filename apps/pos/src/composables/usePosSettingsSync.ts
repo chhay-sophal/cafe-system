@@ -2,7 +2,7 @@ import { computed, ref } from "vue";
 import { i18n, setLocale } from "../i18n";
 import { fetchPosSettings, HttpError, savePosSettings, uploadImage } from "../lib/api";
 import { onPosSettingChanged, type PosSettingsSection } from "../lib/settingsEvents";
-import type { PosSettings } from "../types/settings";
+import type { PosSettings, PosSettingsResponse } from "../types/settings";
 import { useAuth } from "./useAuth";
 import { useFastCash } from "./useFastCash";
 import { useKhqrBanks } from "./useKhqrBanks";
@@ -140,12 +140,16 @@ async function pushPending(): Promise<void> {
 }
 
 // Brings the register up to date with the server, then sends anything queued.
-async function syncPosSettings(): Promise<void> {
-  let response;
-  try {
-    response = await fetchPosSettings();
-  } catch {
-    return; // Unreachable - keep the local copies.
+// `prefetched` is the response already loaded with the menu (the POS
+// bootstrap), saving a request; without it the settings are fetched here.
+async function syncPosSettings(prefetched?: PosSettingsResponse): Promise<void> {
+  let response = prefetched;
+  if (!response) {
+    try {
+      response = await fetchPosSettings();
+    } catch {
+      return; // Unreachable - keep the local copies.
+    }
   }
 
   // Never saved on the server: this register's value becomes the shared one
