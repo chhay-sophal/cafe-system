@@ -34,11 +34,14 @@ export interface PosSettings {
   paymentMethods: PosPaymentMethod[];
   fastCash: { USD: number[]; KHR: number[] };
   khqrBanks: Array<{ id: string; name: string; imageUrl: string }>;
+  language: "en-US" | "km-KH";
 }
 
 export interface PosSettingsResponse {
   // false until first saved (from here, or by the register uploading its own).
   configured: boolean;
   settings: PosSettings;
+  // Never saved yet - the register keeps (and uploads) its own value.
+  unsetSections: Array<keyof PosSettings>;
   updatedAt: string | null;
 }

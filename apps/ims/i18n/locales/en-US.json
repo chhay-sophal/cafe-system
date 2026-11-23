@@ -491,6 +491,11 @@
       "invalidUsd": "Enter a dollar amount, to the cent.",
       "invalidRiel": "Enter riel in whole hundreds, e.g. 5000."
     },
+    "language": {
+      "heading": "Language",
+      "hint": "Used on the register's screens, receipts and customer display. Changing it on the register (in Settings or on the login screen) changes it here too.",
+      "unset": "Not set here yet - the register keeps its own choice and uploads it the next time a manager or admin logs in on it."
+    },
     "khqr": {
       "heading": "KHQR banks",
       "hint": "Banks the shop takes Mobile Pay through. The cashier picks one at checkout and the customer screen shows its QR. Changes save immediately.",

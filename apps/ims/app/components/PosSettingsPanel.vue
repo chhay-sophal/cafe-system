@@ -178,6 +178,21 @@ function formatAmount(currency: "USD" | "KHR", amount: number): string {
   return currency === "KHR" ? formatRiel(amount) : `$${Number.isInteger(amount) ? amount : amount.toFixed(2)}`;
 }
 
+// --- Language ----------------------------------------------------------------
+
+// Shown in their own script, like the register's language picker, so anyone
+// can find theirs.
+const LANGUAGES = [
+  { value: "en-US", label: "English" },
+  { value: "km-KH", label: "ខ្មែរ" },
+] as const;
+
+const languageSection = useSection(
+  (saved) => ({ language: saved.language }),
+  (draft) => ({ language: draft.language }),
+);
+const isLanguageUnset = computed(() => store.response?.unsetSections.includes("language") ?? false);
+
 // --- KHQR banks (saved straight away, like on the register) ---------------
 
 const newBankName = ref("");
@@ -378,6 +393,32 @@ const SMALL_BUTTON = "shrink-0 whitespace-nowrap rounded-lg border border-slate-
             @click="paymentsSection.save()"
           >
             {{ paymentsSection.isSaving ? t("common.saving") : t("common.save") }}
+          </button>
+        </div>
+      </section>
+
+      <!-- Language -->
+      <section v-if="languageSection.draft" class="mt-6 rounded-lg border border-slate-200 bg-white p-5">
+        <h3 class="font-semibold text-slate-900">{{ t("posSettings.language.heading") }}</h3>
+        <p class="text-xs text-slate-500">{{ t("posSettings.language.hint") }}</p>
+        <p v-if="isLanguageUnset && store.response?.configured" class="mt-2 text-xs text-amber-800">{{ t("posSettings.language.unset") }}</p>
+        <div class="mt-3 flex flex-wrap gap-4" role="radiogroup" :aria-label="t('posSettings.language.heading')">
+          <label v-for="language in LANGUAGES" :key="language.value" class="flex items-center gap-2 text-sm text-slate-700">
+            <input v-model="languageSection.draft.language" type="radio" class="h-4 w-4" :value="language.value" />
+            {{ language.label }}
+          </label>
+        </div>
+        <div class="mt-5 flex items-center justify-end gap-2">
+          <p v-if="languageSection.error" class="mr-auto text-xs font-medium text-red-700">{{ languageSection.error }}</p>
+          <p v-else-if="languageSection.justSaved" class="mr-auto text-xs font-medium text-emerald-700">{{ t("posSettings.saved") }}</p>
+          <button v-if="languageSection.isDirty" type="button" :class="SMALL_BUTTON" @click="languageSection.discard()">{{ t("posSettings.discard") }}</button>
+          <button
+            type="button"
+            class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40"
+            :disabled="!languageSection.isDirty || languageSection.isSaving"
+            @click="languageSection.save()"
+          >
+            {{ languageSection.isSaving ? t("common.saving") : t("common.save") }}
           </button>
         </div>
       </section>
