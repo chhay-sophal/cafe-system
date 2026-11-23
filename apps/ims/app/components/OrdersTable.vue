@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, watch } from "vue";
+import { RefreshCw } from "@lucide/vue";
 import { storeToRefs } from "pinia";
 import { createColumnHelper, tableFeatures, useTable } from "@tanstack/vue-table";
 import type { OrderSummary, PaymentMethod } from "~/types/orders";
@@ -116,16 +117,22 @@ const filters = computed<TableFilterDef[]>(() => [
 // the search or filters hide them all.
 const emptyText = computed(() => (orders.value.length > 0 ? t("orders.noMatches") : t("orders.empty")));
 
-function loadOrders() {
+// Reuses the list already loaded for this period if it's recent (see
+// utils/cache.ts); Refresh always reloads, for a sale that just happened.
+function loadOrders({ force = false } = {}) {
   const token = auth.session.value?.token;
   if (!token) {
     return;
   }
-  ordersStore.fetchOrders(period.startDate, period.endDate, token);
+  if (force) {
+    ordersStore.fetchOrders(period.startDate, period.endDate, token);
+  } else {
+    ordersStore.ensureOrders(period.startDate, period.endDate, token);
+  }
 }
 
-onMounted(loadOrders);
-watch(() => [period.startDate, period.endDate], loadOrders);
+onMounted(() => loadOrders());
+watch(() => [period.startDate, period.endDate], () => loadOrders());
 
 function openDetail(order: OrderSummary) {
   const token = auth.session.value?.token;
@@ -142,7 +149,16 @@ function openDetail(order: OrderSummary) {
   <div class="flex h-full min-h-0 flex-col">
     <div class="mb-4 flex flex-wrap items-center gap-3">
       <TableFilters :table="table" :search-placeholder="t('orders.searchPlaceholder')" :filters="filters" />
-      <DateRangePicker class="ml-auto" />
+      <button
+        type="button"
+        class="ml-auto flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+        :disabled="ordersStore.isLoading"
+        @click="loadOrders({ force: true })"
+      >
+        <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': ordersStore.isLoading }" aria-hidden="true" />
+        {{ t("orders.refresh") }}
+      </button>
+      <DateRangePicker />
     </div>
 
     <p v-if="ordersStore.error" class="rounded-lg bg-red-50 p-4 text-sm font-medium text-red-700">{{ ordersStore.error }}</p>

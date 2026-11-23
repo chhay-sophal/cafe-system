@@ -4,6 +4,7 @@ import type { StaffUser, UserCreatePayload, UserUpdatePayload } from "~/types/us
 export const useUserStore = defineStore("users", {
   state: () => ({
     items: [] as StaffUser[],
+    loadedAt: null as number | null,
     isLoading: false,
     error: null as string | null,
   }),
@@ -16,10 +17,18 @@ export const useUserStore = defineStore("users", {
 
       try {
         this.items = await fetchUsers(token);
+        this.loadedAt = Date.now();
       } catch (error) {
         this.error = error instanceof Error ? error.message : "Failed to load staff.";
       } finally {
         this.isLoading = false;
+      }
+    },
+
+    // Staff only change here, so once per session (see utils/cache.ts).
+    async ensureLoaded(token: string) {
+      if (!isFresh(this.loadedAt)) {
+        await this.fetchUsers(token);
       }
     },
 

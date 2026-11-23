@@ -82,7 +82,7 @@ const emptyText = computed(() => (items.value.length > 0 ? t("staff.table.noMatc
 onMounted(() => {
   const token = auth.session.value?.token;
   if (token) {
-    store.fetchUsers(token);
+    store.ensureLoaded(token);
   }
 });
 

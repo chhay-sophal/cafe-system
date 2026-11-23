@@ -8,7 +8,8 @@ const isOpen = ref(false);
 const customStart = ref(store.startDate);
 const customEnd = ref(store.endDate);
 
-const MENU_WIDTH_PX = 288;
+// Wide enough for the two custom-range date inputs side by side.
+const MENU_WIDTH_PX = 320;
 const VIEWPORT_MARGIN_PX = 8;
 const MENU_GAP_PX = 8;
 
@@ -198,13 +199,13 @@ onBeforeUnmount(removeListeners);
             <input
               v-model="customStart"
               type="date"
-              class="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+              class="w-full min-w-0 rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
             />
             <span class="text-slate-400">-</span>
             <input
               v-model="customEnd"
               type="date"
-              class="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+              class="w-full min-w-0 rounded-lg border border-slate-300 px-2 py-1.5 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
             />
           </div>
           <button

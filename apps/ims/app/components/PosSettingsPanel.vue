@@ -12,7 +12,7 @@ const { t } = useI18n();
 const store = usePosSettingsStore();
 const { formatRiel } = useCurrency();
 
-onMounted(() => store.fetch());
+onMounted(() => store.ensureFresh());
 
 const settings = computed(() => store.response?.settings ?? null);
 

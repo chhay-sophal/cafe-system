@@ -450,7 +450,8 @@
       "save": "Save changes",
       "error": "Couldn't save the changes.",
       "editedBy": "Last edited by {name} on {time}"
-    }
+    },
+    "refresh": "Refresh"
   },
   "posSettings": {
     "heading": "POS Settings",

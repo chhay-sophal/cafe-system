@@ -34,7 +34,7 @@ function resetDraft() {
 }
 
 onMounted(async () => {
-  await store.fetchExchangeRate();
+  await store.ensureLoaded();
   resetDraft();
 });
 

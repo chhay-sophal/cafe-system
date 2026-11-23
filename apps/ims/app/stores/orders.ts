@@ -4,6 +4,11 @@ import type { OrderDetail, OrderEditPayload, OrderSummary } from "~/types/orders
 export const useOrdersStore = defineStore("orders", {
   state: () => ({
     orders: [] as OrderSummary[],
+    // The period `orders` was loaded for, and when (see utils/cache.ts).
+    loadedRange: null as string | null,
+    loadedAt: null as number | null,
+    // Order details already opened since the list last loaded.
+    detailCache: {} as Record<string, OrderDetail>,
     isLoading: false,
     hasLoadedOnce: false,
     error: null as string | null,
@@ -20,6 +25,10 @@ export const useOrdersStore = defineStore("orders", {
 
       try {
         this.orders = await fetchOrders(startDate, endDate, token);
+        this.loadedRange = `${startDate}..${endDate}`;
+        this.loadedAt = Date.now();
+        // Fresh list, fresh details - a sale may have been voided on the POS.
+        this.detailCache = {};
         this.hasLoadedOnce = true;
       } catch (error) {
         this.error = error instanceof Error ? error.message : "Failed to load orders.";
@@ -28,7 +37,22 @@ export const useOrdersStore = defineStore("orders", {
       }
     },
 
+    // On opening Sales History: reuse the list unless it's for another period
+    // or over a minute old - the POS keeps adding sales (utils/cache.ts).
+    async ensureOrders(startDate: string, endDate: string, token: string) {
+      if (this.loadedRange !== `${startDate}..${endDate}` || !isFresh(this.loadedAt, SHARED_DATA_MAX_AGE_MS)) {
+        await this.fetchOrders(startDate, endDate, token);
+      }
+    },
+
     async fetchOrderDetail(id: string, token: string) {
+      const cached = this.detailCache[id];
+      if (cached) {
+        this.selectedOrder = cached;
+        this.detailError = null;
+        return;
+      }
+
       const { fetchOrderDetail } = useApi();
       this.isDetailLoading = true;
       this.detailError = null;
@@ -36,6 +60,7 @@ export const useOrdersStore = defineStore("orders", {
 
       try {
         this.selectedOrder = await fetchOrderDetail(id, token);
+        this.detailCache = { ...this.detailCache, [id]: this.selectedOrder };
       } catch (error) {
         this.detailError = error instanceof Error ? error.message : "Failed to load order.";
       } finally {
@@ -65,6 +90,7 @@ export const useOrdersStore = defineStore("orders", {
     // The order's list row brought in line with its saved detail, and the
     // Analytics report marked stale, since totals may have changed.
     afterOrderChange(detail: OrderDetail) {
+      this.detailCache = { ...this.detailCache, [detail.id]: detail };
       this.orders = this.orders.map((row) =>
         row.id === detail.id
           ? {

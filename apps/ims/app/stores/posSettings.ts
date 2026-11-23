@@ -4,6 +4,7 @@ import type { PosSettings, PosSettingsResponse } from "~/types/settings";
 export const usePosSettingsStore = defineStore("posSettings", {
   state: () => ({
     response: null as PosSettingsResponse | null,
+    loadedAt: null as number | null,
     isLoading: false,
     error: null as string | null,
   }),
@@ -15,10 +16,18 @@ export const usePosSettingsStore = defineStore("posSettings", {
       this.error = null;
       try {
         this.response = await fetchPosSettings();
+        this.loadedAt = Date.now();
       } catch (error) {
         this.error = error instanceof Error ? error.message : "Failed to load POS settings.";
       } finally {
         this.isLoading = false;
+      }
+    },
+
+    // The register edits these too, so reused only briefly (utils/cache.ts).
+    async ensureFresh() {
+      if (!isFresh(this.loadedAt, SHARED_DATA_MAX_AGE_MS)) {
+        await this.fetch();
       }
     },
 
@@ -27,6 +36,7 @@ export const usePosSettingsStore = defineStore("posSettings", {
     async save(update: Partial<PosSettings>) {
       const { savePosSettings } = useApi();
       this.response = await savePosSettings(update, useAuth().requireToken());
+      this.loadedAt = Date.now();
     },
   },
 });

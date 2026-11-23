@@ -4,6 +4,9 @@ import type { RecipeIngredientRecord, RecipeTarget, RecipeUpdatePayload } from "
 export const useRecipeStore = defineStore("recipes", {
   state: () => ({
     productRecipeCounts: {} as Record<string, number>,
+    // Recipes already opened in the editor, by "product:<id>" / "modifier:<id>".
+    // Recipes only change here, so kept for the session (utils/cache.ts).
+    recipeCache: {} as Record<string, RecipeIngredientRecord[]>,
     modifierRecipeCounts: {} as Record<string, number>,
     isLoadingCatalog: false,
     hasLoadedCatalog: false,
@@ -43,9 +46,22 @@ export const useRecipeStore = defineStore("recipes", {
       }
     },
 
-    fetchRecipe(target: RecipeTarget): Promise<RecipeIngredientRecord[]> {
+    async fetchRecipe(target: RecipeTarget): Promise<RecipeIngredientRecord[]> {
+      const key = `${target.kind}:${target.id}`;
+      const cached = this.recipeCache[key];
+      if (cached) {
+        return cached;
+      }
       const { fetchRecipe } = useApi();
-      return fetchRecipe(target, useAuth().requireToken());
+      const records = await fetchRecipe(target, useAuth().requireToken());
+      this.recipeCache = { ...this.recipeCache, [key]: records };
+      return records;
+    },
+
+    dropCachedRecipe(key: string) {
+      const next = { ...this.recipeCache };
+      delete next[key];
+      this.recipeCache = next;
     },
 
     async saveRecipe(payload: RecipeUpdatePayload, token: string) {
@@ -53,7 +69,9 @@ export const useRecipeStore = defineStore("recipes", {
       await saveRecipe(payload, token);
 
       // Update the affected target's count locally rather than refetching the
-      // whole summary - the save already tells us exactly what changed.
+      // whole summary - the save already tells us exactly what changed. Its
+      // cached ingredients are dropped, so the next open shows them as saved.
+      this.dropCachedRecipe(payload.productId ? `product:${payload.productId}` : `modifier:${payload.modifierId}`);
       const count = payload.ingredients.length;
       if (payload.productId) {
         this.productRecipeCounts = { ...this.productRecipeCounts, [payload.productId]: count };
@@ -65,12 +83,14 @@ export const useRecipeStore = defineStore("recipes", {
     // A product or modifier option deleted elsewhere - the server dropped its
     // recipe too.
     forgetProduct(productId: string) {
+      this.dropCachedRecipe(`product:${productId}`);
       const next = { ...this.productRecipeCounts };
       delete next[productId];
       this.productRecipeCounts = next;
     },
 
     forgetModifier(modifierId: string) {
+      this.dropCachedRecipe(`modifier:${modifierId}`);
       const next = { ...this.modifierRecipeCounts };
       delete next[modifierId];
       this.modifierRecipeCounts = next;
@@ -79,6 +99,7 @@ export const useRecipeStore = defineStore("recipes", {
     async deleteRecipe(productId: string, token: string) {
       const { deleteRecipe } = useApi();
       await deleteRecipe(productId, token);
+      this.dropCachedRecipe(`product:${productId}`);
 
       const next = { ...this.productRecipeCounts };
       delete next[productId];
