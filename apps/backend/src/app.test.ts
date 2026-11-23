@@ -1,11 +1,11 @@
 import { randomUUID } from 'crypto';
 import request from 'supertest';
-import { describe, expect, it, beforeEach } from 'vitest';
+import { afterEach, describe, expect, it, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { createApp } from './app.js';
 import { db } from './db/index.js';
 import {
-  categories, inventoryItems, modifierGroups, modifiers, orderItemModifiers, orderItems, orders, payments, productModifiers, products, recipes,
+  categories, inventoryItems, modifierGroups, modifiers, orderItemModifiers, orderItems, orders, payments, posSettings, productModifiers, products, recipes,
   stockAdjustments, storeSettings, users,
 } from './db/schema.js';
 import { hashPin, signToken } from './middleware/auth.js';
@@ -1399,3 +1399,68 @@ describe('order edit', () => {
     expect((await edit(manager, orderId, body)).status).toBe(409);
   });
 });
+
+describe('POS settings', () => {
+  beforeEach(async () => {
+    await db.delete(posSettings).run();
+    await db.delete(payments).run();
+    await db.delete(orderItemModifiers).run();
+    await db.delete(orderItems).run();
+    await db.delete(orders).run();
+    await db.delete(stockAdjustments).run();
+    await db.delete(users).run();
+  });
+  // pos_settings.updated_by references users, which other suites delete.
+  afterEach(async () => {
+    await db.delete(posSettings).run();
+  });
+
+  async function tokenFor(role: 'CASHIER' | 'MANAGER') {
+    const id = `${role.toLowerCase()}-1`;
+    await db.insert(users).values({ id, name: role, pinHash: await hashPin(role === 'MANAGER' ? '9999' : '1234'), role, isActive: true }).run();
+    return signToken({ id, name: role, role });
+  }
+
+  const put = (token: string | null, body: object) => {
+    const req = request(app).put('/api/settings/pos');
+    return (token ? req.set('Authorization', `Bearer ${token}`) : req).send(body);
+  };
+
+  it('serves the defaults, unconfigured, to anyone before the first save', async () => {
+    const response = await request(app).get('/api/settings/pos');
+
+    expect(response.status).toBe(200);
+    expect(response.body.configured).toBe(false);
+    expect(response.body.settings).toMatchObject({ storeName: '', paymentMethods: ['CASH', 'CARD', 'QR_CODE'], khqrBanks: [] });
+  });
+
+  it('saves sections independently, keeping the ones not sent', async () => {
+    const token = await tokenFor('MANAGER');
+
+    expect((await put(token, { storeName: 'Lysin Cafe - Riverside' })).status).toBe(200);
+    const second = await put(token, { paymentMethods: ['CASH', 'QR_CODE'], fastCash: { USD: [1, 5], KHR: [5000, 10000] } });
+
+    expect(second.status).toBe(200);
+    expect(second.body.configured).toBe(true);
+    expect(second.body.settings).toMatchObject({
+      storeName: 'Lysin Cafe - Riverside',
+      paymentMethods: ['CASH', 'QR_CODE'],
+      fastCash: { USD: [1, 5], KHR: [5000, 10000] },
+      khqrBanks: [],
+    });
+    expect((await request(app).get('/api/settings/pos')).body.settings.storeName).toBe('Lysin Cafe - Riverside');
+  });
+
+  it('only lets managers and admins save, and rejects values the POS would never allow', async () => {
+    const cashier = await tokenFor('CASHIER');
+    const manager = await tokenFor('MANAGER');
+
+    expect((await put(null, { storeName: 'x' })).status).toBe(401);
+    expect((await put(cashier, { storeName: 'x' })).status).toBe(403);
+    expect((await put(manager, {})).status).toBe(400);
+    expect((await put(manager, { paymentMethods: [] })).status).toBe(400);
+    expect((await put(manager, { fastCash: { USD: [1], KHR: [150] } })).status).toBe(400);
+    expect((await put(manager, { storeName: 'x'.repeat(61) })).status).toBe(400);
+  });
+});
+

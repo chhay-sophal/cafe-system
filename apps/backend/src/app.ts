@@ -5,11 +5,12 @@ import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
 import { alias, type SQLiteColumn } from 'drizzle-orm/sqlite-core';
 import { eq, sql, gte, lte, and, inArray, isNotNull, desc } from 'drizzle-orm';
+import type { z } from 'zod';
 import { db } from './db/index.js';
 import {
   users, categories, products, modifierGroups, modifiers, productModifiers,
   inventoryItems, recipes, stockAdjustments, orders, orderItems,
-  orderItemModifiers, payments, storeSettings,
+  orderItemModifiers, payments, storeSettings, posSettings,
 } from './db/schema.js';
 import { authenticate, hashPin, requireRole, signToken, verifyPin } from './middleware/auth.js';
 import { validateBody } from './middleware/validate.js';
@@ -27,6 +28,8 @@ import {
   orderEditSchema,
   orderSchema,
   pinLoginSchema,
+  posSettingsSchema,
+  posSettingsUpdateSchema,
   productSchema,
   recipeUpdateSchema,
   taxSettingSchema,
@@ -101,6 +104,38 @@ async function findOrderResultByClientOrderId(clientOrderId: string) {
     .get();
 
   return existing ? { success: true, ...existing } : null;
+}
+
+type PosSettings = z.infer<typeof posSettingsSchema>;
+
+// What a register uses before POS settings are first saved - the defaults the
+// POS has always shipped with.
+const DEFAULT_POS_SETTINGS: PosSettings = {
+  storeName: '',
+  storeDetails: { address: '', phones: [], emails: [], socials: [] },
+  paymentMethods: ['CASH', 'CARD', 'QR_CODE'],
+  fastCash: {
+    USD: [0.01, 0.1, 1, 5, 10, 20, 50],
+    KHR: [100, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000],
+  },
+  khqrBanks: [],
+};
+
+// GET /api/settings/pos's body. `configured: false` until the settings are
+// first saved - the POS then uploads its own local settings instead of
+// replacing them with these defaults.
+async function loadPosSettings() {
+  const row = await db.select().from(posSettings).where(eq(posSettings.id, 'default')).get();
+  if (!row) {
+    return { configured: false, settings: DEFAULT_POS_SETTINGS, updatedAt: null as string | null };
+  }
+  // Sections added after a row was saved fall back to their defaults.
+  const saved = posSettingsSchema.partial().safeParse(JSON.parse(row.settings));
+  return {
+    configured: true,
+    settings: { ...DEFAULT_POS_SETTINGS, ...(saved.success ? saved.data : {}) },
+    updatedAt: row.updatedAt,
+  };
 }
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -1251,6 +1286,37 @@ function createApp() {
     } catch (error) {
       console.error('Void order error:', error);
       res.status(500).json({ error: 'Failed to void order' });
+    }
+  });
+
+  // Public like the exchange rate: the POS shows the store name and receipt
+  // header before anyone logs in, and none of it is secret.
+  app.get('/api/settings/pos', async (_req, res) => {
+    try {
+      res.json(await loadPosSettings());
+    } catch (error) {
+      console.error('Fetch POS settings error:', error);
+      res.status(500).json({ error: 'Failed to fetch POS settings' });
+    }
+  });
+
+  // Saves the sections sent and keeps the rest, so IMS and a register editing
+  // different sections at the same time don't overwrite each other.
+  app.put('/api/settings/pos', authenticate, requireRole(['MANAGER', 'ADMIN']), validateBody(posSettingsUpdateSchema), async (req, res) => {
+    try {
+      const current = await loadPosSettings();
+      const merged = posSettingsSchema.parse({ ...current.settings, ...req.body });
+      await db.insert(posSettings)
+        .values({ id: 'default', settings: JSON.stringify(merged), updatedBy: req.user!.id })
+        .onConflictDoUpdate({
+          target: posSettings.id,
+          set: { settings: JSON.stringify(merged), updatedBy: req.user!.id, updatedAt: sql`CURRENT_TIMESTAMP` },
+        })
+        .run();
+      res.json(await loadPosSettings());
+    } catch (error) {
+      console.error('Update POS settings error:', error);
+      res.status(500).json({ error: 'Failed to update POS settings' });
     }
   });
 

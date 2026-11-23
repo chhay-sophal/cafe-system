@@ -171,6 +171,16 @@ export const payments = sqliteTable('payments', {
 // lets a manager turn tax off entirely - many Cambodian SME/family-run
 // stores don't charge it at all. Defaults (KHR, tax off, 4100 riel/usd)
 // match how those same stores are typically set up out of the box.
+// Store-wide POS settings - receipt header, payment methods, fast-cash
+// buttons, KHQR banks - as one JSON document (see posSettingsSchema), managed
+// from IMS and the POS Settings tab. One row; absent until first saved.
+export const posSettings = sqliteTable('pos_settings', {
+  id: text('id').primaryKey().default('default'),
+  settings: text('settings').notNull(),
+  updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`),
+  updatedBy: text('updated_by').references(() => users.id),
+});
+
 export const storeSettings = sqliteTable('store_settings', {
   id: text('id').primaryKey().default('default'),
   exchangeRateRielPerUsd: real('exchange_rate_riel_per_usd').notNull().default(4100),

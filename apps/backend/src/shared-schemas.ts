@@ -10,6 +10,8 @@ export {
   orderEditSchema,
   orderSchema,
   pinLoginSchema,
+  posSettingsSchema,
+  posSettingsUpdateSchema,
   productSchema,
   recipeUpdateSchema,
   taxSettingSchema,

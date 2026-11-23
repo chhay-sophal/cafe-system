@@ -141,3 +141,42 @@ export const recipeUpdateSchema = z.object({
 }).refine((data) => Boolean(data.productId) !== Boolean(data.modifierId), {
   message: 'Exactly one of productId or modifierId must be provided',
 });
+
+// --- POS settings (store-wide, managed from IMS and the POS Settings tab) ---
+// Limits match what the POS has always enforced locally.
+
+export const POS_PAYMENT_METHODS = ['CASH', 'CARD', 'QR_CODE'] as const;
+export const POS_SOCIAL_PLATFORMS = ['FACEBOOK', 'INSTAGRAM', 'TIKTOK', 'TELEGRAM', 'WEBSITE', 'OTHER'] as const;
+
+const isWholeCents = (amount: number) => Math.abs(Math.round(amount * 100) - amount * 100) < 1e-6;
+const contactEntry = z.string().trim().min(1).max(60);
+
+export const posSettingsSchema = z.object({
+  // Empty = the POS shows its default app title.
+  storeName: z.string().trim().max(60),
+  storeDetails: z.object({
+    address: z.string().max(200),
+    phones: z.array(contactEntry).max(3),
+    emails: z.array(contactEntry).max(3),
+    socials: z.array(z.object({ platform: z.enum(POS_SOCIAL_PLATFORMS), handle: contactEntry })).max(3),
+  }),
+  // At least one, so checkout always has a way to take payment.
+  paymentMethods: z.array(z.enum(POS_PAYMENT_METHODS)).min(1)
+    .refine((methods) => new Set(methods).size === methods.length, 'Payment methods must not repeat'),
+  // Quick-tender buttons: USD to the cent, riel in whole hundreds.
+  fastCash: z.object({
+    USD: z.array(z.number().positive().refine(isWholeCents, 'USD amounts are to the cent')).max(10),
+    KHR: z.array(z.number().positive().refine((amount) => amount % 100 === 0, 'Riel amounts are whole hundreds')).max(10),
+  }),
+  // imageUrl as returned by POST /api/upload.
+  khqrBanks: z.array(z.object({
+    id: z.string().min(1).max(64),
+    name: z.string().trim().min(1).max(60),
+    imageUrl: z.string().min(1).max(500),
+  })).max(10),
+});
+
+// PUT /api/settings/pos - any subset of the sections; the rest are kept.
+export const posSettingsUpdateSchema = posSettingsSchema.partial()
+  .refine((update) => Object.keys(update).length > 0, 'Nothing to update');
+
