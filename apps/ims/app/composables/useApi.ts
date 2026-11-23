@@ -6,7 +6,7 @@ import type { InventoryItem, InventoryItemPayload, StockAdjustmentPayload } from
 import type { OrderDetail, OrderEditPayload, OrderSummary } from "~/types/orders";
 import type { RecipeIngredientRecord, RecipeSummary, RecipeTarget, RecipeUpdatePayload } from "~/types/recipe";
 import type { DailySummaryReport } from "~/types/reports";
-import type { ExchangeRateSetting, MainCurrencySetting, StoreSettings, TaxSetting } from "~/types/settings";
+import type { ExchangeRateSetting, MainCurrencySetting, PosSettings, PosSettingsResponse, StoreSettings, TaxSetting } from "~/types/settings";
 import type { StaffUser, UserCreatePayload, UserUpdatePayload } from "~/types/user";
 
 export class HttpError extends Error {
@@ -238,6 +238,15 @@ export function useApi() {
     return sendJson<StaffUser>("PUT", `/api/users/${id}`, payload, token);
   }
 
+  function fetchPosSettings(): Promise<PosSettingsResponse> {
+    return getJson<PosSettingsResponse>("/api/settings/pos");
+  }
+
+  // Saves the given sections; the server keeps the others.
+  function savePosSettings(update: Partial<PosSettings>, token: string): Promise<PosSettingsResponse> {
+    return sendJson<PosSettingsResponse>("PUT", "/api/settings/pos", update, token);
+  }
+
   function fetchExchangeRate(): Promise<StoreSettings> {
     return getJson<StoreSettings>("/api/settings/exchange-rate");
   }
@@ -288,6 +297,8 @@ export function useApi() {
     deleteProduct,
     uploadProductImage,
     fetchExchangeRate,
+    fetchPosSettings,
+    savePosSettings,
     updateExchangeRate,
     updateMainCurrency,
     updateTaxSetting,

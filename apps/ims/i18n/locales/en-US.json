@@ -53,6 +53,7 @@
       "recipes": "Recipes",
       "analytics": "Analytics",
       "salesHistory": "Sales History",
+      "posSettings": "POS Settings",
       "staff": "Staff",
       "settings": "Settings"
     }
@@ -449,6 +450,65 @@
       "save": "Save changes",
       "error": "Couldn't save the changes.",
       "editedBy": "Last edited by {name} on {time}"
+    }
+  },
+  "posSettings": {
+    "heading": "POS Settings",
+    "intro": "Settings the register uses, shared with its own Settings tab - a change made in either place applies to both. The register picks up changes from here at startup, at login, and when Refresh menu is tapped.",
+    "loading": "Loading POS settings...",
+    "notConfigured": "Not set up yet. The register's own settings are uploaded the first time a manager or admin logs in on it - or save a section here to set it for the register instead.",
+    "saved": "Saved.",
+    "saveError": "Couldn't save.",
+    "discard": "Discard changes",
+    "add": "Add",
+    "remove": "Remove {name}",
+    "store": {
+      "heading": "Store name & details",
+      "hint": "Shown on the register's header, receipts and customer display. Everything is optional.",
+      "name": "Store name",
+      "namePlaceholder": "Leave empty to use the default title",
+      "address": "Address",
+      "phones": "Phone numbers",
+      "emails": "Emails",
+      "socials": "Social media",
+      "platform": "Platform",
+      "phonePlaceholder": "e.g. 012 345 678",
+      "emailPlaceholder": "e.g. hello{'@'}cafe.com",
+      "handlePlaceholder": "Page name, {'@'}handle or link",
+      "invalidPhone": "Enter a phone number with at least 6 digits.",
+      "invalidEmail": "Enter a valid email address.",
+      "invalidSocial": "Enter the page name, handle or link.",
+      "duplicate": "That's already in the list.",
+      "full": "Up to {count} - remove one first."
+    },
+    "payments": {
+      "heading": "Payments",
+      "methods": "Payment methods",
+      "methodsHint": "Offered at checkout. At least one must stay on.",
+      "fastCashUSD": "Fast cash buttons (USD)",
+      "fastCashKHR": "Fast cash buttons (riel)",
+      "noButtons": "No buttons.",
+      "invalidUsd": "Enter a dollar amount, to the cent.",
+      "invalidRiel": "Enter riel in whole hundreds, e.g. 5000."
+    },
+    "khqr": {
+      "heading": "KHQR banks",
+      "hint": "Banks the shop takes Mobile Pay through. The cashier picks one at checkout and the customer screen shows its QR. Changes save immediately.",
+      "empty": "No banks added yet.",
+      "qrAlt": "{name} KHQR code",
+      "confirmRemove": "Remove",
+      "addHeading": "Add a bank",
+      "namePlaceholder": "Bank name, e.g. ABA",
+      "image": "KHQR image",
+      "add": "Add bank"
+    },
+    "platforms": {
+      "FACEBOOK": "Facebook",
+      "INSTAGRAM": "Instagram",
+      "TIKTOK": "TikTok",
+      "TELEGRAM": "Telegram",
+      "WEBSITE": "Website",
+      "OTHER": "Other"
     }
   }
 }
