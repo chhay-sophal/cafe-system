@@ -11,7 +11,7 @@ const emit = defineEmits<{
   edit: [user: StaffUser];
 }>();
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const auth = useAuth();
 const store = useUserStore();
 const { items } = storeToRefs(store);
@@ -90,7 +90,7 @@ function formatCreatedAt(value: string | null): string {
   if (!value) {
     return "-";
   }
-  return new Date(value.replace(" ", "T")).toLocaleDateString();
+  return formatDate(value, locale.value);
 }
 </script>
 

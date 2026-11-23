@@ -13,7 +13,7 @@ const emit = defineEmits<{
   delete: [item: InventoryItem];
 }>();
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const auth = useAuth();
 const store = useInventoryStore();
 const { items, isLoading, error } = storeToRefs(store);
@@ -132,7 +132,7 @@ function formatUpdatedAt(value: string | null): string {
   if (!value) {
     return "-";
   }
-  return new Date(value.replace(" ", "T")).toLocaleString();
+  return formatDateTime(value, locale.value);
 }
 </script>
 

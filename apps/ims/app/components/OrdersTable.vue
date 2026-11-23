@@ -5,7 +5,7 @@ import { createColumnHelper, tableFeatures, useTable } from "@tanstack/vue-table
 import type { OrderSummary, PaymentMethod } from "~/types/orders";
 import type { TableFilterDef } from "~/types/table";
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const auth = useAuth();
 const period = useSalesPeriodStore();
 const ordersStore = useOrdersStore();
@@ -26,7 +26,7 @@ const columns = columnHelper.columns([
   // ranges for items and total.
   columnHelper.accessor("createdAt", {
     header: () => t("orders.columns.dateTime"),
-    cell: ({ getValue }) => formatDateTime(getValue()),
+    cell: ({ getValue }) => formatDateTime(getValue(), locale.value),
     enableGlobalFilter: false,
   }),
   columnHelper.accessor("cashierName", {
@@ -105,10 +105,6 @@ function loadOrders() {
 
 onMounted(loadOrders);
 watch(() => [period.startDate, period.endDate], loadOrders);
-
-function formatDateTime(value: string): string {
-  return new Date(value.replace(" ", "T")).toLocaleString();
-}
 
 function openDetail(order: OrderSummary) {
   const token = auth.session.value?.token;

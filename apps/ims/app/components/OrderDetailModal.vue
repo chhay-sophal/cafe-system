@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const ordersStore = useOrdersStore();
 const { formatMain, formatSecondary, formatUsd, formatRiel } = useCurrency();
 
@@ -11,10 +11,6 @@ const isOpen = computed(
 
 function close() {
   ordersStore.clearSelectedOrder();
-}
-
-function formatDateTime(value: string): string {
-  return new Date(value.replace(" ", "T")).toLocaleString();
 }
 </script>
 
@@ -34,7 +30,7 @@ function formatDateTime(value: string): string {
               {{ t("orders.detail.heading", { number: ordersStore.selectedOrder.orderNumber }) }}
             </h2>
             <p class="text-xs text-slate-500">
-              {{ formatDateTime(ordersStore.selectedOrder.createdAt) }} · {{ ordersStore.selectedOrder.cashierName ?? t("common.dash") }}
+              {{ formatDateTime(ordersStore.selectedOrder.createdAt, locale) }} · {{ ordersStore.selectedOrder.cashierName ?? t("common.dash") }}
             </p>
           </div>
           <button type="button" class="text-2xl leading-none text-slate-400 hover:text-slate-600" @click="close">

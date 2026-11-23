@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const store = useSalesPeriodStore();
 
 const isOpen = ref(false);
@@ -44,9 +44,9 @@ const activePreset = computed<PresetKey | null>(() => {
 
 const rangeLabel = computed(() => {
   if (store.startDate === store.endDate) {
-    return activePreset.value === "today" ? t("dateRange.today") : formatDateLabel(store.startDate);
+    return activePreset.value === "today" ? t("dateRange.today") : formatDateLabel(store.startDate, locale.value);
   }
-  return `${formatDateLabel(store.startDate)} – ${formatDateLabel(store.endDate)}`;
+  return `${formatDateLabel(store.startDate, locale.value)} – ${formatDateLabel(store.endDate, locale.value)}`;
 });
 
 function applyPreset(key: PresetKey) {
