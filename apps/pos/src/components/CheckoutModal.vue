@@ -233,8 +233,12 @@ function handleTenderedRielInput(event: Event) {
   amountTenderedRiel.value = parseTendered(tenderedRielText.value);
 }
 
+// Built once per Complete press. If this request times out after the backend
+// has already saved the sale, the same payload (same clientOrderId) goes to
+// the offline queue, and its replay is recognised as a duplicate.
 function buildOrderPayload(): OrderPayload {
   return {
+    clientOrderId: crypto.randomUUID(),
     items: props.items.map((item) => ({
       productId: item.productId,
       productName: item.productName,

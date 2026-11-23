@@ -11,6 +11,9 @@ export interface OrderItemPayload {
 }
 
 export interface OrderPayload {
+  // Generated once per sale and resent unchanged on every retry, so the
+  // backend can tell a resend of a sale it already recorded from a new one.
+  clientOrderId: string;
   items: OrderItemPayload[];
   paymentMethod: PaymentMethod;
   amountTenderedUsd?: number;

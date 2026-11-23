@@ -38,7 +38,9 @@ async function syncPending(): Promise<void> {
 
     for (const entry of queued) {
       try {
-        await submitOrder(entry.payload, token);
+        // Entries queued before clientOrderId existed fall back to their
+        // queue id, which is just as stable across retries.
+        await submitOrder({ ...entry.payload, clientOrderId: entry.payload.clientOrderId ?? entry.id }, token);
         useSalesHistory().invalidate();
         await removeQueuedOrder(entry.id);
       } catch (error) {
