@@ -1,13 +1,11 @@
 <script setup lang="ts">
-import { onMounted } from "vue";
+import { onMounted, watch } from "vue";
 
 const store = useReportsStore();
+const period = useSalesPeriodStore();
 
-onMounted(() => {
-  if (!store.hasLoadedOnce) {
-    store.fetchReport();
-  }
-});
+onMounted(() => store.loadIfStale());
+watch(() => [period.startDate, period.endDate], () => store.fetchReport());
 </script>
 
 <template>
@@ -30,8 +28,6 @@ onMounted(() => {
         <PaymentBreakdownChart />
         <HourlyVolumeChart />
       </div>
-
-      <OrdersTable />
     </template>
   </div>
 </template>

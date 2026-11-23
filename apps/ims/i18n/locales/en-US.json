@@ -43,6 +43,7 @@
       "modifiers": "Modifiers",
       "recipes": "Recipes",
       "analytics": "Analytics",
+      "salesHistory": "Sales History",
       "staff": "Staff",
       "settings": "Settings"
     }
@@ -348,7 +349,6 @@
     "stay": "Keep editing"
   },
   "orders": {
-    "heading": "Orders",
     "loading": "Loading orders...",
     "empty": "No orders in this period.",
     "columns": {

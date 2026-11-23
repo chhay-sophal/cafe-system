@@ -7,7 +7,7 @@ import type { TableFilterDef } from "~/types/table";
 
 const { t } = useI18n();
 const auth = useAuth();
-const reportsStore = useReportsStore();
+const period = useSalesPeriodStore();
 const ordersStore = useOrdersStore();
 const { orders } = storeToRefs(ordersStore);
 const { formatMain, formatSecondary } = useCurrency();
@@ -100,11 +100,11 @@ function loadOrders() {
   if (!token) {
     return;
   }
-  ordersStore.fetchOrders(reportsStore.startDate, reportsStore.endDate, token);
+  ordersStore.fetchOrders(period.startDate, period.endDate, token);
 }
 
 onMounted(loadOrders);
-watch(() => [reportsStore.startDate, reportsStore.endDate], loadOrders);
+watch(() => [period.startDate, period.endDate], loadOrders);
 
 function formatDateTime(value: string): string {
   return new Date(value.replace(" ", "T")).toLocaleString();
@@ -120,10 +120,12 @@ function openDetail(order: OrderSummary) {
 </script>
 
 <template>
-  <div class="mt-6">
-    <div class="mb-3 flex flex-wrap items-center gap-3">
-      <h3 class="text-sm font-semibold text-slate-700">{{ t("orders.heading") }}</h3>
+  <!-- The Sales History page - laid out like the other table pages (Stock,
+       Menu...): toolbar on top, table filling the rest. -->
+  <div class="flex h-full min-h-0 flex-col">
+    <div class="mb-4 flex flex-wrap items-center gap-3">
       <TableFilters :table="table" :search-placeholder="t('orders.searchPlaceholder')" :filters="filters" />
+      <DateRangePicker class="ml-auto" />
     </div>
 
     <p v-if="ordersStore.error" class="rounded-lg bg-red-50 p-4 text-sm font-medium text-red-700">{{ ordersStore.error }}</p>
@@ -134,7 +136,7 @@ function openDetail(order: OrderSummary) {
 
     <div
       v-else
-      class="overflow-x-auto rounded-lg border border-slate-200 transition-opacity duration-150"
+      class="min-h-0 flex-1 overflow-auto rounded-lg border border-slate-200 transition-opacity duration-150"
       :class="{ 'opacity-50': ordersStore.isLoading && ordersStore.hasLoadedOnce }"
     >
       <DataTable

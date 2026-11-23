@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 
 const { t } = useI18n();
-const store = useReportsStore();
+const store = useSalesPeriodStore();
 
 const isOpen = ref(false);
 const customStart = ref(store.startDate);

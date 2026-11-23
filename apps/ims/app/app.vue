@@ -35,10 +35,10 @@ watch(locale, (value) => {
   }
 });
 
-type ActiveView = "inventory" | "menu" | "modifiers" | "recipes" | "analytics" | "staff" | "settings";
+type ActiveView = "inventory" | "menu" | "modifiers" | "recipes" | "analytics" | "salesHistory" | "staff" | "settings";
 
 const ACTIVE_VIEW_STORAGE_KEY = "ims.activeView";
-const ACTIVE_VIEWS: ActiveView[] = ["inventory", "menu", "modifiers", "recipes", "analytics", "staff", "settings"];
+const ACTIVE_VIEWS: ActiveView[] = ["inventory", "menu", "modifiers", "recipes", "analytics", "salesHistory", "staff", "settings"];
 
 function loadStoredActiveView(): ActiveView {
   if (!import.meta.client) {
@@ -90,6 +90,7 @@ const navItems = computed<Array<{ key: ActiveView; label: string }>>(() => {
     { key: "modifiers", label: t("app.nav.modifiers") },
     { key: "recipes", label: t("app.nav.recipes") },
     { key: "analytics", label: t("app.nav.analytics") },
+    { key: "salesHistory", label: t("app.nav.salesHistory") },
   ];
   if (isAdmin.value) {
     items.push({ key: "staff", label: t("app.nav.staff") });
@@ -333,6 +334,7 @@ watch(
       <RecipeEditor v-else-if="activeView === 'recipes'" />
       <UserTable v-else-if="activeView === 'staff' && isAdmin" @create="openCreateUserModal" @edit="openEditUserModal" />
       <SettingsPanel v-else-if="activeView === 'settings' && isAdmin" v-model:dirty="hasUnsavedSettings" />
+      <OrdersTable v-else-if="activeView === 'salesHistory'" />
       <AnalyticsDashboard v-else />
     </main>
 
