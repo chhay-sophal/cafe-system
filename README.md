@@ -68,10 +68,17 @@ cp apps/pos/.env.example apps/pos/.env
 The backend uses SQLite via Drizzle ORM. From `apps/backend`:
 
 ```bash
-pnpm --filter @cafe-system/backend db:migrate   # apply schema
+pnpm --filter @cafe-system/backend db:migrate   # apply schema (local database only)
 pnpm --filter @cafe-system/backend db:seed      # load sample staff/catalog data
 pnpm --filter @cafe-system/backend db:mock-orders  # optional: 30 days of mock sales (--replace / --remove / --days N)
 ```
+
+**Local vs production database.** `db:migrate`, the dev server and the other `db:*` scripts only ever use the local SQLite file — they refuse to run if `apps/backend/.env` points at a remote (Turso) database. The hosted production database is migrated with its own command, which reads credentials from `apps/backend/.env.production` (copy `.env.production.example`), shows the pending migrations and asks you to type the database name first:
+
+```bash
+pnpm --filter @cafe-system/backend db:migrate:prod
+```
+
 
 ### Run the apps
 

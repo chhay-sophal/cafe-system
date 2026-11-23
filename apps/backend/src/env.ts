@@ -29,7 +29,29 @@ const envSchema = z.object({
   R2_SECRET_ACCESS_KEY: z.string().optional(),
   R2_BUCKET: z.string().optional(),
   R2_PUBLIC_URL: z.string().optional(),
+  // Escape hatch for the remote-database guard below - set to "true" only to
+  // deliberately run a dev command against the hosted database.
+  ALLOW_REMOTE_DB: z.string().optional(),
 });
+
+// Outside production, only a local file database is allowed: .env is for
+// local development, and a hosted (Turso) URL left in it would send dev
+// servers and scripts - test orders, seeds, admins - to the real shop's data.
+// Render sets NODE_ENV=production (Dockerfile), and on-prem uses a local
+// file, so neither is affected. Production migrations have their own command
+// with its own credentials file: `pnpm db:migrate:prod`.
+function assertLocalDatabaseOutsideProduction(data: z.infer<typeof envSchema>) {
+  const isRemote = !data.TURSO_DATABASE_URL.startsWith('file:');
+  if (isRemote && data.NODE_ENV !== 'production' && data.ALLOW_REMOTE_DB !== 'true') {
+    console.error(
+      'Refusing to start: TURSO_DATABASE_URL points at a remote database, but this is not production.\n'
+      + '  - For local development, remove (or comment out) TURSO_DATABASE_URL in apps/backend/.env to use the local file.\n'
+      + '  - Production credentials belong in apps/backend/.env.production, used only by `pnpm db:migrate:prod`.\n'
+      + '  - To deliberately run against the remote database anyway, set ALLOW_REMOTE_DB=true for that one command.',
+    );
+    process.exit(1);
+  }
+}
 
 function loadEnv() {
   const result = envSchema.safeParse(process.env);
@@ -40,6 +62,7 @@ function loadEnv() {
     }
     process.exit(1);
   }
+  assertLocalDatabaseOutsideProduction(result.data);
   return result.data;
 }
 

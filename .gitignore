@@ -37,6 +37,7 @@ coverage/
 .env.*.local
 .env.*
 !.env.example
+!.env.production.example
 
 ####################################
 # Backend (Express + Drizzle + SQLite)
