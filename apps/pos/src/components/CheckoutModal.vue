@@ -254,9 +254,15 @@ function buildOrderPayload(): OrderPayload {
   };
 }
 
-async function queueOffline(payload: OrderPayload) {
+async function queueOffline(payload: OrderPayload, soldAt: Date) {
   try {
-    await offlineQueue.enqueue(payload);
+    await offlineQueue.enqueue({
+      ...payload,
+      // It syncs whenever the backend is next reachable - possibly hours
+      // later - so it carries when it was sold and the rate it was charged at.
+      soldAt: soldAt.toISOString(),
+      exchangeRateRielPerUsd: exchangeRateRielPerUsd.value,
+    });
     orderResult.value = null;
     isQueuedOffline.value = true;
     phase.value = "success";
@@ -276,11 +282,12 @@ async function handleComplete() {
   phase.value = "submitting";
   errorMessage.value = null;
   const payload = buildOrderPayload();
+  const soldAt = new Date();
 
   // Already known offline - skip the network round trip entirely so the
   // cashier never sits staring at a spinner waiting for a doomed request.
   if (!network.isOnline.value) {
-    await queueOffline(payload);
+    await queueOffline(payload, soldAt);
     return;
   }
 
@@ -301,7 +308,7 @@ async function handleComplete() {
 
     // navigator.onLine said we were connected but the request still failed
     // outright (unreachable host, timed out) - treat it the same as offline.
-    await queueOffline(payload);
+    await queueOffline(payload, soldAt);
   }
 }
 

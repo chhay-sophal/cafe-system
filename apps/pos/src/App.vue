@@ -30,6 +30,7 @@ import { useStoreName } from "./composables/useStoreName";
 import { useTheme } from "./composables/useTheme";
 import { useOfflineQueue } from "./composables/useOfflineQueue";
 import { fetchCategories, fetchModifierGroups, fetchProducts } from "./lib/api";
+import { loadCachedCatalog, saveCachedCatalog, type Catalog } from "./lib/catalogCache";
 import type { Category, Product } from "./types/catalog";
 import type { CartModifier, ModifierGroup, ModifierGroupWithProducts } from "./types/cart";
 
@@ -173,16 +174,27 @@ function groupModifiersByProduct(groups: ModifierGroupWithProducts[]): Map<strin
   return byProduct;
 }
 
-let syncIntervalId: ReturnType<typeof setInterval> | undefined;
-
-function handleOnline() {
-  offlineQueue.syncPending();
+function applyCatalog(catalog: Catalog) {
+  categories.value = catalog.categories;
+  products.value = catalog.products;
+  modifierGroupsByProduct.value = groupModifiersByProduct(catalog.modifierGroups);
+  // The category picked from a saved menu may be gone from the fresh one.
+  if (selectedCategoryId.value !== null && !catalog.categories.some((category) => category.id === selectedCategoryId.value)) {
+    selectedCategoryId.value = null;
+  }
 }
 
-onMounted(async () => {
-  // Cold start, before login and before any order is in progress - the
-  // safe moment for a silent self-update-and-relaunch.
-  checkForUpdateAndInstall();
+// False until the menu and store settings have come from the backend this
+// session - while it's false (started offline, on the saved menu), coming
+// back online or the retry timer tries again.
+let serverDataLoaded = false;
+let isLoadingServerData = false;
+
+async function loadServerData() {
+  if (isLoadingServerData) {
+    return;
+  }
+  isLoadingServerData = true;
 
   try {
     const [categoryList, productList, modifierGroups] = await Promise.all([
@@ -191,14 +203,45 @@ onMounted(async () => {
       fetchModifierGroups(),
       exchangeRate.refreshExchangeRate().then(() => publishStoreSettings(exchangeRate.currentStoreSettings())),
     ]);
-    categories.value = categoryList;
-    products.value = productList;
-    modifierGroupsByProduct.value = groupModifiersByProduct(modifierGroups);
+    const catalog = { categories: categoryList, products: productList, modifierGroups };
+    applyCatalog(catalog);
+    saveCachedCatalog(catalog);
+    serverDataLoaded = true;
+    errorMessage.value = null;
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : t("app.loadError");
+    // With a saved menu on screen the register keeps selling from it; only a
+    // first launch with nothing saved has no menu to show.
+    if (products.value.length === 0) {
+      errorMessage.value = error instanceof Error ? error.message : t("app.loadError");
+    }
   } finally {
+    isLoadingServerData = false;
     isLoading.value = false;
   }
+}
+
+let syncIntervalId: ReturnType<typeof setInterval> | undefined;
+
+function handleOnline() {
+  offlineQueue.syncPending();
+  if (!serverDataLoaded) {
+    loadServerData();
+  }
+}
+
+onMounted(async () => {
+  // Cold start, before login and before any order is in progress - the
+  // safe moment for a silent self-update-and-relaunch.
+  checkForUpdateAndInstall();
+
+  // Show the saved menu straight away; the fresh one replaces it when it
+  // arrives (or doesn't, if the backend is unreachable).
+  const cachedCatalog = loadCachedCatalog();
+  if (cachedCatalog) {
+    applyCatalog(cachedCatalog);
+    isLoading.value = false;
+  }
+  await loadServerData();
 
   // A freshly (re)opened customer-display window has missed every prior
   // cart-update, so it asks for a resync on its own mount - answer with
@@ -217,10 +260,14 @@ onMounted(async () => {
   }
 
   // Fallback: some outages (server unreachable but interface "online") never
-  // fire the online event, so poll while anything is still queued.
+  // fire the online event, so poll while anything is still queued - or the
+  // menu hasn't loaded from the backend yet.
   syncIntervalId = setInterval(() => {
     if (offlineQueue.pendingCount.value > 0) {
       offlineQueue.syncPending();
+    }
+    if (!serverDataLoaded && network.isOnline.value) {
+      loadServerData();
     }
   }, SYNC_RETRY_INTERVAL_MS);
 });

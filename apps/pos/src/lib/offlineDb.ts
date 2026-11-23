@@ -6,7 +6,18 @@ export interface QueuedOrder {
   createdAt: number;
   attempts: number;
   lastError?: string;
+  // "failed": the backend rejected it for a reason retrying won't fix, so it
+  // waits for staff (see UnsyncedOrdersModal) instead of being retried
+  // automatically. Missing on entries queued before this field existed.
+  status?: "pending" | "failed";
+  // The login of the cashier who rang it up, so it syncs under their name
+  // even if someone else is logged in by then (while it hasn't expired).
+  token?: string;
+  tokenExpiresAt?: string;
+  cashierName?: string;
 }
+
+export type QueuedOrderCashier = Pick<QueuedOrder, "token" | "tokenExpiresAt" | "cashierName">;
 
 const DB_NAME = "cafe-pos-offline";
 const DB_VERSION = 1;
@@ -39,8 +50,9 @@ async function withStore<T>(mode: IDBTransactionMode, run: (store: IDBObjectStor
   });
 }
 
-export async function enqueueOrder(payload: OrderPayload): Promise<string> {
+export async function enqueueOrder(payload: OrderPayload, cashier: QueuedOrderCashier): Promise<string> {
   const entry: QueuedOrder = {
+    ...cashier,
     id: crypto.randomUUID(),
     // Vue's reactive Proxies (cart line items live inside a ref array) can't
     // survive IndexedDB's structured-clone algorithm, so strip them to plain
@@ -48,6 +60,7 @@ export async function enqueueOrder(payload: OrderPayload): Promise<string> {
     payload: JSON.parse(JSON.stringify(payload)),
     createdAt: Date.now(),
     attempts: 0,
+    status: "pending",
   };
 
   await withStore("readwrite", (store) => store.add(entry));

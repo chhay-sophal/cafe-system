@@ -80,7 +80,19 @@
   },
   "network": {
     "offlineMessage": "You're offline. Orders will save locally and sync automatically.",
-    "backOnline": "Back online - syncing pending orders..."
+    "backOnline": "Back online - syncing pending orders...",
+    "failedMessage": "Some sales couldn't be synced and need attention.",
+    "failedBadge": "{count} failed to sync",
+    "review": "Review"
+  },
+  "unsynced": {
+    "title": "Sales that failed to sync",
+    "intro": "These sales were completed at the register, but the server rejected them, so they aren't in the sales records yet. Try again once the problem is fixed. A manager can discard a sale that shouldn't be recorded.",
+    "serverSaid": "Server said: {error}",
+    "retrying": "Trying...",
+    "discard": "Discard",
+    "confirmDiscard": "Discard this sale? It will never be recorded.",
+    "discardSale": "Discard sale"
   },
   "product": {
     "soldOut": "Sold Out",

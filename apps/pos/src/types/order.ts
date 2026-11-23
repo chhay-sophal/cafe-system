@@ -14,6 +14,11 @@ export interface OrderPayload {
   // Generated once per sale and resent unchanged on every retry, so the
   // backend can tell a resend of a sale it already recorded from a new one.
   clientOrderId: string;
+  // Set only on a sale queued offline: when it was rung up and the exchange
+  // rate it was charged at, so the backend records it as it happened rather
+  // than as of whenever it syncs.
+  soldAt?: string;
+  exchangeRateRielPerUsd?: number;
   items: OrderItemPayload[];
   paymentMethod: PaymentMethod;
   amountTenderedUsd?: number;
