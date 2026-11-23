@@ -113,8 +113,9 @@ export function useApi() {
     return sendJson<AuthSession>("POST", "/api/auth/login", { pin });
   }
 
-  function adjustInventory(payload: StockAdjustmentPayload, token: string): Promise<{ success: boolean }> {
-    return sendJson<{ success: boolean }>("POST", "/api/inventory/adjust", payload, token);
+  // Returns the item as it stands after the adjustment.
+  function adjustInventory(payload: StockAdjustmentPayload, token: string): Promise<{ success: boolean; item: InventoryItem | null }> {
+    return sendJson<{ success: boolean; item: InventoryItem | null }>("POST", "/api/inventory/adjust", payload, token);
   }
 
   function createInventoryItem(payload: InventoryItemPayload, token: string): Promise<InventoryItem> {
@@ -129,16 +130,9 @@ export function useApi() {
     return deleteJson<{ success: boolean }>(`/api/inventory/${id}`, token);
   }
 
-  function fetchCategories(): Promise<Category[]> {
-    return getJson<Category[]>("/api/categories");
-  }
-
-  function fetchProducts(): Promise<Product[]> {
-    return getJson<Product[]>("/api/products");
-  }
-
-  function fetchModifiers(): Promise<ModifierGroup[]> {
-    return getJson<ModifierGroup[]>("/api/modifiers");
+  // The whole menu in one request (GET /api/catalog).
+  function fetchCatalog(): Promise<{ categories: Category[]; products: Product[]; modifierGroups: ModifierGroup[] }> {
+    return getJson("/api/catalog");
   }
 
   function createModifierGroup(payload: ModifierGroupPayload, token: string): Promise<ModifierGroup> {
@@ -165,9 +159,14 @@ export function useApi() {
     return sendJson<Category[]>("PUT", "/api/categories/order", { categoryIds }, token);
   }
 
-  function deleteCategory(id: string, token: string, reassignToCategoryId?: string): Promise<{ success: boolean; reassignedCount: number }> {
+  // Returns the remaining categories, renumbered by the server.
+  function deleteCategory(
+    id: string,
+    token: string,
+    reassignToCategoryId?: string,
+  ): Promise<{ success: boolean; reassignedCount: number; categories: Category[] }> {
     const query = reassignToCategoryId ? `?reassignToCategoryId=${reassignToCategoryId}` : "";
-    return deleteJson<{ success: boolean; reassignedCount: number }>(`/api/categories/${id}${query}`, token);
+    return deleteJson<{ success: boolean; reassignedCount: number; categories: Category[] }>(`/api/categories/${id}${query}`, token);
   }
 
   function createProduct(payload: ProductPayload, token: string): Promise<Product> {
@@ -270,9 +269,7 @@ export function useApi() {
     createInventoryItem,
     updateInventoryItem,
     deleteInventoryItem,
-    fetchCategories,
-    fetchProducts,
-    fetchModifiers,
+    fetchCatalog,
     createModifierGroup,
     updateModifierGroup,
     deleteModifierGroup,

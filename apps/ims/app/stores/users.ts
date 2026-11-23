@@ -23,16 +23,16 @@ export const useUserStore = defineStore("users", {
       }
     },
 
+    // From the save's response rather than reloading the whole staff list.
     async createUser(payload: UserCreatePayload, token: string) {
       const { createUser } = useApi();
-      await createUser(payload, token);
-      await this.fetchUsers(token);
+      this.items = [...this.items, await createUser(payload, token)];
     },
 
     async updateUser(id: string, payload: UserUpdatePayload, token: string) {
       const { updateUser } = useApi();
-      await updateUser(id, payload, token);
-      await this.fetchUsers(token);
+      const updated = await updateUser(id, payload, token);
+      this.items = this.items.map((user) => (user.id === id ? updated : user));
     },
   },
 });

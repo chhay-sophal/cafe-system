@@ -50,20 +50,36 @@ export const useOrdersStore = defineStore("orders", {
       const { voidOrder, fetchOrderDetail } = useApi();
       const token = useAuth().requireToken();
       await voidOrder(id, reason, token);
+      // The detail is fetched for who voided it and when; the list row is
+      // patched from it rather than reloading the whole list.
       this.selectedOrder = await fetchOrderDetail(id, token);
-      this.afterOrderChange(token);
+      this.afterOrderChange(this.selectedOrder);
     },
 
     async updateOrder(id: string, payload: OrderEditPayload) {
       const { updateOrder } = useApi();
-      const token = useAuth().requireToken();
-      this.selectedOrder = await updateOrder(id, payload, token);
-      this.afterOrderChange(token);
+      this.selectedOrder = await updateOrder(id, payload, useAuth().requireToken());
+      this.afterOrderChange(this.selectedOrder);
     },
 
-    afterOrderChange(token: string) {
-      const period = useSalesPeriodStore();
-      this.fetchOrders(period.startDate, period.endDate, token);
+    // The order's list row brought in line with its saved detail, and the
+    // Analytics report marked stale, since totals may have changed.
+    afterOrderChange(detail: OrderDetail) {
+      this.orders = this.orders.map((row) =>
+        row.id === detail.id
+          ? {
+            ...row,
+            status: detail.status,
+            subtotal: detail.subtotal,
+            taxAmount: detail.taxAmount,
+            discountAmount: detail.discountAmount,
+            totalAmount: detail.totalAmount,
+            paymentMethod: detail.payment?.paymentMethod ?? row.paymentMethod,
+            itemCount: detail.items.length,
+            isEdited: detail.editedAt !== null,
+          }
+          : row,
+      );
       useReportsStore().loadedRange = null;
     },
 

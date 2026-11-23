@@ -3,6 +3,11 @@ import type {
   Category, CategoryPayload, ModifierGroup, ModifierGroupPayload, Product, ProductPayload,
 } from "~/types/catalog";
 
+// Categories are shown in their saved order (sortOrder), as the server lists them.
+function sortCategories(list: Category[]): Category[] {
+  return [...list].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+}
+
 export const useCatalogStore = defineStore("catalog", {
   state: () => ({
     categories: [] as Category[],
@@ -15,12 +20,12 @@ export const useCatalogStore = defineStore("catalog", {
 
   actions: {
     async fetchCatalog() {
-      const { fetchCategories, fetchModifiers, fetchProducts } = useApi();
+      const { fetchCatalog } = useApi();
       this.isLoading = true;
       this.error = null;
 
       try {
-        const [categories, products, modifierGroups] = await Promise.all([fetchCategories(), fetchProducts(), fetchModifiers()]);
+        const { categories, products, modifierGroups } = await fetchCatalog();
         this.categories = categories;
         this.products = products;
         this.modifierGroups = modifierGroups;
@@ -32,34 +37,41 @@ export const useCatalogStore = defineStore("catalog", {
       }
     },
 
+    // Saves update the lists from the server's response instead of reloading
+    // the whole menu (three lists) after every change.
+
     async createProduct(payload: ProductPayload, token: string) {
       const { createProduct } = useApi();
-      await createProduct(payload, token);
-      await this.fetchCatalog();
+      this.products = [...this.products, await createProduct(payload, token)];
     },
 
     async updateProduct(id: string, payload: ProductPayload, token: string) {
       const { updateProduct } = useApi();
-      await updateProduct(id, payload, token);
-      await this.fetchCatalog();
+      const updated = await updateProduct(id, payload, token);
+      this.products = this.products.map((product) => (product.id === id ? updated : product));
     },
 
     async deleteProduct(id: string, token: string) {
       const { deleteProduct } = useApi();
       await deleteProduct(id, token);
-      await this.fetchCatalog();
+      // The server also unlinks it from modifier groups and drops its recipe.
+      this.products = this.products.filter((product) => product.id !== id);
+      this.modifierGroups = this.modifierGroups.map((group) => ({
+        ...group,
+        productIds: group.productIds.filter((productId) => productId !== id),
+      }));
+      useRecipeStore().forgetProduct(id);
     },
 
     async createCategory(payload: CategoryPayload, token: string) {
       const { createCategory } = useApi();
-      await createCategory(payload, token);
-      await this.fetchCatalog();
+      this.categories = sortCategories([...this.categories, await createCategory(payload, token)]);
     },
 
     async updateCategory(id: string, payload: CategoryPayload, token: string) {
       const { updateCategory } = useApi();
-      await updateCategory(id, payload, token);
-      await this.fetchCatalog();
+      const updated = await updateCategory(id, payload, token);
+      this.categories = sortCategories(this.categories.map((category) => (category.id === id ? updated : category)));
     },
 
     async reorderCategories(categoryIds: string[], token: string) {
@@ -69,28 +81,36 @@ export const useCatalogStore = defineStore("catalog", {
 
     async deleteCategory(id: string, token: string, reassignToCategoryId?: string) {
       const { deleteCategory } = useApi();
-      await deleteCategory(id, token, reassignToCategoryId);
-      // Deletion also recalculates every remaining category's sortOrder
-      // server-side, so a full refetch is needed, not just removing the id.
-      await this.fetchCatalog();
+      // The response carries the remaining categories, renumbered.
+      const result = await deleteCategory(id, token, reassignToCategoryId);
+      this.categories = result.categories;
+      if (reassignToCategoryId) {
+        this.products = this.products.map((product) =>
+          product.categoryId === id ? { ...product, categoryId: reassignToCategoryId } : product,
+        );
+      }
     },
 
     async createModifierGroup(payload: ModifierGroupPayload, token: string) {
       const { createModifierGroup } = useApi();
-      await createModifierGroup(payload, token);
-      await this.fetchCatalog();
+      this.modifierGroups = [...this.modifierGroups, await createModifierGroup(payload, token)];
     },
 
     async updateModifierGroup(id: string, payload: ModifierGroupPayload, token: string) {
       const { updateModifierGroup } = useApi();
-      await updateModifierGroup(id, payload, token);
-      await this.fetchCatalog();
+      const updated = await updateModifierGroup(id, payload, token);
+      this.modifierGroups = this.modifierGroups.map((group) => (group.id === id ? updated : group));
     },
 
     async deleteModifierGroup(id: string, token: string) {
       const { deleteModifierGroup } = useApi();
       await deleteModifierGroup(id, token);
-      await this.fetchCatalog();
+      const removed = this.modifierGroups.find((group) => group.id === id);
+      this.modifierGroups = this.modifierGroups.filter((group) => group.id !== id);
+      // Its options' recipes go with it on the server.
+      for (const option of removed?.options ?? []) {
+        useRecipeStore().forgetModifier(option.id);
+      }
     },
   },
 });

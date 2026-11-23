@@ -28,30 +28,37 @@ export const useInventoryStore = defineStore("inventory", {
       }
     },
 
+    // Saves update the list from the server's response - its authoritative
+    // stock and low-stock state - instead of reloading the whole inventory.
+
     async adjustStock(payload: StockAdjustmentPayload, token: string) {
       const { adjustInventory } = useApi();
-      await adjustInventory(payload, token);
-      // Re-fetch rather than mutate locally so the table reflects the
-      // server's authoritative stock/low-stock state, not a client guess.
-      await this.fetchInventory();
+      const { item } = await adjustInventory(payload, token);
+      if (item) {
+        this.replaceItem(item);
+      } else {
+        await this.fetchInventory();
+      }
     },
 
     async createItem(payload: InventoryItemPayload, token: string) {
       const { createInventoryItem } = useApi();
-      await createInventoryItem(payload, token);
-      await this.fetchInventory();
+      this.items = [...this.items, await createInventoryItem(payload, token)];
     },
 
     async updateItem(id: string, payload: InventoryItemPayload, token: string) {
       const { updateInventoryItem } = useApi();
-      await updateInventoryItem(id, payload, token);
-      await this.fetchInventory();
+      this.replaceItem(await updateInventoryItem(id, payload, token));
     },
 
     async deleteItem(id: string, token: string) {
       const { deleteInventoryItem } = useApi();
       await deleteInventoryItem(id, token);
-      await this.fetchInventory();
+      this.items = this.items.filter((item) => item.id !== id);
+    },
+
+    replaceItem(updated: InventoryItem) {
+      this.items = this.items.map((item) => (item.id === updated.id ? updated : item));
     },
   },
 });

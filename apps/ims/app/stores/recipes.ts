@@ -62,6 +62,20 @@ export const useRecipeStore = defineStore("recipes", {
       }
     },
 
+    // A product or modifier option deleted elsewhere - the server dropped its
+    // recipe too.
+    forgetProduct(productId: string) {
+      const next = { ...this.productRecipeCounts };
+      delete next[productId];
+      this.productRecipeCounts = next;
+    },
+
+    forgetModifier(modifierId: string) {
+      const next = { ...this.modifierRecipeCounts };
+      delete next[modifierId];
+      this.modifierRecipeCounts = next;
+    },
+
     async deleteRecipe(productId: string, token: string) {
       const { deleteRecipe } = useApi();
       await deleteRecipe(productId, token);
