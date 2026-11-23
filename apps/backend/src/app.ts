@@ -119,21 +119,26 @@ const DEFAULT_POS_SETTINGS: PosSettings = {
     KHR: [100, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000],
   },
   khqrBanks: [],
+  language: 'en-US',
 };
 
-// GET /api/settings/pos's body. `configured: false` until the settings are
-// first saved - the POS then uploads its own local settings instead of
-// replacing them with these defaults.
+// GET /api/settings/pos's body. Sections never saved (all of them before the
+// first save, or ones added since, like language) are filled with defaults
+// but listed in `unsetSections` - the POS uploads its own value for those
+// instead of taking the default, so a new setting can't silently change what
+// the register already uses.
 async function loadPosSettings() {
+  const allSections = Object.keys(DEFAULT_POS_SETTINGS) as Array<keyof PosSettings>;
   const row = await db.select().from(posSettings).where(eq(posSettings.id, 'default')).get();
   if (!row) {
-    return { configured: false, settings: DEFAULT_POS_SETTINGS, updatedAt: null as string | null };
+    return { configured: false, settings: DEFAULT_POS_SETTINGS, unsetSections: allSections, updatedAt: null as string | null };
   }
-  // Sections added after a row was saved fall back to their defaults.
-  const saved = posSettingsSchema.partial().safeParse(JSON.parse(row.settings));
+  const parsed = posSettingsSchema.partial().safeParse(JSON.parse(row.settings));
+  const saved = parsed.success ? parsed.data : {};
   return {
     configured: true,
-    settings: { ...DEFAULT_POS_SETTINGS, ...(saved.success ? saved.data : {}) },
+    settings: { ...DEFAULT_POS_SETTINGS, ...saved },
+    unsetSections: allSections.filter((section) => !(section in saved)),
     updatedAt: row.updatedAt,
   };
 }
@@ -1304,8 +1309,11 @@ function createApp() {
   // different sections at the same time don't overwrite each other.
   app.put('/api/settings/pos', authenticate, requireRole(['MANAGER', 'ADMIN']), validateBody(posSettingsUpdateSchema), async (req, res) => {
     try {
-      const current = await loadPosSettings();
-      const merged = posSettingsSchema.parse({ ...current.settings, ...req.body });
+      // Only sections actually saved before, plus the new ones - so saving one
+      // section doesn't store defaults for the others and mark them as set.
+      const row = await db.select().from(posSettings).where(eq(posSettings.id, 'default')).get();
+      const parsed = row ? posSettingsSchema.partial().safeParse(JSON.parse(row.settings)) : null;
+      const merged = posSettingsSchema.partial().parse({ ...(parsed?.success ? parsed.data : {}), ...req.body });
       await db.insert(posSettings)
         .values({ id: 'default', settings: JSON.stringify(merged), updatedBy: req.user!.id })
         .onConflictDoUpdate({

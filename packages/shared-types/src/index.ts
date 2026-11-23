@@ -174,6 +174,8 @@ export const posSettingsSchema = z.object({
     name: z.string().trim().min(1).max(60),
     imageUrl: z.string().min(1).max(500),
   })).max(10),
+  // The register's screens, receipts and customer display.
+  language: z.enum(['en-US', 'km-KH']),
 });
 
 // PUT /api/settings/pos - any subset of the sections; the rest are kept.
