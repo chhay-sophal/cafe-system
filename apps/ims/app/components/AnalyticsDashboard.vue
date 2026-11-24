@@ -1,11 +1,19 @@
 <script setup lang="ts">
-import { onMounted, watch } from "vue";
+import { watch } from "vue";
 
 const store = useReportsStore();
 const period = useSalesPeriodStore();
 
-onMounted(() => store.loadIfStale());
-watch(() => [period.startDate, period.endDate], () => store.fetchReport());
+// Checked on every visit - the POS keeps adding sales, and the period may
+// have changed on Sales History. A period picked while hidden loads on the
+// next visit.
+const { isVisible } = usePageVisible(() => store.loadIfStale());
+watch(
+  () => [period.startDate, period.endDate],
+  () => {
+    if (isVisible.value) store.loadIfStale();
+  },
+);
 </script>
 
 <template>

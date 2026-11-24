@@ -313,32 +313,40 @@ watch(
     </div>
 
     <main class="mx-auto flex w-full max-w-6xl flex-1 flex-col overflow-y-auto p-4 sm:p-6">
-      <StockTable
-        v-if="activeView === 'inventory'"
-        @adjust="openAdjustModal"
-        @create="openCreateModal"
-        @edit="openEditModal"
-        @delete="openDeleteDialog"
-      />
-      <ProductTable
-        v-else-if="activeView === 'menu'"
-        @create="openCreateProductModal"
-        @edit="openEditProductModal"
-        @delete="openProductDeleteDialog"
-        @manage-categories="isCategoryModalOpen = true"
-      />
-      <ModifierTable
-        v-else-if="activeView === 'modifiers'"
-        @create="openCreateModifierModal"
-        @edit="openEditModifierModal"
-        @delete="openModifierDeleteDialog"
-      />
-      <RecipeEditor v-else-if="activeView === 'recipes'" />
-      <UserTable v-else-if="activeView === 'staff' && isAdmin" @create="openCreateUserModal" @edit="openEditUserModal" />
-      <SettingsPanel v-else-if="activeView === 'settings' && isAdmin" v-model:dirty="hasUnsavedSettings" />
-      <OrdersTable v-else-if="activeView === 'salesHistory'" />
-      <PosSettingsPanel v-else-if="activeView === 'posSettings'" />
-      <AnalyticsDashboard v-else />
+      <!-- Pages stay alive while another is open, so coming back shows them
+           as they were left - search, filters, sorting, page, the recipe
+           being edited - without rebuilding or reloading. Pages reload only
+           what may have gone stale (see usePageVisible). Settings is left
+           out: leaving it without saving discards its changes. Logging out
+           drops them all, with this whole block. -->
+      <KeepAlive exclude="SettingsPanel">
+        <StockTable
+          v-if="activeView === 'inventory'"
+          @adjust="openAdjustModal"
+          @create="openCreateModal"
+          @edit="openEditModal"
+          @delete="openDeleteDialog"
+        />
+        <ProductTable
+          v-else-if="activeView === 'menu'"
+          @create="openCreateProductModal"
+          @edit="openEditProductModal"
+          @delete="openProductDeleteDialog"
+          @manage-categories="isCategoryModalOpen = true"
+        />
+        <ModifierTable
+          v-else-if="activeView === 'modifiers'"
+          @create="openCreateModifierModal"
+          @edit="openEditModifierModal"
+          @delete="openModifierDeleteDialog"
+        />
+        <RecipeEditor v-else-if="activeView === 'recipes'" />
+        <UserTable v-else-if="activeView === 'staff' && isAdmin" @create="openCreateUserModal" @edit="openEditUserModal" />
+        <SettingsPanel v-else-if="activeView === 'settings' && isAdmin" v-model:dirty="hasUnsavedSettings" />
+        <OrdersTable v-else-if="activeView === 'salesHistory'" />
+        <PosSettingsPanel v-else-if="activeView === 'posSettings'" />
+        <AnalyticsDashboard v-else />
+      </KeepAlive>
     </main>
 
     <StockAdjustmentModal v-model:open="isAdjustOpen" :item="selectedItem" />

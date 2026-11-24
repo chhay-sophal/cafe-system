@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, watch } from "vue";
+import { computed, watch } from "vue";
 import { RefreshCw } from "@lucide/vue";
 import { storeToRefs } from "pinia";
 import { columnVisibilityFeature, createColumnHelper, tableFeatures, useTable } from "@tanstack/vue-table";
@@ -161,8 +161,15 @@ function loadOrders({ force = false } = {}) {
   }
 }
 
-onMounted(() => loadOrders());
-watch(() => [period.startDate, period.endDate], () => loadOrders());
+// Checked on every visit (sales keep coming from the POS); a period picked on
+// Analytics meanwhile loads on the next visit, not in the background.
+const { isVisible } = usePageVisible(() => loadOrders());
+watch(
+  () => [period.startDate, period.endDate],
+  () => {
+    if (isVisible.value) loadOrders();
+  },
+);
 
 function openDetail(order: OrderSummary) {
   const token = auth.session.value?.token;

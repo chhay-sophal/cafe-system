@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch, type Ref } from "vue";
+import { computed, reactive, ref, watch, type Ref } from "vue";
 import { Trash2 } from "@lucide/vue";
 import type { PosPaymentMethod, PosSettings, PosSocialPlatform } from "~/types/settings";
 
@@ -12,7 +12,8 @@ const { t } = useI18n();
 const store = usePosSettingsStore();
 const { formatRiel } = useCurrency();
 
-onMounted(() => store.ensureFresh());
+// On every visit - the register can change these too.
+usePageVisible(() => store.ensureFresh());
 
 const settings = computed(() => store.response?.settings ?? null);
 

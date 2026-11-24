@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onDeactivated, ref, watch } from "vue";
 
 const { t, locale } = useI18n();
 const store = useSalesPeriodStore();
@@ -157,6 +157,11 @@ watch(isOpen, (open) => {
 });
 
 onBeforeUnmount(removeListeners);
+// Its page is kept alive when another page opens (app.vue) - don't leave
+// the menu, which lives in <body>, open over that page.
+onDeactivated(() => {
+  isOpen.value = false;
+});
 </script>
 
 <template>
