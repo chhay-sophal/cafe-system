@@ -403,7 +403,8 @@
       "tendered": "Tendered",
       "change": "Change"
     },
-    "searchPlaceholder": "Search order #, cashier, payment...",
+    "searchPlaceholder": "Search order #, cashier, item, payment...",
+    "itemFilter": "Item sold",
     "totalUsd": "Total (USD)",
     "noMatches": "No orders match your search or filters.",
     "status": {

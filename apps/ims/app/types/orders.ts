@@ -12,6 +12,9 @@ export interface OrderSummary {
   cashierName: string | null;
   paymentMethod: PaymentMethod | null;
   itemCount: number;
+  // What was sold, one entry per distinct product - the name as rung up.
+  // Missing from backends older than the item filter.
+  products?: Array<{ id: string; name: string }>;
   // Corrected in IMS since it was rung up (see OrderDetail.edited*).
   isEdited: boolean;
 }

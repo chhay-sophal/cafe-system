@@ -102,6 +102,7 @@ export const useOrdersStore = defineStore("orders", {
             totalAmount: detail.totalAmount,
             paymentMethod: detail.payment?.paymentMethod ?? row.paymentMethod,
             itemCount: detail.items.length,
+            products: [...new Map(detail.items.map((item) => [item.productId, { id: item.productId, name: item.productName }])).values()],
             isEdited: detail.editedAt !== null,
           }
           : row,

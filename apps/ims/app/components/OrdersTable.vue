@@ -2,7 +2,7 @@
 import { computed, onMounted, watch } from "vue";
 import { RefreshCw } from "@lucide/vue";
 import { storeToRefs } from "pinia";
-import { createColumnHelper, tableFeatures, useTable } from "@tanstack/vue-table";
+import { columnVisibilityFeature, createColumnHelper, tableFeatures, useTable } from "@tanstack/vue-table";
 import type { OrderSummary, PaymentMethod } from "~/types/orders";
 import type { TableFilterDef } from "~/types/table";
 
@@ -13,7 +13,7 @@ const ordersStore = useOrdersStore();
 const { orders } = storeToRefs(ordersStore);
 const { formatMain, formatSecondary } = useCurrency();
 
-const features = tableFeatures({ ...sortingFeatures, ...filteringFeatures, ...paginationFeatures });
+const features = tableFeatures({ ...sortingFeatures, ...filteringFeatures, ...paginationFeatures, columnVisibilityFeature });
 const columnHelper = createColumnHelper<typeof features, OrderSummary>();
 
 const columns = columnHelper.columns([
@@ -23,8 +23,8 @@ const columns = columnHelper.columns([
   }),
   // The page's date range already narrows orders by date, and numbers as
   // search text match too loosely ("2" in any total) - so search covers the
-  // order number, cashier and payment method only; the filter panel has
-  // ranges for items and total.
+  // order number, cashier, payment method and the items sold; the filter
+  // panel has ranges for items and total.
   columnHelper.accessor("createdAt", {
     header: () => t("orders.columns.dateTime"),
     cell: ({ getValue }) => formatDateTime(getValue(), locale.value),
@@ -61,6 +61,18 @@ const columns = columnHelper.columns([
     filterFn: "inNumberRange",
     enableGlobalFilter: false,
   }),
+  // Hidden: the items sold, as search text ("latte" finds every order with
+  // a latte) and as ids for the Item filter.
+  columnHelper.accessor((order) => (order.products ?? []).map((product) => product.name).join(", "), {
+    id: "productNames",
+    enableSorting: false,
+  }),
+  columnHelper.accessor((order) => (order.products ?? []).map((product) => product.id), {
+    id: "product",
+    filterFn: "contains",
+    enableGlobalFilter: false,
+    enableSorting: false,
+  }),
 ]);
 
 const cellClass = {
@@ -77,14 +89,32 @@ const table = useTable({
   columns,
   data: orders,
   globalFilterFn: "includesDisplayText",
-  initialState: { pagination: { pageIndex: 0, pageSize: DEFAULT_PAGE_SIZE } },
+  initialState: {
+    pagination: { pageIndex: 0, pageSize: DEFAULT_PAGE_SIZE },
+    columnVisibility: { productNames: false, product: false },
+  },
   // Page resets are TablePagination's job - see its rowCount watcher.
   autoResetPageIndex: false,
 });
 
 const PAYMENT_METHODS: PaymentMethod[] = ["CASH", "CARD", "QR_CODE"];
 
+// Products sold in the loaded period, by id. Orders keep the name as rung
+// up; the list is newest first, so a renamed product shows its latest name.
+const soldProducts = computed(() => {
+  const names = new Map<string, string>();
+  for (const order of orders.value) {
+    for (const { id, name } of order.products ?? []) {
+      if (!names.has(id)) {
+        names.set(id, name);
+      }
+    }
+  }
+  return [...names].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label));
+});
+
 const filters = computed<TableFilterDef[]>(() => [
+  { type: "select", columnId: "product", label: t("orders.itemFilter"), options: soldProducts.value },
   {
     type: "select",
     columnId: "cashierName",
