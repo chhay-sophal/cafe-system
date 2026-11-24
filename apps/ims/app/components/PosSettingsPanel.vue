@@ -193,6 +193,14 @@ const languageSection = useSection(
 );
 const isLanguageUnset = computed(() => store.response?.unsetSections.includes("language") ?? false);
 
+// --- Menu: unavailable items ----------------------------------------------------
+
+const menuSection = useSection(
+  (saved) => ({ hideUnavailableItems: saved.hideUnavailableItems }),
+  (draft) => ({ hideUnavailableItems: draft.hideUnavailableItems }),
+);
+const isMenuUnset = computed(() => store.response?.unsetSections.includes("hideUnavailableItems") ?? false);
+
 // --- KHQR banks (saved straight away, like on the register) ---------------
 
 const newBankName = ref("");
@@ -419,6 +427,32 @@ const SMALL_BUTTON = "shrink-0 whitespace-nowrap rounded-lg border border-slate-
             @click="languageSection.save()"
           >
             {{ languageSection.isSaving ? t("common.saving") : t("common.save") }}
+          </button>
+        </div>
+      </section>
+
+      <!-- Menu: unavailable items -->
+      <section v-if="menuSection.draft" class="mt-6 rounded-lg border border-slate-200 bg-white p-5">
+        <h3 class="font-semibold text-slate-900">{{ t("posSettings.menu.heading") }}</h3>
+        <p class="text-xs text-slate-500">{{ t("posSettings.menu.hint") }}</p>
+        <p v-if="isMenuUnset && store.response?.configured" class="mt-2 text-xs text-amber-800">{{ t("posSettings.menu.unset") }}</p>
+        <div class="mt-3 flex flex-wrap gap-4" role="radiogroup" :aria-label="t('posSettings.menu.heading')">
+          <label v-for="hide in [false, true]" :key="String(hide)" class="flex items-center gap-2 text-sm text-slate-700">
+            <input v-model="menuSection.draft.hideUnavailableItems" type="radio" class="h-4 w-4" :value="hide" />
+            {{ hide ? t("posSettings.menu.hide") : t("posSettings.menu.show") }}
+          </label>
+        </div>
+        <div class="mt-5 flex items-center justify-end gap-2">
+          <p v-if="menuSection.error" class="mr-auto text-xs font-medium text-red-700">{{ menuSection.error }}</p>
+          <p v-else-if="menuSection.justSaved" class="mr-auto text-xs font-medium text-emerald-700">{{ t("posSettings.saved") }}</p>
+          <button v-if="menuSection.isDirty" type="button" :class="SMALL_BUTTON" @click="menuSection.discard()">{{ t("posSettings.discard") }}</button>
+          <button
+            type="button"
+            class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40"
+            :disabled="!menuSection.isDirty || menuSection.isSaving"
+            @click="menuSection.save()"
+          >
+            {{ menuSection.isSaving ? t("common.saving") : t("common.save") }}
           </button>
         </div>
       </section>
