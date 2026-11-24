@@ -1202,13 +1202,18 @@ describe('modifier group management', () => {
     await cleanup(group.id, fixture);
   });
 
-  it('refuses to remove an option or delete a group that has order history', async () => {
+  it('soft-deletes a sold option removed from its group, then the group when it is deleted', async () => {
     const token = await managerToken();
     const fixture = await testProduct();
     const groupId = randomUUID();
-    const optionId = randomUUID();
+    const soldId = randomUUID();
+    const unsoldId = randomUUID();
     await db.insert(modifierGroups).values({ id: groupId, name: 'Test Syrup', minSelection: 0, maxSelection: 1 }).run();
-    await db.insert(modifiers).values({ id: optionId, groupId, name: 'Vanilla', priceExtra: 0.5 }).run();
+    await db.insert(modifiers).values([
+      { id: soldId, groupId, name: 'Vanilla', priceExtra: 0.5 },
+      { id: unsoldId, groupId, name: 'Hazelnut', priceExtra: 0.5 },
+    ]).run();
+    await db.insert(productModifiers).values({ productId: fixture.productId, groupId }).run();
 
     const orderResponse = await request(app)
       .post('/api/orders')
@@ -1219,7 +1224,7 @@ describe('modifier group management', () => {
           productName: 'Test Latte',
           quantity: 1,
           unitPrice: 4,
-          selectedModifiers: [{ id: optionId, name: 'Vanilla', priceExtra: 0.5 }],
+          selectedModifiers: [{ id: soldId, name: 'Vanilla', priceExtra: 0.5 }],
         }],
         paymentMethod: 'CASH',
         amountTenderedUsd: 10,
@@ -1227,17 +1232,31 @@ describe('modifier group management', () => {
       });
     expect(orderResponse.status).toBe(201);
 
+    // Removing the sold option: marked deleted, gone from the group.
     const updateResponse = await request(app)
       .put(`/api/modifiers/${groupId}`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ name: 'Test Syrup', minSelection: 0, maxSelection: 1, options: [{ name: 'Caramel', priceExtra: 0.5 }] });
-    expect(updateResponse.status).toBe(409);
+      .send({ name: 'Test Syrup', minSelection: 0, maxSelection: 1, options: [{ id: unsoldId, name: 'Hazelnut', priceExtra: 0.5 }], productIds: [fixture.productId] });
+    expect(updateResponse.status).toBe(200);
+    expect(updateResponse.body.options.map((o: { id: string }) => o.id)).toEqual([unsoldId]);
+    expect((await db.select().from(modifiers).where(eq(modifiers.id, soldId)).get())?.deletedAt).toBeTruthy();
 
+    // Deleting the group: marked deleted (a sold option points to it), the
+    // unsold option and the product link removed, gone from the menu.
     const deleteResponse = await request(app)
       .delete(`/api/modifiers/${groupId}`)
       .set('Authorization', `Bearer ${token}`);
-    expect(deleteResponse.status).toBe(409);
-    expect(await db.select().from(modifiers).where(eq(modifiers.id, optionId)).get()).toBeDefined();
+    expect(deleteResponse.status).toBe(200);
+    expect((await db.select().from(modifierGroups).where(eq(modifierGroups.id, groupId)).get())?.deletedAt).toBeTruthy();
+    expect(await db.select().from(modifiers).where(eq(modifiers.id, unsoldId)).get()).toBeUndefined();
+    expect(await db.select().from(productModifiers).where(eq(productModifiers.groupId, groupId)).all()).toEqual([]);
+    const catalog = await request(app).get('/api/catalog');
+    expect(catalog.body.modifierGroups.some((group: { id: string }) => group.id === groupId)).toBe(false);
+    expect((await request(app).delete(`/api/modifiers/${groupId}`).set('Authorization', `Bearer ${token}`)).status).toBe(404);
+
+    // The past order still shows the option.
+    const order = await request(app).get(`/api/orders/${orderResponse.body.orderId}`).set('Authorization', `Bearer ${token}`);
+    expect(order.body.items[0].modifiers[0].modifierName).toBe('Vanilla');
 
     await db.delete(payments).run();
     await db.delete(orderItemModifiers).run();

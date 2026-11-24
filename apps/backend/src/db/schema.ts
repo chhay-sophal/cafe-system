@@ -49,6 +49,9 @@ export const modifierGroups = sqliteTable('modifier_groups', {
   name: text('name').notNull(),
   minSelection: integer('min_selection').default(0), // 0 = optional, 1 = required
   maxSelection: integer('max_selection').default(1), // 1 = single choice, >1 = multiple
+  // Set instead of deleting a group whose options have been sold, so order
+  // history keeps pointing at them. Deleted groups are left out everywhere.
+  deletedAt: text('deleted_at'),
 });
 
 // Individual modifier choices (e.g., "Oat Milk", "Vanilla Syrup (+0.50)")
@@ -57,6 +60,9 @@ export const modifiers = sqliteTable('modifiers', {
   groupId: text('group_id').notNull().references(() => modifierGroups.id),
   name: text('name').notNull(),
   priceExtra: real('price_extra').notNull().default(0.0), // Extra charge added to drink base price
+  // Set instead of deleting a sold option (removed from its group, or the
+  // group deleted), so order history keeps pointing at it.
+  deletedAt: text('deleted_at'),
 });
 
 // Many-to-Many junction mapping products to modifier groups

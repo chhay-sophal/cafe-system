@@ -109,10 +109,29 @@ async function findOrderResultByClientOrderId(clientOrderId: string) {
 // Every modifier group with its options and linked product ids - the shape
 // GET /api/modifiers has always returned - in three queries for the whole
 // menu rather than three per group.
+// Menu items, categories, modifier groups and options are soft-deleted once
+// sales point to them (see their DELETE routes) - these pick the live ones.
+const liveProduct = isNull(products.deletedAt);
+const liveCategory = isNull(categories.deletedAt);
+const liveModifierGroup = isNull(modifierGroups.deletedAt);
+const liveModifier = isNull(modifiers.deletedAt);
+
+// The ids of these options that appear on past orders.
+async function findSoldModifierIds(optionIds: string[]): Promise<Set<string>> {
+  if (optionIds.length === 0) {
+    return new Set();
+  }
+  const rows = await db.selectDistinct({ modifierId: orderItemModifiers.modifierId })
+    .from(orderItemModifiers)
+    .where(inArray(orderItemModifiers.modifierId, optionIds))
+    .all();
+  return new Set(rows.map((row) => row.modifierId));
+}
+
 async function loadAllModifierGroups() {
   const [groups, options, links] = await Promise.all([
-    db.select().from(modifierGroups).all(),
-    db.select().from(modifiers).all(),
+    db.select().from(modifierGroups).where(liveModifierGroup).all(),
+    db.select().from(modifiers).where(liveModifier).all(),
     db.select().from(productModifiers).all(),
   ]);
   return groups.map((group) => ({
@@ -121,11 +140,6 @@ async function loadAllModifierGroups() {
     productIds: links.filter((link) => link.groupId === group.id).map((link) => link.productId),
   }));
 }
-
-// Menu items and categories are soft-deleted once sales point to them (see
-// DELETE /api/products/:id and /api/categories/:id) - these pick the live ones.
-const liveProduct = isNull(products.deletedAt);
-const liveCategory = isNull(categories.deletedAt);
 
 function liveCategoriesInOrder(executor: Pick<typeof db, 'select'> = db) {
   return executor.select().from(categories).where(liveCategory).orderBy(categories.sortOrder).all();
@@ -747,9 +761,9 @@ function createApp() {
         return res.json([]);
       }
 
-      const groups = await db.select().from(modifierGroups).where(inArray(modifierGroups.id, groupIds)).all();
+      const groups = await db.select().from(modifierGroups).where(and(inArray(modifierGroups.id, groupIds), liveModifierGroup)).all();
       const result = await Promise.all(groups.map(async (group) => {
-        const options = await db.select().from(modifiers).where(eq(modifiers.groupId, group.id)).all();
+        const options = await db.select().from(modifiers).where(and(eq(modifiers.groupId, group.id), liveModifier)).all();
         return { ...group, options };
       }));
 
@@ -760,11 +774,11 @@ function createApp() {
   });
 
   async function loadModifierGroup(id: string) {
-    const group = await db.select().from(modifierGroups).where(eq(modifierGroups.id, id)).get();
+    const group = await db.select().from(modifierGroups).where(and(eq(modifierGroups.id, id), liveModifierGroup)).get();
     if (!group) {
       return null;
     }
-    const options = await db.select().from(modifiers).where(eq(modifiers.groupId, id)).all();
+    const options = await db.select().from(modifiers).where(and(eq(modifiers.groupId, id), liveModifier)).all();
     const links = await db.select().from(productModifiers).where(eq(productModifiers.groupId, id)).all();
     return { ...group, options, productIds: links.map((link) => link.productId) };
   }
@@ -825,12 +839,12 @@ function createApp() {
     };
 
     try {
-      const existing = await db.select().from(modifierGroups).where(eq(modifierGroups.id, id)).get();
+      const existing = await db.select().from(modifierGroups).where(and(eq(modifierGroups.id, id), liveModifierGroup)).get();
       if (!existing) {
         return res.status(404).json({ error: 'Modifier group not found' });
       }
 
-      const existingOptions = await db.select().from(modifiers).where(eq(modifiers.groupId, id)).all();
+      const existingOptions = await db.select().from(modifiers).where(and(eq(modifiers.groupId, id), liveModifier)).all();
       const existingOptionIds = new Set(existingOptions.map((option) => option.id));
 
       if (options.some((option) => option.id && !existingOptionIds.has(option.id))) {
@@ -840,20 +854,9 @@ function createApp() {
       const keptOptionIds = new Set(options.flatMap((option) => (option.id ? [option.id] : [])));
       const removedOptions = existingOptions.filter((option) => !keptOptionIds.has(option.id));
 
-      // order_item_modifiers.modifier_id is a real FK, so an option that has
-      // been sold can't be deleted - same rule as products with order history.
-      if (removedOptions.length > 0) {
-        const soldOptionIds = new Set((await db.select({ modifierId: orderItemModifiers.modifierId })
-          .from(orderItemModifiers)
-          .where(inArray(orderItemModifiers.modifierId, removedOptions.map((option) => option.id)))
-          .all()).map((row) => row.modifierId));
-        const soldNames = removedOptions.filter((option) => soldOptionIds.has(option.id)).map((option) => option.name);
-        if (soldNames.length > 0) {
-          return res.status(409).json({
-            error: `${soldNames.map((n) => `"${n}"`).join(', ')} has order history and cannot be removed. Rename it instead.`,
-          });
-        }
-      }
+      // Removed options that were sold are only marked deleted - past orders
+      // point to them (order_item_modifiers.modifier_id is a real FK).
+      const soldOptionIds = await findSoldModifierIds(removedOptions.map((option) => option.id));
 
       const uniqueProductIds = [...new Set(productIds)];
       if ((await findUnknownProductIds(uniqueProductIds)).length > 0) {
@@ -865,7 +868,11 @@ function createApp() {
 
         for (const option of removedOptions) {
           await tx.delete(recipes).where(eq(recipes.modifierId, option.id)).run();
-          await tx.delete(modifiers).where(eq(modifiers.id, option.id)).run();
+          if (soldOptionIds.has(option.id)) {
+            await tx.update(modifiers).set({ deletedAt: sql`CURRENT_TIMESTAMP` }).where(eq(modifiers.id, option.id)).run();
+          } else {
+            await tx.delete(modifiers).where(eq(modifiers.id, option.id)).run();
+          }
         }
 
         for (const option of options) {
@@ -892,33 +899,36 @@ function createApp() {
     const id = String(req.params.id);
 
     try {
-      const existing = await db.select().from(modifierGroups).where(eq(modifierGroups.id, id)).get();
+      const existing = await db.select().from(modifierGroups).where(and(eq(modifierGroups.id, id), liveModifierGroup)).get();
       if (!existing) {
         return res.status(404).json({ error: 'Modifier group not found' });
       }
 
+      // Every option, including ones removed earlier (already marked deleted).
       const optionIds = (await db.select({ id: modifiers.id }).from(modifiers).where(eq(modifiers.groupId, id)).all())
         .map((option) => option.id);
-
-      if (optionIds.length > 0) {
-        const soldLines = await db.select({ id: orderItemModifiers.id })
-          .from(orderItemModifiers)
-          .where(inArray(orderItemModifiers.modifierId, optionIds))
-          .all();
-        if (soldLines.length > 0) {
-          return res.status(409).json({
-            error: `"${existing.name}" has ${soldLines.length} historical order line(s) and cannot be deleted. Unlink it from all products instead.`,
-          });
-        }
-      }
+      // Options that were sold are only marked deleted, and the group with
+      // them, so past orders keep pointing at them. The rest go outright.
+      const soldOptionIds = await findSoldModifierIds(optionIds);
+      const unsoldOptionIds = optionIds.filter((optionId) => !soldOptionIds.has(optionId));
 
       await db.transaction(async (tx) => {
         if (optionIds.length > 0) {
           await tx.delete(recipes).where(inArray(recipes.modifierId, optionIds)).run();
         }
         await tx.delete(productModifiers).where(eq(productModifiers.groupId, id)).run();
-        await tx.delete(modifiers).where(eq(modifiers.groupId, id)).run();
-        await tx.delete(modifierGroups).where(eq(modifierGroups.id, id)).run();
+        if (unsoldOptionIds.length > 0) {
+          await tx.delete(modifiers).where(inArray(modifiers.id, unsoldOptionIds)).run();
+        }
+        if (soldOptionIds.size > 0) {
+          await tx.update(modifiers)
+            .set({ deletedAt: sql`CURRENT_TIMESTAMP` })
+            .where(and(inArray(modifiers.id, [...soldOptionIds]), liveModifier))
+            .run();
+          await tx.update(modifierGroups).set({ deletedAt: sql`CURRENT_TIMESTAMP` }).where(eq(modifierGroups.id, id)).run();
+        } else {
+          await tx.delete(modifierGroups).where(eq(modifierGroups.id, id)).run();
+        }
       });
 
       res.json({ success: true });
