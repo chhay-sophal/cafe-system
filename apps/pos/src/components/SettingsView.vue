@@ -9,7 +9,7 @@ import { useKhqrBanks } from "../composables/useKhqrBanks";
 import { useNetworkStatus } from "../composables/useNetworkStatus";
 import { ALL_PAYMENT_METHODS, usePaymentMethods } from "../composables/usePaymentMethods";
 import { usePosSettingsSync } from "../composables/usePosSettingsSync";
-import { useReceiptPrinter } from "../composables/useReceiptPrinter";
+import { useReceiptPrinter, type PrintMode } from "../composables/useReceiptPrinter";
 import { STORE_NAME_MAX_LENGTH, useStoreName } from "../composables/useStoreName";
 import FastCashSettings from "./FastCashSettings.vue";
 import ReceiptTestCard from "./ReceiptTestCard.vue";
@@ -72,6 +72,7 @@ const { pendingCount: settingsPendingCount, lastPushError: settingsPushError } =
 const activeSection = ref<SectionId>("general");
 
 const receiptPrinter = useReceiptPrinter();
+const PRINT_MODES: PrintMode[] = ["auto", "manual"];
 
 // Keep a saved printer selectable even while Windows doesn't list it (e.g.
 // unplugged), instead of the dropdown silently showing "No printer".
@@ -283,6 +284,27 @@ function handleRemoveBank(id: string) {
             </select>
             <button type="button" class="settings-choice__option" @click="receiptPrinter.refreshPrinters()">
               {{ t("salesHistory.refresh") }}
+            </button>
+          </div>
+        </div>
+
+        <div class="settings-field">
+          <div class="settings-field__text">
+            <span class="settings-field__label">{{ t("settings.printer.printMode") }}</span>
+            <span class="settings-field__hint">{{ t("settings.printer.printModeHint") }}</span>
+          </div>
+          <div class="settings-choice" role="radiogroup" :aria-label="t('settings.printer.printMode')">
+            <button
+              v-for="mode in PRINT_MODES"
+              :key="mode"
+              type="button"
+              role="radio"
+              :aria-checked="receiptPrinter.printMode.value === mode"
+              class="settings-choice__option"
+              :class="{ 'settings-choice__option--active': receiptPrinter.printMode.value === mode }"
+              @click="receiptPrinter.setPrintMode(mode)"
+            >
+              {{ t(`settings.printer.printModes.${mode}`) }}
             </button>
           </div>
         </div>

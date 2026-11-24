@@ -13,9 +13,8 @@ import { useOfflineQueue } from "../composables/useOfflineQueue";
 import { useSalesHistory } from "../composables/useSalesHistory";
 import { usePaymentMethods } from "../composables/usePaymentMethods";
 import { useReceiptPrinter } from "../composables/useReceiptPrinter";
-import { storeFooterBlocks, storeHeaderBlocks } from "../composables/useStoreDetails";
-import { useStoreName } from "../composables/useStoreName";
 import { formatReceiptDate, type ReceiptBlock } from "../lib/receipt";
+import { buildSaleReceipt, formatChangeAmount } from "../lib/saleReceipt";
 import type { CartLineItem } from "../types/cart";
 import type { OrderPayload, OrderResult, PaymentMethod } from "../types/order";
 
@@ -37,7 +36,6 @@ type Phase = "payment" | "submitting" | "success" | "error";
 type PrintStatus = "idle" | "printing" | "printed" | "failed" | "noPrinter";
 
 const { t } = useI18n({ useScope: "global" });
-const { storeName } = useStoreName();
 
 // Only the methods this register offers (Settings → Payments).
 const { enabledMethods } = usePaymentMethods();
@@ -136,16 +134,6 @@ function formatSecondaryAmount(value: number): string {
 // USD/Riel tender order follows the main-currency setting so the more
 // prominent currency's input and fast-cash row appear first.
 const isMainKhr = computed(() => mainCurrency.value === "KHR");
-
-function formatChangeAmount(usd: number, riel: number): string {
-  if (usd > 0 && riel > 0) {
-    return `${formatUsd(usd)} + ${formatRiel(riel)}`;
-  }
-  if (riel > 0) {
-    return formatRiel(riel);
-  }
-  return formatUsd(usd);
-}
 
 function selectPaymentMethod(method: PaymentMethod) {
   paymentMethod.value = method;
@@ -313,70 +301,34 @@ async function handleComplete() {
 }
 
 function buildReceiptBlocks(): ReceiptBlock[] {
-  const subtotal = isQueuedOffline.value ? props.subtotal : orderResult.value?.subtotal ?? props.subtotal;
-  const orderLabel = isQueuedOffline.value
-    ? t("receipt.pendingSync")
-    : t("checkout.orderNumber", { number: orderResult.value?.orderNumber });
-
-  const storeHeader = storeHeaderBlocks();
-  const blocks: ReceiptBlock[] = [
-    { type: "text", text: storeName.value, align: "center", size: "large", bold: true },
-    // Address, phones and emails from Settings → General, set apart from the
-    // sale details below.
-    ...storeHeader,
-    ...(storeHeader.length > 0 ? [{ type: "spacer", height: 8 } as const] : []),
-    { type: "text", text: formatReceiptDate(new Date()), align: "center", size: "small" },
-    { type: "text", text: orderLabel, align: "center", bold: true },
-  ];
-
-  const cashierName = auth.session.value?.user.name;
-  if (cashierName) {
-    blocks.push({ type: "text", text: t("receipt.cashier", { name: cashierName }), align: "center", size: "small" });
-  }
-
-  blocks.push({ type: "divider" });
-
-  for (const item of props.items) {
-    const unitPrice = item.unitBasePrice + item.modifiers.reduce((sum, modifier) => sum + modifier.priceExtra, 0);
-    blocks.push({ type: "row", left: `${item.quantity} x ${item.productName}`, right: format(unitPrice * item.quantity) });
-    for (const modifier of item.modifiers) {
-      blocks.push({ type: "text", text: `+ ${modifier.name}`, size: "small", indent: 24 });
-    }
-  }
-
-  blocks.push({ type: "divider" });
-  blocks.push({ type: "row", left: t("cart.subtotal"), right: format(subtotal) });
-  if (props.taxAmount > 0) {
-    blocks.push({ type: "row", left: t("cart.tax"), right: format(props.taxAmount) });
-  }
-  if (props.discountAmount > 0) {
-    blocks.push({ type: "row", left: t("cart.discount"), right: `-${format(props.discountAmount)}` });
-  }
-  blocks.push({ type: "row", left: t("cart.total"), right: format(finalTotal.value), size: "large", bold: true });
-  blocks.push({ type: "row", left: "", right: formatSecondaryAmount(finalTotal.value), size: "small" });
-
-  blocks.push({ type: "divider" });
-  blocks.push({ type: "row", left: t("receipt.payment"), right: t(`checkout.methods.${paymentMethod.value}`) });
-  if (isCash.value) {
-    if (amountTenderedUsd.value > 0) {
-      blocks.push({ type: "row", left: t("receipt.tendered"), right: formatUsd(amountTenderedUsd.value) });
-    }
-    if (amountTenderedRiel.value > 0) {
-      blocks.push({ type: "row", left: t("receipt.tendered"), right: formatRiel(amountTenderedRiel.value) });
-    }
-    blocks.push({
-      type: "row",
-      left: t("checkout.changeDueLabel"),
-      right: formatChangeAmount(finalChange.value.usd, finalChange.value.riel),
-      bold: true,
-    });
-  }
-
-  blocks.push({ type: "spacer", height: 12 });
-  blocks.push({ type: "text", text: t("receipt.thankYou"), align: "center" });
-  // Social media under the thanks, where customers look for where to follow.
-  blocks.push(...storeFooterBlocks());
-  return blocks;
+  return buildSaleReceipt({
+    orderLabel: isQueuedOffline.value
+      ? t("receipt.pendingSync")
+      : t("checkout.orderNumber", { number: orderResult.value?.orderNumber }),
+    soldAt: formatReceiptDate(new Date()),
+    cashierName: auth.session.value?.user.name,
+    items: props.items.map((item) => ({
+      quantity: item.quantity,
+      name: item.productName,
+      lineTotal: (item.unitBasePrice + item.modifiers.reduce((sum, modifier) => sum + modifier.priceExtra, 0)) * item.quantity,
+      modifiers: item.modifiers.map((modifier) => modifier.name),
+    })),
+    subtotal: isQueuedOffline.value ? props.subtotal : orderResult.value?.subtotal ?? props.subtotal,
+    taxAmount: props.taxAmount,
+    discountAmount: props.discountAmount,
+    totalAmount: finalTotal.value,
+    paymentMethod: paymentMethod.value,
+    cash: isCash.value
+      ? {
+        tenderedUsd: amountTenderedUsd.value,
+        tenderedRiel: amountTenderedRiel.value,
+        changeUsd: finalChange.value.usd,
+        changeRiel: finalChange.value.riel,
+      }
+      : null,
+    mainCurrency: mainCurrency.value,
+    exchangeRateRielPerUsd: exchangeRateRielPerUsd.value,
+  });
 }
 
 // Never blocks the sale - it has already gone through by the time this
@@ -403,14 +355,17 @@ async function printSaleReceipt() {
 // exact moment the sale actually succeeds (online or queued offline) -
 // matches successDisplay's own preference for the server-confirmed change
 // amounts over the locally-computed ones when both are available. The
-// receipt prints at the same moment.
+// receipt prints at the same moment - or, when this register prints only on
+// request (Settings → Printer), waits for the Print receipt button.
 watch(phase, (newPhase) => {
   if (newPhase !== "success") {
     return;
   }
 
   receiptBlocks = buildReceiptBlocks();
-  printSaleReceipt();
+  if (receiptPrinter.printMode.value === "auto") {
+    printSaleReceipt();
+  }
 
   const change = finalChange.value;
 
@@ -627,13 +582,15 @@ function handleDone() {
           {{ t("receipt.failed", { error: printError }) }}
         </p>
         <div class="checkout-error__actions">
+          <!-- idle = not printed yet (print on request); noPrinter after a
+               tap shows the warning above and offers it again. -->
           <button
-            v-if="printStatus === 'printed' || printStatus === 'failed'"
+            v-if="printStatus !== 'printing'"
             type="button"
             class="checkout-modal__cancel"
             @click="printSaleReceipt"
           >
-            {{ t("receipt.reprint") }}
+            {{ printStatus === "printed" || printStatus === "failed" ? t("receipt.reprint") : t("receipt.print") }}
           </button>
           <button type="button" class="checkout-modal__complete" @click="handleDone">{{ t("common.done") }}</button>
         </div>

@@ -4,6 +4,8 @@ import { useI18n } from "vue-i18n";
 import { voidOrder } from "../lib/api";
 import { formatMain, formatRiel, formatSecondary, formatUsd } from "../lib/currency";
 import { useExchangeRate } from "../composables/useExchangeRate";
+import { useReceiptPrinter } from "../composables/useReceiptPrinter";
+import { buildSaleReceipt, receiptSaleFromOrder } from "../lib/saleReceipt";
 import { useSalesHistory } from "../composables/useSalesHistory";
 import type { OrderDetail, OrderDetailItem } from "../types/order";
 
@@ -30,6 +32,34 @@ const isVoiding = ref(false);
 const voidError = ref<string | null>(null);
 
 const canVoid = computed(() => order.value?.status === "COMPLETED");
+// Printing a copy for a customer who asks later. Voided sales aren't
+// printed - a receipt for one would look like a valid sale.
+const canPrint = computed(() => order.value?.status === "COMPLETED");
+const receiptPrinter = useReceiptPrinter();
+const printStatus = ref<"idle" | "printing" | "printed" | "failed" | "noPrinter">("idle");
+const printError = ref<string | null>(null);
+
+async function printCopy() {
+  if (!order.value) {
+    return;
+  }
+  if (!receiptPrinter.printerName.value) {
+    printStatus.value = "noPrinter";
+    return;
+  }
+  printStatus.value = "printing";
+  printError.value = null;
+  try {
+    await receiptPrinter.printReceipt(
+      buildSaleReceipt(receiptSaleFromOrder(order.value, mainCurrency.value, exchangeRateRielPerUsd.value)),
+    );
+    printStatus.value = "printed";
+  } catch (error) {
+    // Rust command errors arrive as plain strings, not Error objects.
+    printError.value = error instanceof Error ? error.message : String(error);
+    printStatus.value = "failed";
+  }
+}
 const canSubmitVoid = computed(() => voidReason.value.trim() !== "" && !isVoiding.value);
 
 function format(value: number): string {
@@ -207,12 +237,31 @@ onMounted(loadOrder);
           </div>
         </div>
 
-        <div v-else class="order-modal__actions">
-          <button v-if="canVoid" type="button" class="order-modal__danger" @click="startVoid">
-            {{ t("orderDetail.voidOrder") }}
-          </button>
-          <button type="button" class="order-modal__secondary" @click="emit('close')">{{ t("common.close") }}</button>
-        </div>
+        <template v-else>
+          <p v-if="printStatus === 'printing'" class="order-modal__print">{{ t("receipt.printing") }}</p>
+          <p v-else-if="printStatus === 'printed'" class="order-modal__print">{{ t("receipt.printed") }}</p>
+          <p v-else-if="printStatus === 'noPrinter'" class="order-modal__print order-modal__print--warning">
+            {{ t("receipt.noPrinter") }}
+          </p>
+          <p v-else-if="printStatus === 'failed'" class="order-modal__print order-modal__print--warning">
+            {{ t("receipt.failed", { error: printError }) }}
+          </p>
+          <div class="order-modal__actions">
+            <button v-if="canVoid" type="button" class="order-modal__danger" @click="startVoid">
+              {{ t("orderDetail.voidOrder") }}
+            </button>
+            <button
+              v-if="canPrint"
+              type="button"
+              class="order-modal__secondary"
+              :disabled="printStatus === 'printing'"
+              @click="printCopy"
+            >
+              {{ printStatus === "printed" || printStatus === "failed" ? t("receipt.reprint") : t("receipt.print") }}
+            </button>
+            <button type="button" class="order-modal__secondary" @click="emit('close')">{{ t("common.close") }}</button>
+          </div>
+        </template>
       </div>
     </div>
   </div>
@@ -425,8 +474,21 @@ onMounted(loadOrder);
 
 .order-modal__actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.75rem;
+}
+
+.order-modal__print {
+  margin: 0;
+  color: #888888;
+  font-size: 0.85rem;
+  text-align: right;
+}
+
+.order-modal__print--warning {
+  color: #c0392b;
+  font-weight: 600;
 }
 
 .order-modal__secondary,

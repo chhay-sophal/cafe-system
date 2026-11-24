@@ -14,6 +14,11 @@ import {
 const PRINTER_STORAGE_KEY = "pos.receiptPrinter";
 const PAPER_SIZE_STORAGE_KEY = "pos.receiptPaperSize";
 const BOTTOM_MARGIN_STORAGE_KEY = "pos.receiptBottomMarginMm";
+const PRINT_MODE_STORAGE_KEY = "pos.receiptPrintMode";
+
+// "auto": every checkout prints its receipt. "manual": the checkout success
+// screen offers a Print button instead, for customers who don't want one.
+export type PrintMode = "auto" | "manual";
 
 // Per-register choice (each till has its own USB printer), so it lives in
 // localStorage rather than in the store-wide settings from the backend.
@@ -37,6 +42,10 @@ function loadBottomMargin(): BottomMarginMm {
 }
 
 const bottomMarginMm = ref<BottomMarginMm>(loadBottomMargin());
+
+// Also per register, next to the printer it applies to. Defaults to "auto",
+// how receipts always printed before this setting.
+const printMode = ref<PrintMode>(localStorage.getItem(PRINT_MODE_STORAGE_KEY) === "manual" ? "manual" : "auto");
 
 async function refreshPrinters(): Promise<void> {
   try {
@@ -66,6 +75,11 @@ function setBottomMargin(mm: BottomMarginMm) {
   localStorage.setItem(BOTTOM_MARGIN_STORAGE_KEY, String(mm));
 }
 
+function setPrintMode(mode: PrintMode) {
+  printMode.value = mode;
+  localStorage.setItem(PRINT_MODE_STORAGE_KEY, mode);
+}
+
 // Rejects with the spooler's message (printer offline, wrong name, driver
 // refusing RAW data) so the checkout screen can show it and offer a reprint.
 async function printReceipt(blocks: ReceiptBlock[]): Promise<void> {
@@ -84,10 +98,12 @@ export function useReceiptPrinter() {
     availablePrinters,
     paperSize,
     bottomMarginMm,
+    printMode,
     refreshPrinters,
     setPrinter,
     setPaperSize,
     setBottomMargin,
+    setPrintMode,
     printReceipt,
   };
 }

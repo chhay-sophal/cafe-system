@@ -112,7 +112,9 @@
     "printed": "Receipt printed",
     "noPrinter": "No receipt printer selected",
     "failed": "Receipt not printed: {error}",
+    "print": "Print receipt",
     "reprint": "Reprint",
+    "copy": "COPY",
     "pendingSync": "Order pending sync",
     "cashier": "Cashier: {name}",
     "payment": "Payment",
@@ -224,7 +226,13 @@
       }
     },
     "printer": {
-      "hint": "Receipts print here automatically after each sale. Saved on this register only.",
+      "hint": "The printer for this register's receipts. Saved on this register only.",
+      "printMode": "Print receipts",
+      "printModeHint": "Automatically after each checkout, or only when the cashier taps Print receipt on the payment-complete screen. Saved on this register only.",
+      "printModes": {
+        "auto": "After each checkout",
+        "manual": "Only when asked"
+      },
       "paperSize": "Paper size",
       "paperSizeHint": "Match the width of the receipt roll in this register's printer. If an 80 mm printer cuts off the right edge of receipts, choose 64 mm. Saved on this register only.",
       "bottomMargin": "Bottom margin",
