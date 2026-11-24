@@ -246,6 +246,11 @@ onMounted(() => loadOrders());
 }
 
 .sales-table-wrap {
+  /* overflow: hidden (for the rounded corners) lets a flex item shrink below
+     its content, which squeezed the table into the space left and clipped
+     its rows - so .sales-history never overflowed and couldn't scroll. Keep
+     it full height and let the page scroll instead. */
+  flex-shrink: 0;
   border-radius: 14px;
   background: #ffffff;
   border: 2px solid #e2e2e2;
