@@ -176,6 +176,9 @@ export const posSettingsSchema = z.object({
   })).max(10),
   // The register's screens, receipts and customer display.
   language: z.enum(['en-US', 'km-KH']),
+  // Leave items marked unavailable (sold out) off the register's menu,
+  // instead of showing them greyed out.
+  hideUnavailableItems: z.boolean(),
 });
 
 // PUT /api/settings/pos - any subset of the sections; the rest are kept.

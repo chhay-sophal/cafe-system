@@ -147,6 +147,7 @@ const DEFAULT_POS_SETTINGS: PosSettings = {
   },
   khqrBanks: [],
   language: 'en-US',
+  hideUnavailableItems: false,
 };
 
 // GET /api/settings/pos's body. Sections never saved (all of them before the

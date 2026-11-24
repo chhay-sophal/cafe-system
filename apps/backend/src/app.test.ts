@@ -1432,7 +1432,7 @@ describe('POS settings', () => {
     expect(response.status).toBe(200);
     expect(response.body.configured).toBe(false);
     expect(response.body.settings).toMatchObject({ storeName: '', paymentMethods: ['CASH', 'CARD', 'QR_CODE'], khqrBanks: [], language: 'en-US' });
-    expect(response.body.unsetSections).toHaveLength(6);
+    expect(response.body.unsetSections).toHaveLength(7);
   });
 
   it('lists the sections never saved, so the POS uploads its own instead of taking the default', async () => {
@@ -1441,7 +1441,7 @@ describe('POS settings', () => {
     const response = await put(token, { storeName: 'Lysin Cafe', language: 'km-KH' });
 
     expect(response.body.settings).toMatchObject({ storeName: 'Lysin Cafe', language: 'km-KH', paymentMethods: ['CASH', 'CARD', 'QR_CODE'] });
-    expect(response.body.unsetSections.sort()).toEqual(['fastCash', 'khqrBanks', 'paymentMethods', 'storeDetails']);
+    expect(response.body.unsetSections.sort()).toEqual(['fastCash', 'hideUnavailableItems', 'khqrBanks', 'paymentMethods', 'storeDetails']);
   });
 
   it('saves sections independently, keeping the ones not sent', async () => {
@@ -1472,6 +1472,7 @@ describe('POS settings', () => {
     expect((await put(manager, { fastCash: { USD: [1], KHR: [150] } })).status).toBe(400);
     expect((await put(manager, { storeName: 'x'.repeat(61) })).status).toBe(400);
     expect((await put(manager, { language: 'fr-FR' })).status).toBe(400);
+    expect((await put(manager, { hideUnavailableItems: 'yes' })).status).toBe(400);
   });
 });
 
