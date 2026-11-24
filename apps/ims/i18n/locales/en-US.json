@@ -206,7 +206,7 @@
     "createButton": "Create Group",
     "saveError": "Failed to save modifier group.",
     "deleteHeading": "Delete Modifier Group",
-    "deleteConfirm": "Are you sure you want to delete {name}? This also removes its options, their recipe mappings, and its links to menu items. This cannot be undone.",
+    "deleteConfirm": "Are you sure you want to delete {name}? This also removes its options, their recipe mappings, and its links to menu items. Past sales still show the options chosen. This cannot be undone.",
     "deleteError": "Failed to delete modifier group."
   },
   "modifierTable": {
