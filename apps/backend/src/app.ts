@@ -1115,7 +1115,26 @@ function createApp() {
         .orderBy(desc(orders.createdAt))
         .all();
 
-      res.json(rows);
+      // What each order sold, for finding orders by item: the product id for
+      // an exact filter (a renamed product keeps it) and the name as rung up
+      // for search. One query for the whole list, grouped here.
+      const soldLines = await db.selectDistinct({
+        orderId: orderItems.orderId,
+        id: orderItems.productId,
+        name: orderItems.productName,
+      })
+        .from(orderItems)
+        .innerJoin(orders, eq(orderItems.orderId, orders.id))
+        .where(dateCondition)
+        .all();
+      const productsByOrder = new Map<string, Array<{ id: string; name: string }>>();
+      for (const { orderId, id, name } of soldLines) {
+        const products = productsByOrder.get(orderId) ?? [];
+        products.push({ id, name });
+        productsByOrder.set(orderId, products);
+      }
+
+      res.json(rows.map((row) => ({ ...row, products: productsByOrder.get(row.id) ?? [] })));
     } catch (error) {
       console.error('Fetch orders error:', error);
       res.status(500).json({ error: 'Failed to fetch orders' });
