@@ -165,7 +165,7 @@
   },
   "product": {
     "deleteHeading": "Delete Product",
-    "deleteConfirm": "Are you sure you want to delete {name}? This also removes any recipe/ingredient mappings and modifier links for this item. This cannot be undone.",
+    "deleteConfirm": "Are you sure you want to delete {name}? This also removes any recipe/ingredient mappings and modifier links for this item. Past sales and reports still show it. This cannot be undone.",
     "deleteError": "Failed to delete product.",
     "editHeading": "Edit Product",
     "newHeading": "New Product",
