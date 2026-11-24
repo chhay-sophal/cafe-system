@@ -25,6 +25,7 @@ import {
   type DisplayLocale,
 } from "./composables/useCustomerDisplayChannel";
 import { useExchangeRate } from "./composables/useExchangeRate";
+import { useMenuDisplay } from "./composables/useMenuDisplay";
 import { useNetworkStatus } from "./composables/useNetworkStatus";
 import { useStoreName } from "./composables/useStoreName";
 import { useTheme } from "./composables/useTheme";
@@ -121,11 +122,36 @@ watch(storeName, applyWindowTitle, { immediate: true });
 
 let unlistenRequestSync: (() => void) | undefined;
 
+// Settings → General can leave sold-out items off the menu (store-wide, set
+// from IMS too). Categories left with nothing to sell go with them.
+const { hideUnavailableItems } = useMenuDisplay();
+
+const menuProducts = computed(() =>
+  hideUnavailableItems.value ? products.value.filter((product) => product.isAvailable) : products.value,
+);
+
+const menuCategories = computed(() => {
+  if (!hideUnavailableItems.value) {
+    return categories.value;
+  }
+  const withItems = new Set(menuProducts.value.map((product) => product.categoryId));
+  // Categories that had no items at all stay as they were.
+  const withAnyItems = new Set(products.value.map((product) => product.categoryId));
+  return categories.value.filter((category) => withItems.has(category.id) || !withAnyItems.has(category.id));
+});
+
+// The open category may disappear when its last item sells out.
+watch(menuCategories, (visible) => {
+  if (selectedCategoryId.value !== null && !visible.some((category) => category.id === selectedCategoryId.value)) {
+    selectedCategoryId.value = null;
+  }
+});
+
 const filteredProducts = computed(() => {
   if (selectedCategoryId.value === null) {
-    return products.value;
+    return menuProducts.value;
   }
-  return products.value.filter((product) => product.categoryId === selectedCategoryId.value);
+  return menuProducts.value.filter((product) => product.categoryId === selectedCategoryId.value);
 });
 
 function selectCategory(categoryId: string | null) {
@@ -408,7 +434,7 @@ onUnmounted(() => {
     <div v-show="activeView === 'register'" class="pos-body">
       <div class="pos-catalog">
         <CategoryTabs
-          :categories="categories"
+          :categories="menuCategories"
           :selected-category-id="selectedCategoryId"
           @select="selectCategory"
         />

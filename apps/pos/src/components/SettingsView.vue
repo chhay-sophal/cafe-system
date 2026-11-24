@@ -6,6 +6,7 @@ import { useI18n } from "vue-i18n";
 import { setLocale } from "../i18n";
 import { checkForUpdate, installUpdate, updatesEnabled } from "../composables/useAppUpdater";
 import { useKhqrBanks } from "../composables/useKhqrBanks";
+import { useMenuDisplay } from "../composables/useMenuDisplay";
 import { useNetworkStatus } from "../composables/useNetworkStatus";
 import { ALL_PAYMENT_METHODS, usePaymentMethods } from "../composables/usePaymentMethods";
 import { usePosSettingsSync } from "../composables/usePosSettingsSync";
@@ -73,6 +74,7 @@ const activeSection = ref<SectionId>("general");
 
 const receiptPrinter = useReceiptPrinter();
 const PRINT_MODES: PrintMode[] = ["auto", "manual"];
+const { hideUnavailableItems, setHideUnavailableItems } = useMenuDisplay();
 
 // Keep a saved printer selectable even while Windows doesn't list it (e.g.
 // unplugged), instead of the dropdown silently showing "No printer".
@@ -238,6 +240,27 @@ function handleRemoveBank(id: string) {
               @click="setLocale(language.value)"
             >
               {{ language.label }}
+            </button>
+          </div>
+        </div>
+
+        <div class="settings-field">
+          <div class="settings-field__text">
+            <span class="settings-field__label">{{ t("settings.general.unavailableItems") }}</span>
+            <span class="settings-field__hint">{{ t("settings.general.unavailableItemsHint") }}</span>
+          </div>
+          <div class="settings-choice" role="radiogroup" :aria-label="t('settings.general.unavailableItems')">
+            <button
+              v-for="hide in [false, true]"
+              :key="String(hide)"
+              type="button"
+              role="radio"
+              :aria-checked="hideUnavailableItems === hide"
+              class="settings-choice__option"
+              :class="{ 'settings-choice__option--active': hideUnavailableItems === hide }"
+              @click="setHideUnavailableItems(hide)"
+            >
+              {{ hide ? t("settings.general.unavailableHide") : t("settings.general.unavailableShow") }}
             </button>
           </div>
         </div>

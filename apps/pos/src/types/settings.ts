@@ -21,6 +21,7 @@ export interface PosSettings {
   fastCash: { USD: number[]; KHR: number[] };
   khqrBanks: Array<{ id: string; name: string; imageUrl: string }>;
   language: "en-US" | "km-KH";
+  hideUnavailableItems: boolean;
 }
 
 export interface PosSettingsResponse {

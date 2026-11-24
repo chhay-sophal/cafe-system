@@ -6,12 +6,13 @@ import type { PosSettings, PosSettingsResponse } from "../types/settings";
 import { useAuth } from "./useAuth";
 import { useFastCash } from "./useFastCash";
 import { useKhqrBanks } from "./useKhqrBanks";
+import { useMenuDisplay } from "./useMenuDisplay";
 import { usePaymentMethods } from "./usePaymentMethods";
 import { useStoreDetails } from "./useStoreDetails";
 import { useStoreName } from "./useStoreName";
 
 // Keeps the store-wide POS settings (store name & details, payment methods,
-// fast cash, KHQR banks, language) in step with the server, where IMS edits
+// fast cash, KHQR banks, language, hiding unavailable items) in step with the server, where IMS edits
 // them too.
 // The composables keep their local copies, so checkout works offline; this
 // moves changes both ways:
@@ -26,7 +27,15 @@ import { useStoreName } from "./useStoreName";
 // replaced by defaults - nothing set up on this register is lost.
 
 const PENDING_STORAGE_KEY = "pos.settingsPending";
-const ALL_SECTIONS: PosSettingsSection[] = ["storeName", "storeDetails", "paymentMethods", "fastCash", "khqrBanks", "language"];
+const ALL_SECTIONS: PosSettingsSection[] = [
+  "storeName",
+  "storeDetails",
+  "paymentMethods",
+  "fastCash",
+  "khqrBanks",
+  "language",
+  "hideUnavailableItems",
+];
 // PUT /api/settings/pos is for managers and admins only.
 const SAVE_ROLES = ["MANAGER", "ADMIN"];
 
@@ -88,6 +97,8 @@ async function sectionValue(section: PosSettingsSection, token: string): Promise
     }
     case "language":
       return { language: i18n.global.locale.value as PosSettings["language"] };
+    case "hideUnavailableItems":
+      return { hideUnavailableItems: useMenuDisplay().hideUnavailableItems.value };
     case "khqrBanks": {
       const khqr = useKhqrBanks();
       for (const bank of khqr.banks.value) {
@@ -167,6 +178,7 @@ async function syncPosSettings(prefetched?: PosSettingsResponse): Promise<void> 
   if (take("paymentMethods")) usePaymentMethods().applyFromServer(settings.paymentMethods);
   if (take("fastCash")) useFastCash().applyFromServer(settings.fastCash);
   if (take("language")) setLocale(settings.language, { fromServer: true });
+  if (take("hideUnavailableItems")) useMenuDisplay().applyFromServer(settings.hideUnavailableItems);
   if (take("khqrBanks")) await useKhqrBanks().applyFromServer(settings.khqrBanks).catch(() => {});
 
   await pushPending();

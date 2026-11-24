@@ -2,7 +2,7 @@
 // composables/usePosSettingsSync.ts. Each composable announces a change the
 // cashier/manager made here, so the sync can send it; values applied FROM
 // the server don't announce, or every sync would echo straight back.
-export type PosSettingsSection = "storeName" | "storeDetails" | "paymentMethods" | "fastCash" | "khqrBanks" | "language";
+export type PosSettingsSection = "storeName" | "storeDetails" | "paymentMethods" | "fastCash" | "khqrBanks" | "language" | "hideUnavailableItems";
 
 let listener: ((section: PosSettingsSection) => void) | null = null;
 
