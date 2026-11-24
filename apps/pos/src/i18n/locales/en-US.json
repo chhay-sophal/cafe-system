@@ -127,6 +127,11 @@
     "loading": "Loading sales...",
     "loadError": "Failed to load sales.",
     "empty": "No sales yet today.",
+    "searchPlaceholder": "Search order # or item...",
+    "itemFilter": "Item sold",
+    "allItems": "All items",
+    "noMatches": "No sales match your search.",
+    "matchCount": "{shown} of {total}",
     "pendingNote": "{count} offline order(s) not synced yet - they will appear here once synced.",
     "columns": {
       "time": "Time",

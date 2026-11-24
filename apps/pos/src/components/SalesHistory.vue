@@ -25,6 +25,43 @@ const isLoading = ref(false);
 const errorMessage = ref<string | null>(null);
 const selectedOrderId = ref<string | null>(null);
 
+// Finding a sale in the table: by order number or item name (search), or by
+// an item sold today (select). The summary cards keep counting all sales.
+const searchText = ref("");
+const selectedProductId = ref("");
+
+// Products sold today, by id. The list is newest first, so a product renamed
+// during the day shows its latest name.
+const soldProducts = computed(() => {
+  const names = new Map<string, string>();
+  for (const order of orders.value) {
+    for (const { id, name } of order.products ?? []) {
+      if (!names.has(id)) {
+        names.set(id, name);
+      }
+    }
+  }
+  return [...names].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+});
+
+const visibleOrders = computed(() => {
+  const query = searchText.value.trim().toLowerCase().replace(/^#/, "");
+  const productId = selectedProductId.value;
+  return orders.value.filter((order) => {
+    const products = order.products ?? [];
+    if (productId && !products.some((product) => product.id === productId)) {
+      return false;
+    }
+    return (
+      !query ||
+      String(order.orderNumber).includes(query) ||
+      products.some((product) => product.name.toLowerCase().includes(query))
+    );
+  });
+});
+
+const isFiltered = computed(() => searchText.value.trim() !== "" || selectedProductId.value !== "");
+
 // Voided/refunded orders stay visible in the table but don't count as sales.
 const completedOrders = computed(() => orders.value.filter((order) => order.status === "COMPLETED"));
 
@@ -84,7 +121,12 @@ onMounted(() => loadOrders());
 <template>
   <section class="sales-history">
     <div class="sales-history__toolbar">
-      <h2 class="sales-history__heading">{{ t("salesHistory.heading") }}</h2>
+      <h2 class="sales-history__heading">
+        {{ t("salesHistory.heading") }}
+        <span v-if="isFiltered && !isLoading" class="sales-history__count">
+          {{ t("salesHistory.matchCount", { shown: visibleOrders.length, total: orders.length }) }}
+        </span>
+      </h2>
       <button type="button" class="sales-history__refresh" :disabled="isLoading" @click="loadOrders(true)">
         {{ t("salesHistory.refresh") }}
       </button>
@@ -110,10 +152,25 @@ onMounted(() => loadOrders());
       </div>
     </div>
 
+    <div v-if="orders.length > 0" class="sales-filters">
+      <input
+        v-model="searchText"
+        type="search"
+        class="sales-filters__search"
+        :placeholder="t('salesHistory.searchPlaceholder')"
+        :aria-label="t('salesHistory.searchPlaceholder')"
+      />
+      <select v-model="selectedProductId" class="sales-filters__item" :aria-label="t('salesHistory.itemFilter')">
+        <option value="">{{ t("salesHistory.allItems") }}</option>
+        <option v-for="product in soldProducts" :key="product.id" :value="product.id">{{ product.name }}</option>
+      </select>
+    </div>
+
     <div class="sales-table-wrap">
       <p v-if="isLoading" class="sales-history__status">{{ t("salesHistory.loading") }}</p>
       <p v-else-if="errorMessage" class="sales-history__status sales-history__status--error">{{ errorMessage }}</p>
       <p v-else-if="orders.length === 0" class="sales-history__status">{{ t("salesHistory.empty") }}</p>
+      <p v-else-if="visibleOrders.length === 0" class="sales-history__status">{{ t("salesHistory.noMatches") }}</p>
 
       <table v-else class="sales-table">
         <thead>
@@ -128,7 +185,7 @@ onMounted(() => loadOrders());
         </thead>
         <tbody>
           <tr
-            v-for="order in orders"
+            v-for="order in visibleOrders"
             :key="order.id"
             class="sales-table__row"
             :class="{ 'sales-table__row--inactive': order.status !== 'COMPLETED' }"
@@ -208,6 +265,39 @@ onMounted(() => loadOrders());
   color: #c0392b;
   font-size: 0.9rem;
   font-weight: 600;
+}
+
+.sales-history__count {
+  margin-left: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #777777;
+}
+
+.sales-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.sales-filters__search,
+.sales-filters__item {
+  min-height: 44px;
+  padding: 0 0.9rem;
+  border-radius: 10px;
+  border: 2px solid #dcdcdc;
+  background: #ffffff;
+  color: #1a1a1a;
+  font-size: 0.95rem;
+}
+
+.sales-filters__search {
+  flex: 1 1 240px;
+}
+
+.sales-filters__item {
+  flex: 0 1 260px;
+  min-width: 0;
 }
 
 .sales-summary {
@@ -337,6 +427,8 @@ onMounted(() => loadOrders());
    keeps these rules at their own specificity, so they override light styles
    exactly as the prefers-color-scheme media query used to. */
 :where(:root[data-theme="dark"]) .sales-history__refresh,
+:where(:root[data-theme="dark"]) .sales-filters__search,
+:where(:root[data-theme="dark"]) .sales-filters__item,
 :where(:root[data-theme="dark"]) .sales-summary__card,
 :where(:root[data-theme="dark"]) .sales-table-wrap {
   background: #242424;

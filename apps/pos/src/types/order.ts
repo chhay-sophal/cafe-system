@@ -54,6 +54,9 @@ export interface OrderListRow {
   cashierName: string | null;
   paymentMethod: PaymentMethod | null;
   itemCount: number;
+  // What was sold, one entry per distinct product - the name as rung up.
+  // Missing from older backends.
+  products?: Array<{ id: string; name: string }>;
 }
 
 // GET /api/orders/:id. Item unitPrice/totalPrice exclude modifier extras -
