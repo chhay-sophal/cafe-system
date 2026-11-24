@@ -20,6 +20,10 @@ export const categories = sqliteTable('categories', {
   id: text('id').primaryKey(),
   name: text('name').notNull(), // e.g., "Espresso Drinks", "Pastries", "Teas"
   sortOrder: integer('sort_order').default(0),
+  // Set instead of deleting a category that sold items still point to, so
+  // sales reports keep its name. Deleted categories are left out everywhere
+  // else.
+  deletedAt: text('deleted_at'),
 });
 
 export const products = sqliteTable('products', {
@@ -31,6 +35,9 @@ export const products = sqliteTable('products', {
   imageUrl: text('image_url'), // e.g., "/uploads/products/iced-latte.jpg"
   isAvailable: integer('is_available', { mode: 'boolean' }).notNull().default(true),
   createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
+  // Set instead of deleting an item that has been sold, so order history
+  // keeps pointing at it. Deleted items are left out of the menu everywhere.
+  deletedAt: text('deleted_at'),
 }, (table) => ({
   skuIndex: uniqueIndex('idx_products_sku').on(table.sku),
   categoryIndex: index('idx_products_category').on(table.categoryId),

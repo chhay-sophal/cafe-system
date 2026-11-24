@@ -64,6 +64,13 @@
       "when": 1795407975637,
       "tag": "0008_pos_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1795502018649,
+      "tag": "0009_menu_soft_delete",
+      "breakpoints": true
     }
   ]
 }

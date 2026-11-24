@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
 import { alias, type SQLiteColumn } from 'drizzle-orm/sqlite-core';
-import { eq, sql, gte, lte, and, inArray, isNotNull, desc } from 'drizzle-orm';
+import { eq, sql, gte, lte, and, inArray, isNotNull, isNull, desc } from 'drizzle-orm';
 import type { z } from 'zod';
 import { db } from './db/index.js';
 import {
@@ -122,12 +122,21 @@ async function loadAllModifierGroups() {
   }));
 }
 
+// Menu items and categories are soft-deleted once sales point to them (see
+// DELETE /api/products/:id and /api/categories/:id) - these pick the live ones.
+const liveProduct = isNull(products.deletedAt);
+const liveCategory = isNull(categories.deletedAt);
+
+function liveCategoriesInOrder(executor: Pick<typeof db, 'select'> = db) {
+  return executor.select().from(categories).where(liveCategory).orderBy(categories.sortOrder).all();
+}
+
 // The whole menu in one response: what GET /api/categories, /api/products
 // and /api/modifiers return separately.
 async function loadCatalog() {
   const [categoryRows, productRows, modifierGroupRows] = await Promise.all([
-    db.select().from(categories).orderBy(categories.sortOrder).all(),
-    db.select().from(products).all(),
+    liveCategoriesInOrder(),
+    db.select().from(products).where(liveProduct).all(),
     loadAllModifierGroups(),
   ]);
   return { categories: categoryRows, products: productRows, modifierGroups: modifierGroupRows };
@@ -478,8 +487,7 @@ function createApp() {
 
   app.get('/api/categories', async (_req, res) => {
     try {
-      const result = await db.select().from(categories).orderBy(categories.sortOrder).all();
-      res.json(result);
+      res.json(await liveCategoriesInOrder());
     } catch (error) {
       res.status(500).json({ error: 'Failed to fetch categories' });
     }
@@ -506,7 +514,7 @@ function createApp() {
     try {
       // Require the complete set, so a client working from a stale list can't
       // silently drop or misplace categories it doesn't know about.
-      const existing = await db.select({ id: categories.id }).from(categories).all();
+      const existing = await db.select({ id: categories.id }).from(categories).where(liveCategory).all();
       const existingIds = new Set(existing.map((category) => category.id));
       const requestedIds = new Set(categoryIds);
       if (
@@ -523,8 +531,7 @@ function createApp() {
         }
       });
 
-      const result = await db.select().from(categories).orderBy(categories.sortOrder).all();
-      res.json(result);
+      res.json(await liveCategoriesInOrder());
     } catch (error) {
       res.status(500).json({ error: 'Failed to reorder categories' });
     }
@@ -535,7 +542,7 @@ function createApp() {
     const { name, sortOrder } = req.body;
 
     try {
-      const existing = await db.select().from(categories).where(eq(categories.id, id)).get();
+      const existing = await db.select().from(categories).where(and(eq(categories.id, id), liveCategory)).get();
       if (!existing) {
         return res.status(404).json({ error: 'Category not found' });
       }
@@ -554,12 +561,17 @@ function createApp() {
     const reassignToCategoryId = req.query.reassignToCategoryId ? String(req.query.reassignToCategoryId) : undefined;
 
     try {
-      const existing = await db.select().from(categories).where(eq(categories.id, id)).get();
+      const existing = await db.select().from(categories).where(and(eq(categories.id, id), liveCategory)).get();
       if (!existing) {
         return res.status(404).json({ error: 'Category not found' });
       }
 
-      const productsInCategory = await db.select().from(products).where(eq(products.categoryId, id)).all();
+      const productsInCategory = await db.select().from(products).where(and(eq(products.categoryId, id), liveProduct)).all();
+      // Deleted items that were sold still belong to it - then the category
+      // is only marked deleted, so sales reports keep showing its name.
+      const deletedProductRef = await db.select({ id: products.id }).from(products)
+        .where(and(eq(products.categoryId, id), isNotNull(products.deletedAt)))
+        .get();
 
       if (productsInCategory.length > 0) {
         // No target given yet - tell the client how many products are
@@ -576,7 +588,9 @@ function createApp() {
           return res.status(400).json({ error: 'Cannot reassign products to the category being deleted' });
         }
 
-        const targetCategory = await db.select().from(categories).where(eq(categories.id, reassignToCategoryId)).get();
+        const targetCategory = await db.select().from(categories)
+          .where(and(eq(categories.id, reassignToCategoryId), liveCategory))
+          .get();
         if (!targetCategory) {
           return res.status(404).json({ error: 'Target category not found' });
         }
@@ -584,15 +598,21 @@ function createApp() {
 
       await db.transaction(async (tx) => {
         if (productsInCategory.length > 0 && reassignToCategoryId) {
-          await tx.update(products).set({ categoryId: reassignToCategoryId }).where(eq(products.categoryId, id)).run();
+          await tx.update(products).set({ categoryId: reassignToCategoryId })
+            .where(and(eq(products.categoryId, id), liveProduct))
+            .run();
         }
 
-        await tx.delete(categories).where(eq(categories.id, id)).run();
+        if (deletedProductRef) {
+          await tx.update(categories).set({ deletedAt: sql`CURRENT_TIMESTAMP` }).where(eq(categories.id, id)).run();
+        } else {
+          await tx.delete(categories).where(eq(categories.id, id)).run();
+        }
 
         // Recalculate sortOrder for the remaining categories so there's no
         // gap left by the deleted one - keeps their relative order, just
         // compacted (e.g. 0,1,2,3 minus #1 becomes 0,1,2, not 0,2,3).
-        const remaining = await tx.select().from(categories).orderBy(categories.sortOrder).all();
+        const remaining = await liveCategoriesInOrder(tx);
         for (const [index, category] of remaining.entries()) {
           if (category.sortOrder !== index) {
             await tx.update(categories).set({ sortOrder: index }).where(eq(categories.id, category.id)).run();
@@ -602,7 +622,7 @@ function createApp() {
 
       // The remaining categories as renumbered, so the client can update its
       // list without reloading the menu.
-      const remaining = await db.select().from(categories).orderBy(categories.sortOrder).all();
+      const remaining = await liveCategoriesInOrder();
       res.json({ success: true, reassignedCount: productsInCategory.length, categories: remaining });
     } catch (error) {
       console.error('Delete category error:', error);
@@ -615,8 +635,8 @@ function createApp() {
 
     try {
       const query = categoryId && typeof categoryId === 'string'
-        ? db.select().from(products).where(eq(products.categoryId, categoryId))
-        : db.select().from(products);
+        ? db.select().from(products).where(and(eq(products.categoryId, categoryId), liveProduct))
+        : db.select().from(products).where(liveProduct);
 
       res.json(await query.all());
     } catch (error) {
@@ -628,7 +648,7 @@ function createApp() {
     const { categoryId, name, basePrice, sku, imageUrl, isAvailable } = req.body;
 
     try {
-      const categoryExists = await db.select().from(categories).where(eq(categories.id, categoryId)).get();
+      const categoryExists = await db.select().from(categories).where(and(eq(categories.id, categoryId), liveCategory)).get();
       if (!categoryExists) {
         return res.status(400).json({ error: 'Selected category does not exist' });
       }
@@ -656,12 +676,12 @@ function createApp() {
     const { categoryId, name, basePrice, sku, imageUrl, isAvailable } = req.body;
 
     try {
-      const existing = await db.select().from(products).where(eq(products.id, id)).get();
+      const existing = await db.select().from(products).where(and(eq(products.id, id), liveProduct)).get();
       if (!existing) {
         return res.status(404).json({ error: 'Product not found' });
       }
 
-      const categoryExists = await db.select().from(categories).where(eq(categories.id, categoryId)).get();
+      const categoryExists = await db.select().from(categories).where(and(eq(categories.id, categoryId), liveCategory)).get();
       if (!categoryExists) {
         return res.status(400).json({ error: 'Selected category does not exist' });
       }
@@ -686,22 +706,28 @@ function createApp() {
     const id = String(req.params.id);
 
     try {
-      const existing = await db.select().from(products).where(eq(products.id, id)).get();
+      const existing = await db.select().from(products).where(and(eq(products.id, id), liveProduct)).get();
       if (!existing) {
         return res.status(404).json({ error: 'Product not found' });
       }
 
-      const historicalOrderItems = await db.select().from(orderItems).where(eq(orderItems.productId, id)).all();
-      if (historicalOrderItems.length > 0) {
-        return res.status(409).json({
-          error: `"${existing.name}" has ${historicalOrderItems.length} historical order line(s) and cannot be deleted.`,
-        });
-      }
+      // Sold before: order history points to it, so it's only marked deleted -
+      // gone from the menu, IMS and registers, but past orders, reports and
+      // edits of those orders still find it. Never sold: removed outright.
+      const wasSold = await db.select({ id: orderItems.id }).from(orderItems).where(eq(orderItems.productId, id)).get();
 
       await db.transaction(async (tx) => {
         await tx.delete(recipes).where(eq(recipes.productId, id)).run();
         await tx.delete(productModifiers).where(eq(productModifiers.productId, id)).run();
-        await tx.delete(products).where(eq(products.id, id)).run();
+        if (wasSold) {
+          // The barcode is freed for a new item; the name stays for history.
+          await tx.update(products)
+            .set({ deletedAt: sql`CURRENT_TIMESTAMP`, sku: null, isAvailable: false })
+            .where(eq(products.id, id))
+            .run();
+        } else {
+          await tx.delete(products).where(eq(products.id, id)).run();
+        }
       });
 
       res.json({ success: true });
@@ -749,7 +775,7 @@ function createApp() {
     if (productIds.length === 0) {
       return [];
     }
-    const found = await db.select({ id: products.id }).from(products).where(inArray(products.id, productIds)).all();
+    const found = await db.select({ id: products.id }).from(products).where(and(inArray(products.id, productIds), liveProduct)).all();
     const foundIds = new Set(found.map((row) => row.id));
     return productIds.filter((id) => !foundIds.has(id));
   }

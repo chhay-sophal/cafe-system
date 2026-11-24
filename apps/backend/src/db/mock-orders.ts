@@ -13,7 +13,7 @@
 // real sales are never touched. Inventory stock is not deducted.
 import { randomUUID } from 'node:crypto';
 import { createInterface } from 'node:readline/promises';
-import { eq, like, sql } from 'drizzle-orm';
+import { eq, like, sql, isNull } from 'drizzle-orm';
 import { db } from './index.js';
 import {
   modifiers, orderItemModifiers, orderItems, orders, payments, productModifiers, products, storeSettings, users,
@@ -157,7 +157,8 @@ async function removeMockOrders(): Promise<number> {
 async function addMockOrders(days: number) {
   const productList: Product[] = await db
     .select({ id: products.id, name: products.name, basePrice: products.basePrice })
-    .from(products);
+    .from(products)
+    .where(isNull(products.deletedAt));
   const staff = await db.select({ id: users.id, role: users.role }).from(users).where(eq(users.isActive, true));
   if (productList.length === 0 || staff.length === 0) {
     throw new Error('No products or active staff to sell with - run db:seed (or add some in IMS) first.');

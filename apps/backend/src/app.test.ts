@@ -969,6 +969,101 @@ describe('category deletion', () => {
   });
 });
 
+describe('menu item deletion', () => {
+  beforeEach(async () => {
+    await db.delete(payments).run();
+    await db.delete(orderItemModifiers).run();
+    await db.delete(orderItems).run();
+    await db.delete(orders).run();
+    await db.delete(stockAdjustments).run();
+    await db.delete(users).run();
+  });
+
+  async function managerToken() {
+    const pinHash = await hashPin('9999');
+    await db.insert(users).values({ id: 'manager-1', name: 'Manager', pinHash, role: 'MANAGER', isActive: true }).run();
+    return signToken({ id: 'manager-1', name: 'Manager', role: 'MANAGER' });
+  }
+
+  // A category holding one item that appears on a past order.
+  async function soldItemFixture() {
+    const categoryId = randomUUID();
+    const productId = randomUUID();
+    const orderId = randomUUID();
+    await db.insert(categories).values({ id: categoryId, name: 'Test Snacks', sortOrder: 1000 }).run();
+    await db.insert(products).values({ id: productId, categoryId, name: 'Test Cassava', basePrice: 2, sku: `sku-${productId}` }).run();
+    await db.insert(orders).values({ id: orderId, userId: 'manager-1', orderNumber: 1, subtotal: 2, totalAmount: 2 }).run();
+    await db.insert(orderItems).values({
+      id: randomUUID(), orderId, productId, productName: 'Test Cassava', quantity: 1, unitPrice: 2, totalPrice: 2,
+    }).run();
+    return { categoryId, productId, orderId };
+  }
+
+  async function cleanUp({ categoryId, productId }: { categoryId: string; productId: string }) {
+    await db.delete(orderItems).run();
+    await db.delete(orders).run();
+    await db.delete(products).where(eq(products.id, productId)).run();
+    await db.delete(categories).where(eq(categories.id, categoryId)).run();
+  }
+
+  it('soft-deletes a sold item: gone from the menu, kept for order history, barcode freed', async () => {
+    const token = await managerToken();
+    const fixture = await soldItemFixture();
+
+    const response = await request(app).delete(`/api/products/${fixture.productId}`).set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(200);
+    const row = await db.select().from(products).where(eq(products.id, fixture.productId)).get();
+    expect(row?.deletedAt).toBeTruthy();
+    expect(row?.sku).toBeNull();
+
+    const catalog = await request(app).get('/api/catalog');
+    expect(catalog.body.products.some((product: { id: string }) => product.id === fixture.productId)).toBe(false);
+    const list = await request(app).get('/api/products');
+    expect(list.body.some((product: { id: string }) => product.id === fixture.productId)).toBe(false);
+
+    // Deleting it again, or editing it, finds nothing.
+    expect((await request(app).delete(`/api/products/${fixture.productId}`).set('Authorization', `Bearer ${token}`)).status).toBe(404);
+
+    // The past order still shows the item.
+    const order = await request(app).get(`/api/orders/${fixture.orderId}`).set('Authorization', `Bearer ${token}`);
+    expect(order.body.items[0].productName).toBe('Test Cassava');
+
+    await cleanUp(fixture);
+  });
+
+  it('removes a never-sold item outright', async () => {
+    const token = await managerToken();
+    const categoryId = randomUUID();
+    const productId = randomUUID();
+    await db.insert(categories).values({ id: categoryId, name: 'Test Snacks', sortOrder: 1000 }).run();
+    await db.insert(products).values({ id: productId, categoryId, name: 'Test Unsold', basePrice: 2 }).run();
+
+    const response = await request(app).delete(`/api/products/${productId}`).set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(200);
+    expect(await db.select().from(products).where(eq(products.id, productId)).get()).toBeUndefined();
+    await db.delete(categories).where(eq(categories.id, categoryId)).run();
+  });
+
+  it('marks a category deleted when only deleted items still point to it', async () => {
+    const token = await managerToken();
+    const fixture = await soldItemFixture();
+    await request(app).delete(`/api/products/${fixture.productId}`).set('Authorization', `Bearer ${token}`);
+
+    const response = await request(app).delete(`/api/categories/${fixture.categoryId}`).set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.categories.some((category: { id: string }) => category.id === fixture.categoryId)).toBe(false);
+    const row = await db.select().from(categories).where(eq(categories.id, fixture.categoryId)).get();
+    expect(row?.deletedAt).toBeTruthy();
+    const catalog = await request(app).get('/api/catalog');
+    expect(catalog.body.categories.some((category: { id: string }) => category.id === fixture.categoryId)).toBe(false);
+
+    await cleanUp(fixture);
+  });
+});
+
 describe('inventory item deletion', () => {
   beforeEach(async () => {
     await db.delete(payments).run();
