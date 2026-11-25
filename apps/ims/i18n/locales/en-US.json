@@ -138,11 +138,20 @@
   },
   "dateRange": {
     "today": "Today",
+    "yesterday": "Yesterday",
     "last7Days": "Last 7 days",
     "last30Days": "Last 30 days",
-    "monthToDate": "Month to date",
-    "customRange": "Custom range",
-    "apply": "Apply"
+    "thisMonth": "This month",
+    "lastMonth": "Last month",
+    "chooseDates": "Choose dates",
+    "singleDay": "One day",
+    "dateRange": "Date range",
+    "day": "Day",
+    "from": "From",
+    "to": "To",
+    "apply": "Apply",
+    "previous": "Previous period",
+    "next": "Next period"
   },
   "hourlyVolume": {
     "heading": "Hourly Volume",

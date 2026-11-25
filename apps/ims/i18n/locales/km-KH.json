@@ -138,11 +138,20 @@
   },
   "dateRange": {
     "today": "ថ្ងៃនេះ",
+    "yesterday": "ម្សិលមិញ",
     "last7Days": "៧ថ្ងៃចុងក្រោយ",
     "last30Days": "៣០ថ្ងៃចុងក្រោយ",
-    "monthToDate": "តាំងពីដើមខែដល់ថ្ងៃនេះ",
-    "customRange": "ជួរកាលបរិច្ឆេទផ្ទាល់ខ្លួន",
-    "apply": "អនុវត្ត"
+    "thisMonth": "ខែនេះ",
+    "lastMonth": "ខែមុន",
+    "chooseDates": "ជ្រើសរើសកាលបរិច្ឆេទ",
+    "singleDay": "មួយថ្ងៃ",
+    "dateRange": "ចន្លោះកាលបរិច្ឆេទ",
+    "day": "ថ្ងៃ",
+    "from": "ពី",
+    "to": "ដល់",
+    "apply": "អនុវត្ត",
+    "previous": "រយៈពេលមុន",
+    "next": "រយៈពេលបន្ទាប់"
   },
   "hourlyVolume": {
     "heading": "បរិមាណតាមម៉ោង",
