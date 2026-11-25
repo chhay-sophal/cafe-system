@@ -71,33 +71,70 @@
     "loadingReport": "Loading report..."
   },
   "summaryCards": {
-    "grossRevenue": "Gross revenue",
     "netRevenue": "Net revenue",
     "orders": "Orders",
     "averageOrderValue": "Average order value",
-    "vsPrevious": "vs previous day | vs previous {count} days"
+    "vsPrevious": "vs previous day | vs previous {count} days",
+    "grossProfit": "Gross profit",
+    "margin": "{percent}% margin",
+    "itemsSold": "Items sold",
+    "voidsAndDiscounts": "Voids & discounts",
+    "voids": "{count} voided | {count} voided",
+    "voidsDetail": "Voided {voided} · Discounts {discounts}",
+    "profitIncomplete": "Profit reads too high:",
+    "noRecipe": "{count} item sold has no recipe on Recipes. | {count} items sold have no recipe on Recipes.",
+    "noCost": "{names} has no cost per unit on Stock. | {names} have no cost per unit on Stock."
   },
   "salesTrend": {
     "heading": "Revenue Over Time",
     "noData": "No sales recorded for this period.",
-    "singleDay": "Pick a range of two or more days to see the daily trend. Hourly Volume below shows a single day.",
     "date": "Date",
     "revenue": "Revenue"
   },
   "topProducts": {
     "heading": "Top Products",
     "noData": "No products sold in this period.",
-    "products": "Products",
-    "categories": "Categories",
     "revenue": "Revenue",
     "quantity": "Quantity",
     "product": "Product",
     "category": "Category",
-    "groupBy": "Group by",
     "rankBy": "Rank by",
     "uncategorized": "Uncategorized",
     "sold": "{count} sold | {count} sold",
-    "note": "Top 10. Revenue includes add-ons, before order discounts."
+    "note": "Top 10. Revenue includes add-ons, before order discounts.",
+    "profit": "Profit",
+    "cost": "Ingredient cost",
+    "margin": "Margin",
+    "profitOf": "profit {amount}",
+    "incompleteNote": "* Missing a recipe or ingredient cost, so its profit reads too high."
+  },
+  "categorySales": {
+    "heading": "Sales by Category",
+    "revenue": "Revenue",
+    "share": "Share",
+    "note": "Item revenue including add-ons, before order discounts."
+  },
+  "weekday": {
+    "heading": "Busiest Days",
+    "day": "Day",
+    "orders": "Avg. orders",
+    "revenue": "Avg. revenue",
+    "averageOrders": "{count} orders on average",
+    "note": "Average for each day of the week over the period."
+  },
+  "weekdays": {
+    "mon": "Mon",
+    "tue": "Tue",
+    "wed": "Wed",
+    "thu": "Thu",
+    "fri": "Fri",
+    "sat": "Sat",
+    "sun": "Sun"
+  },
+  "unsoldItems": {
+    "heading": "Items Not Sold",
+    "none": "Every menu item sold at least once in this period.",
+    "unavailable": "unavailable"
   },
   "dateRange": {
     "today": "Today",
@@ -113,7 +150,10 @@
     "hour": "Hour",
     "orders": "Orders",
     "revenue": "Revenue",
-    "orderCount": "{count} order | {count} orders"
+    "orderCount": "{count} order | {count} orders",
+    "averageHeading": "Busiest Hours (average day)",
+    "averageOrders": "{count} orders on average",
+    "averageNote": "Average per day over the {count} days. | Average per day over the {count} days."
   },
   "paymentBreakdown": {
     "heading": "Payments Collected",

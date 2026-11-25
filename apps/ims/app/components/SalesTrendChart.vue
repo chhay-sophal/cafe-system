@@ -13,8 +13,6 @@ const showTable = ref(false);
 
 const days = computed(() => store.report?.dailyVolume ?? []);
 const hasData = computed(() => days.value.some((day) => day.orderCount > 0));
-// One day is a single bar - the Hourly Volume chart covers a day better.
-const isSingleDay = computed(() => days.value.length <= 1);
 
 // Daily revenue only, on one axis - order counts are in the tooltip and the
 // table rather than on a second scale.
@@ -71,7 +69,7 @@ const chartOptions = computed(() => ({
     <div class="mb-3 flex items-center justify-between">
       <h3 class="text-sm font-semibold text-slate-700">{{ $t("salesTrend.heading") }}</h3>
       <button
-        v-if="hasData && !isSingleDay"
+        v-if="hasData"
         type="button"
         class="text-xs font-semibold text-slate-500 hover:text-slate-700"
         @click="showTable = !showTable"
@@ -80,11 +78,7 @@ const chartOptions = computed(() => ({
       </button>
     </div>
 
-    <p v-if="isSingleDay" class="flex h-64 items-center justify-center text-center text-sm text-slate-400">
-      {{ $t("salesTrend.singleDay") }}
-    </p>
-
-    <p v-else-if="!hasData" class="flex h-64 items-center justify-center text-center text-sm text-slate-400">
+    <p v-if="!hasData" class="flex h-64 items-center justify-center text-center text-sm text-slate-400">
       {{ $t("salesTrend.noData") }}
     </p>
 

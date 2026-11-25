@@ -18,8 +18,23 @@ function formatHourLabel(hour: number): string {
   return hour < 12 ? `${hour}am` : `${hour - 12}pm`;
 }
 
-const hourlyVolume = computed(() => store.report?.hourlyVolume ?? []);
+// Over several days the totals would grow with the range, so they're shown
+// as the average day instead - comparable between a week and a month.
+const periodDays = computed(() => Math.max(store.report?.dailyVolume?.length ?? 1, 1));
+const isAverage = computed(() => periodDays.value > 1);
+
+const hourlyVolume = computed(() =>
+  (store.report?.hourlyVolume ?? []).map((entry) => ({
+    hour: entry.hour,
+    orderCount: entry.orderCount / periodDays.value,
+    revenue: entry.revenue / periodDays.value,
+  })),
+);
 const hasData = computed(() => hourlyVolume.value.some((entry) => entry.orderCount > 0));
+
+function formatOrders(value: number): string {
+  return isAverage.value ? value.toFixed(1).replace(/\.0$/, "") : String(value);
+}
 
 const chartData = computed(() => ({
   labels: hourlyVolume.value.map((entry) => formatHourLabel(entry.hour)),
@@ -35,7 +50,7 @@ const chartData = computed(() => ({
   ],
 }));
 
-const chartOptions = {
+const chartOptions = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
   scales: {
@@ -45,7 +60,7 @@ const chartOptions = {
     },
     y: {
       beginAtZero: true,
-      ticks: { color: "#898781", precision: 0 },
+      ticks: { color: "#898781", precision: isAverage.value ? 1 : 0 },
       grid: { color: "#e1e0d9" },
       border: { display: false },
     },
@@ -57,18 +72,23 @@ const chartOptions = {
         label(context: TooltipItem<"bar">) {
           const entry = hourlyVolume.value[context.dataIndex];
           const orderCount = context.parsed.y ?? 0;
-          return ` ${t("hourlyVolume.orderCount", orderCount)} – ${formatMain(entry?.revenue ?? 0)}`;
+          const orders = isAverage.value
+            ? t("hourlyVolume.averageOrders", { count: formatOrders(orderCount) })
+            : t("hourlyVolume.orderCount", orderCount);
+          return ` ${orders} – ${formatMain(entry?.revenue ?? 0)}`;
         },
       },
     },
   },
-};
+}));
 </script>
 
 <template>
   <div class="rounded-lg border border-slate-200 bg-white p-4">
     <div class="mb-3 flex items-center justify-between">
-      <h3 class="text-sm font-semibold text-slate-700">{{ $t("hourlyVolume.heading") }}</h3>
+      <h3 class="text-sm font-semibold text-slate-700">
+        {{ isAverage ? $t("hourlyVolume.averageHeading") : $t("hourlyVolume.heading") }}
+      </h3>
       <button
         v-if="hasData"
         type="button"
@@ -99,7 +119,7 @@ const chartOptions = {
             class="border-b border-slate-100"
           >
             <td class="py-2 text-slate-700">{{ formatHourLabel(entry.hour) }}</td>
-            <td class="py-2 text-right font-medium text-slate-900">{{ entry.orderCount }}</td>
+            <td class="py-2 text-right font-medium text-slate-900">{{ formatOrders(entry.orderCount) }}</td>
             <td class="py-2 text-right text-slate-500">
               {{ formatMain(entry.revenue) }}
               <span class="block text-xs text-slate-400">{{ formatSecondary(entry.revenue) }}</span>
@@ -116,5 +136,7 @@ const chartOptions = {
     >
       <Bar :data="chartData" :options="chartOptions" />
     </div>
+
+    <p v-if="hasData && isAverage" class="mt-3 text-xs text-slate-400">{{ $t("hourlyVolume.averageNote", periodDays) }}</p>
   </div>
 </template>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { watch } from "vue";
+import { computed, watch } from "vue";
 
 const store = useReportsStore();
 const period = useSalesPeriodStore();
@@ -8,6 +8,12 @@ const period = useSalesPeriodStore();
 // have changed on Sales History. A period picked while hidden loads on the
 // next visit.
 const { isVisible } = usePageVisible(() => store.loadIfStale());
+
+const periodDays = computed(() => store.report?.dailyVolume?.length ?? 1);
+// A daily trend needs two days or more; one day is covered by the hourly
+// chart. Weekdays need two of each to compare.
+const showTrend = computed(() => periodDays.value > 1);
+const showWeekdays = computed(() => periodDays.value >= 14);
 watch(
   () => [period.startDate, period.endDate],
   () => {
@@ -32,12 +38,17 @@ watch(
     <template v-else>
       <DailySummaryCards class="mb-6" />
 
-      <SalesTrendChart class="mb-4" />
+      <SalesTrendChart v-if="showTrend" class="mb-4" />
 
       <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <TopProductsChart />
+        <CategorySalesChart />
         <PaymentBreakdownChart />
-        <HourlyVolumeChart class="lg:col-span-2" />
+        <!-- Next to the payments when there are no weekdays to show;
+             otherwise the weekdays sit there and hours get a full row. -->
+        <WeekdayChart v-if="showWeekdays" />
+        <HourlyVolumeChart :class="{ 'lg:col-span-2': showWeekdays }" />
+        <UnsoldItemsCard class="lg:col-span-2" />
       </div>
     </template>
   </div>

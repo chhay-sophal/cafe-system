@@ -4,6 +4,14 @@ export interface DailySummaryMetrics {
   totalTax: number;
   totalDiscounts: number;
   netRevenue: number;
+  // The fields below are missing from backends before profit was added.
+  itemsSold?: number;
+  // From today's recipes and Stock costs.
+  ingredientCost?: number;
+  // Sales before tax and after discounts, less ingredient cost.
+  grossProfit?: number;
+  voidedOrders?: number;
+  voidedAmount?: number;
 }
 
 export interface PaymentBreakdownEntry {
@@ -30,6 +38,12 @@ export interface TopProductEntry {
   categoryName: string | null;
   quantity: number;
   revenue: number;
+  // Ingredient cost and revenue less it. costComplete is false when part of
+  // the cost is unknown (no recipe, or an ingredient with no cost), so the
+  // profit is too high.
+  cost?: number;
+  profit?: number;
+  costComplete?: boolean;
 }
 
 export interface DailySummaryReport {
@@ -43,4 +57,6 @@ export interface DailySummaryReport {
   dailyVolume: DailyVolumeEntry[];
   // Every product sold in dateRange, highest revenue first.
   topProducts: TopProductEntry[];
+  // Why profit may be too high.
+  costCoverage?: { productsWithoutRecipe: number; uncostedIngredients: string[] };
 }
