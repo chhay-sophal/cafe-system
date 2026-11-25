@@ -102,10 +102,13 @@ async function submit() {
     isSubmitting.value = false;
   }
 }
+
+// Closes on a click outside it or Escape (see useDismiss).
+const dismiss = useDismiss(() => open.value, close, () => isSubmitting.value);
 </script>
 
 <template>
-  <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+  <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" @pointerdown="dismiss.onPointerDown" @click="dismiss.onClick">
     <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
       <div class="flex items-start justify-between">
         <h2 class="text-lg font-bold text-slate-900">{{ isEditMode ? $t("inventoryItem.editHeading") : $t("inventoryItem.newHeading") }}</h2>

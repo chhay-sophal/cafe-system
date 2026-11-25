@@ -92,10 +92,13 @@ async function submit() {
     isSubmitting.value = false;
   }
 }
+
+// Closes on a click outside it or Escape (see useDismiss).
+const dismiss = useDismiss(() => open.value && !!props.item, close, () => isSubmitting.value);
 </script>
 
 <template>
-  <div v-if="open && item" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+  <div v-if="open && item" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" @pointerdown="dismiss.onPointerDown" @click="dismiss.onClick">
     <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
       <div class="flex items-start justify-between">
         <div>

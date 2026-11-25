@@ -182,10 +182,13 @@ async function save() {
 
 const INPUT_CLASS =
   "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500";
+
+// Closes on a click outside it or Escape (see useDismiss).
+const dismiss = useDismiss(() => true, () => emit("close"), () => isSaving.value);
 </script>
 
 <template>
-  <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" @click.self="emit('close')">
+  <div class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" @pointerdown="dismiss.onPointerDown" @click="dismiss.onClick">
     <div
       class="flex max-h-[90vh] w-full max-w-xl flex-col rounded-xl bg-white shadow-xl"
       role="dialog"

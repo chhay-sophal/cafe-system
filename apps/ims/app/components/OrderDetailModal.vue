@@ -50,10 +50,13 @@ async function confirmVoid() {
 function close() {
   ordersStore.clearSelectedOrder();
 }
+
+// Closes on a click outside it or Escape (see useDismiss).
+const dismiss = useDismiss(() => isOpen.value, close, () => isVoiding.value);
 </script>
 
 <template>
-  <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" @click.self="close">
+  <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" @pointerdown="dismiss.onPointerDown" @click="dismiss.onClick">
     <div class="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
       <p v-if="ordersStore.isDetailLoading" class="p-6 text-center text-sm text-slate-500">{{ t("orders.detail.loading") }}</p>
 
