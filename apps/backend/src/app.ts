@@ -128,6 +128,38 @@ async function findSoldModifierIds(optionIds: string[]): Promise<Set<string>> {
   return new Set(rows.map((row) => row.modifierId));
 }
 
+// Ingredient cost of one unit of each product and modifier option, from
+// today's recipes and stock costs (Stock's cost per unit) - not what they
+// were when a sale was made. `uncosted` lists what makes a cost incomplete:
+// a product sold without a recipe counts as free, and so does an ingredient
+// with no cost entered.
+async function loadUnitCosts() {
+  const rows = await db.select({
+    productId: recipes.productId,
+    modifierId: recipes.modifierId,
+    quantityRequired: recipes.quantityRequired,
+    ingredientName: inventoryItems.name,
+    costPerUnit: inventoryItems.costPerUnit,
+  }).from(recipes).innerJoin(inventoryItems, eq(recipes.inventoryItemId, inventoryItems.id)).all();
+
+  const productCost = new Map<string, number>();
+  const modifierCost = new Map<string, number>();
+  // Per product / option: the names of its ingredients with no cost.
+  const productUncosted = new Map<string, Set<string>>();
+  const modifierUncosted = new Map<string, Set<string>>();
+  for (const row of rows) {
+    const [costs, uncosted, id] = row.productId
+      ? [productCost, productUncosted, row.productId]
+      : [modifierCost, modifierUncosted, row.modifierId];
+    if (!id) continue;
+    costs.set(id, (costs.get(id) ?? 0) + row.quantityRequired * row.costPerUnit);
+    const names = uncosted.get(id) ?? new Set<string>();
+    if (row.costPerUnit <= 0) names.add(row.ingredientName);
+    uncosted.set(id, names);
+  }
+  return { productCost, modifierCost, productUncosted, modifierUncosted };
+}
+
 async function loadAllModifierGroups() {
   const [groups, options, links] = await Promise.all([
     db.select().from(modifierGroups).where(liveModifierGroup).all(),
@@ -1738,27 +1770,79 @@ function createApp() {
     // to guard against. Money sums come out of SQLite as raw floats (Riel
     // converted back to USD rarely lands on whole cents), so they're rounded
     // to cents before being sent.
-    const summarize = async (from: string, to: string) => {
-      const row = await db.select({
-        totalOrders: sql<number>`count(${orders.id})`,
-        grossRevenue: sql<number>`coalesce(sum(${orders.subtotal}), 0)`,
-        totalTax: sql<number>`coalesce(sum(${orders.taxAmount}), 0)`,
-        totalDiscounts: sql<number>`coalesce(sum(${orders.discountAmount}), 0)`,
-        netRevenue: sql<number>`coalesce(sum(${orders.totalAmount}), 0)`,
-      }).from(orders).where(completedBetween(from, to)).get();
+    // What was sold in a period, for item counts and ingredient cost: units
+    // per product, and per modifier option the units of the items it was
+    // chosen on (an option's recipe is used once per unit, like the stock
+    // deduction at sale time).
+    const soldUnits = async (from: string, to: string) => {
+      const [byProduct, byModifier] = await Promise.all([
+        db.select({ productId: orderItems.productId, quantity: sql<number>`sum(${orderItems.quantity})` })
+          .from(orderItems)
+          .innerJoin(orders, eq(orderItems.orderId, orders.id))
+          .where(completedBetween(from, to))
+          .groupBy(orderItems.productId)
+          .all(),
+        db.select({
+          productId: orderItems.productId,
+          modifierId: orderItemModifiers.modifierId,
+          quantity: sql<number>`sum(${orderItems.quantity})`,
+        })
+          .from(orderItemModifiers)
+          .innerJoin(orderItems, eq(orderItemModifiers.orderItemId, orderItems.id))
+          .innerJoin(orders, eq(orderItems.orderId, orders.id))
+          .where(completedBetween(from, to))
+          .groupBy(orderItems.productId, orderItemModifiers.modifierId)
+          .all(),
+      ]);
+      return { byProduct, byModifier };
+    };
+
+    const summarize = async (from: string, to: string, unitCosts: Awaited<ReturnType<typeof loadUnitCosts>>) => {
+      const [row, voided, sold] = await Promise.all([
+        db.select({
+          totalOrders: sql<number>`count(${orders.id})`,
+          grossRevenue: sql<number>`coalesce(sum(${orders.subtotal}), 0)`,
+          totalTax: sql<number>`coalesce(sum(${orders.taxAmount}), 0)`,
+          totalDiscounts: sql<number>`coalesce(sum(${orders.discountAmount}), 0)`,
+          netRevenue: sql<number>`coalesce(sum(${orders.totalAmount}), 0)`,
+        }).from(orders).where(completedBetween(from, to)).get(),
+        // Voided sales, by when they were rung up - money that was taken and
+        // given back, worth watching.
+        db.select({
+          count: sql<number>`count(${orders.id})`,
+          amount: sql<number>`coalesce(sum(${orders.totalAmount}), 0)`,
+        }).from(orders).where(and(
+          gte(localCreatedAt, `${from} 00:00:00`),
+          lte(localCreatedAt, `${to} 23:59:59`),
+          eq(orders.status, 'VOIDED'),
+        )).get(),
+        soldUnits(from, to),
+      ]);
+      const ingredientCost = sold.byProduct.reduce((sum, line) => sum + line.quantity * (unitCosts.productCost.get(line.productId) ?? 0), 0)
+        + sold.byModifier.reduce((sum, line) => sum + line.quantity * (unitCosts.modifierCost.get(line.modifierId) ?? 0), 0);
+      const grossRevenue = row?.grossRevenue ?? 0;
+      const totalDiscounts = row?.totalDiscounts ?? 0;
       return {
         totalOrders: row?.totalOrders ?? 0,
-        grossRevenue: round2(row?.grossRevenue ?? 0),
+        itemsSold: sold.byProduct.reduce((sum, line) => sum + line.quantity, 0),
+        grossRevenue: round2(grossRevenue),
         totalTax: round2(row?.totalTax ?? 0),
-        totalDiscounts: round2(row?.totalDiscounts ?? 0),
+        totalDiscounts: round2(totalDiscounts),
         netRevenue: round2(row?.netRevenue ?? 0),
+        // Sales before tax and after discounts, less what the ingredients cost.
+        ingredientCost: round2(ingredientCost),
+        grossProfit: round2(grossRevenue - totalDiscounts - ingredientCost),
+        voidedOrders: voided?.count ?? 0,
+        voidedAmount: round2(voided?.amount ?? 0),
+        sold,
       };
     };
 
     try {
-      const [metrics, previousMetrics] = await Promise.all([
-        summarize(startDate, endDate),
-        summarize(previousStartDate, previousEndDate),
+      const unitCosts = await loadUnitCosts();
+      const [{ sold, ...metrics }, { sold: _previousSold, ...previousMetrics }] = await Promise.all([
+        summarize(startDate, endDate, unitCosts),
+        summarize(previousStartDate, previousEndDate, unitCosts),
       ]);
 
       // Riel legs are converted back to USD via each row's own snapshotted
@@ -1826,7 +1910,35 @@ function createApp() {
         .groupBy(orderItems.productId)
         .orderBy(desc(productRevenue))
         .all();
-      const topProducts = productRows.map((row) => ({ ...row, revenue: round2(row.revenue) }));
+      // Each product's ingredient cost (its own recipe plus the options
+      // chosen on it) and profit before order discounts. costComplete is
+      // false when part of it is unknown - no recipe, or an ingredient with
+      // no cost - so the profit shown is too high.
+      const modifierLinesByProduct = new Map<string, typeof sold.byModifier>();
+      for (const line of sold.byModifier) {
+        modifierLinesByProduct.set(line.productId, [...(modifierLinesByProduct.get(line.productId) ?? []), line]);
+      }
+      const uncostedIngredients = new Set<string>();
+      let productsWithoutRecipe = 0;
+      const topProducts = productRows.map((row) => {
+        const modifierLines = modifierLinesByProduct.get(row.productId) ?? [];
+        const cost = row.quantity * (unitCosts.productCost.get(row.productId) ?? 0)
+          + modifierLines.reduce((sum, line) => sum + line.quantity * (unitCosts.modifierCost.get(line.modifierId) ?? 0), 0);
+        const hasRecipe = unitCosts.productUncosted.has(row.productId);
+        const missing = [
+          ...(unitCosts.productUncosted.get(row.productId) ?? []),
+          ...modifierLines.flatMap((line) => [...(unitCosts.modifierUncosted.get(line.modifierId) ?? [])]),
+        ];
+        missing.forEach((name) => uncostedIngredients.add(name));
+        if (!hasRecipe) productsWithoutRecipe += 1;
+        return {
+          ...row,
+          revenue: round2(row.revenue),
+          cost: round2(cost),
+          profit: round2(row.revenue - cost),
+          costComplete: hasRecipe && missing.length === 0,
+        };
+      });
 
       res.json({
         dateRange: { startDate, endDate },
@@ -1836,6 +1948,9 @@ function createApp() {
         hourlyVolume,
         dailyVolume,
         topProducts,
+        // Why profit may be too high: products sold that have no recipe, and
+        // ingredients used with no cost entered.
+        costCoverage: { productsWithoutRecipe, uncostedIngredients: [...uncostedIngredients].sort() },
       });
     } catch (error) {
       console.error('Daily summary report error:', error);

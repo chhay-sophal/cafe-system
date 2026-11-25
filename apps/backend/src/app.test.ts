@@ -555,6 +555,18 @@ describe('daily summary date range (store-local timezone)', () => {
     await db.insert(products).values({ id: productId, categoryId, name: 'Report Latte', basePrice: 4 }).run();
     await db.insert(modifierGroups).values({ id: groupId, name: 'Report Milk' }).run();
     await db.insert(modifiers).values({ id: modifierId, groupId, name: 'Report Oat', priceExtra: 0.5 }).run();
+    // Recipes: 18g beans at $0.02/g per latte ($0.36), 100ml oat milk at
+    // $0.003/ml per oat option ($0.30).
+    const beansId = randomUUID();
+    const oatMilkId = randomUUID();
+    await db.insert(inventoryItems).values([
+      { id: beansId, name: 'Report Beans', unit: 'g', stockQuantity: 1000, costPerUnit: 0.02 },
+      { id: oatMilkId, name: 'Report Oat Milk', unit: 'ml', stockQuantity: 1000, costPerUnit: 0.003 },
+    ]).run();
+    await db.insert(recipes).values([
+      { id: randomUUID(), productId, inventoryItemId: beansId, quantityRequired: 18 },
+      { id: randomUUID(), modifierId, inventoryItemId: oatMilkId, quantityRequired: 100 },
+    ]).run();
 
     // Store-local days (UTC+7): the range is Aug 30 - Sep 1, so the previous
     // period is Aug 27 - 29.
@@ -583,9 +595,17 @@ describe('daily summary date range (store-local timezone)', () => {
         { date: '2026-08-31', orderCount: 0, revenue: 0 },
         { date: '2026-09-01', orderCount: 1, revenue: 3 },
       ]);
+      // Cost: 2 lattes x $0.36 + 1 oat option x $0.30.
       expect(report.body.topProducts).toEqual([
-        { productId, productName: 'Report Latte', categoryName: 'Report Drinks', quantity: 2, revenue: 7.5 },
+        {
+          productId, productName: 'Report Latte', categoryName: 'Report Drinks', quantity: 2, revenue: 7.5,
+          cost: 1.02, profit: 6.48, costComplete: true,
+        },
       ]);
+      expect(report.body.metrics).toMatchObject({
+        totalOrders: 2, itemsSold: 2, ingredientCost: 1.02, grossProfit: 6.48, voidedOrders: 1, voidedAmount: 4,
+      });
+      expect(report.body.costCoverage).toEqual({ productsWithoutRecipe: 0, uncostedIngredients: [] });
       expect(report.body.previousPeriod.startDate).toBe('2026-08-27');
       expect(report.body.previousPeriod.endDate).toBe('2026-08-29');
       expect(report.body.previousPeriod.metrics).toMatchObject({ totalOrders: 1, netRevenue: 2 });
@@ -593,6 +613,10 @@ describe('daily summary date range (store-local timezone)', () => {
       await db.delete(orderItemModifiers).run();
       await db.delete(orderItems).run();
       await db.delete(orders).run();
+      await db.delete(recipes).where(eq(recipes.productId, productId)).run();
+      await db.delete(recipes).where(eq(recipes.modifierId, modifierId)).run();
+      await db.delete(inventoryItems).where(eq(inventoryItems.id, beansId)).run();
+      await db.delete(inventoryItems).where(eq(inventoryItems.id, oatMilkId)).run();
       await db.delete(modifiers).where(eq(modifiers.id, modifierId)).run();
       await db.delete(modifierGroups).where(eq(modifierGroups.id, groupId)).run();
       await db.delete(products).where(eq(products.id, productId)).run();
