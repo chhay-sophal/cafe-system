@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
+import { ChevronRight } from "@lucide/vue";
 import type { DailySummaryMetrics } from "~/types/reports";
+import type { SummaryCardKey } from "./SummaryCardDetail.vue";
 
 const { t } = useI18n();
 const store = useReportsStore();
@@ -31,6 +33,7 @@ function marginOf(metrics: DailySummaryMetrics | undefined): number | null {
 }
 
 interface Card {
+  key: SummaryCardKey;
   label: string;
   value: string;
   subValue: string | null;
@@ -47,6 +50,7 @@ const cards = computed<Card[]>(() => {
   const list: Card[] = [
     {
       // What customers paid, after discounts - the money that came in.
+      key: "netRevenue",
       label: t("summaryCards.netRevenue"),
       ...money(current?.netRevenue ?? 0),
       change: changeFrom(current?.netRevenue ?? 0, previous?.netRevenue ?? 0),
@@ -54,6 +58,7 @@ const cards = computed<Card[]>(() => {
   ];
   if (current?.grossProfit !== undefined) {
     list.push({
+      key: "grossProfit",
       label: t("summaryCards.grossProfit"),
       value: formatMain(current.grossProfit),
       subValue: margin === null ? null : t("summaryCards.margin", { percent: margin }),
@@ -62,6 +67,7 @@ const cards = computed<Card[]>(() => {
   }
   list.push(
     {
+      key: "orders",
       label: t("summaryCards.orders"),
       value: String(current?.totalOrders ?? 0),
       subValue: null,
@@ -70,6 +76,7 @@ const cards = computed<Card[]>(() => {
   );
   if (current?.itemsSold !== undefined) {
     list.push({
+      key: "itemsSold",
       label: t("summaryCards.itemsSold"),
       value: String(current.itemsSold),
       subValue: null,
@@ -77,7 +84,8 @@ const cards = computed<Card[]>(() => {
     });
   }
   list.push({
-    label: t("summaryCards.averageOrderValue"),
+    key: "averageOrderValue",
+      label: t("summaryCards.averageOrderValue"),
     ...money(averageOrderValue(current)),
     change: changeFrom(averageOrderValue(current), averageOrderValue(previous)),
   });
@@ -85,6 +93,7 @@ const cards = computed<Card[]>(() => {
     // Money taken and given back, and given away - no "vs previous" arrow,
     // since up is bad here and the colours would say the opposite.
     list.push({
+      key: "voids",
       label: t("summaryCards.voidsAndDiscounts"),
       value: t("summaryCards.voids", current.voidedOrders),
       subValue: t("summaryCards.voidsDetail", {
@@ -111,6 +120,10 @@ const costWarning = computed(() => {
   return parts.length > 0 ? parts.join(" ") : null;
 });
 
+// Clicking a card opens what's behind it (SummaryCardDetail).
+const openCard = ref<SummaryCardKey | null>(null);
+const openCardTitle = computed(() => cards.value.find((card) => card.key === openCard.value)?.label ?? "");
+
 // Arrow plus sign plus text, so the direction never rests on colour alone.
 const CHANGE_STYLE = {
   up: { arrow: "▲", class: "text-emerald-700" },
@@ -125,8 +138,18 @@ const CHANGE_STYLE = {
       class="grid grid-cols-1 gap-4 transition-opacity duration-150 sm:grid-cols-2 lg:grid-cols-3"
       :class="{ 'opacity-50': store.isLoading && store.hasLoadedOnce }"
     >
-      <div v-for="card in cards" :key="card.label" class="rounded-lg border border-slate-200 bg-white p-4">
-        <p class="text-sm text-slate-500">{{ card.label }}</p>
+      <button
+        v-for="card in cards"
+        :key="card.key"
+        type="button"
+        class="group rounded-lg border border-slate-200 bg-white p-4 text-left transition hover:border-slate-300 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        :aria-label="t('summaryCards.showDetails', { name: card.label })"
+        @click="openCard = card.key"
+      >
+        <p class="flex items-center justify-between text-sm text-slate-500">
+          {{ card.label }}
+          <ChevronRight class="h-4 w-4 text-slate-300 transition group-hover:text-slate-500" aria-hidden="true" />
+        </p>
         <p class="mt-1 text-2xl font-semibold text-slate-900">{{ card.value }}</p>
         <p v-if="card.subValue" class="mt-0.5 text-xs text-slate-400">{{ card.subValue }}</p>
         <p v-if="card.change" class="mt-2 text-xs">
@@ -136,10 +159,12 @@ const CHANGE_STYLE = {
           </span>
           <span class="ml-1 text-slate-400">{{ t("summaryCards.vsPrevious", periodDays) }}</span>
         </p>
-      </div>
+      </button>
     </div>
     <p v-if="costWarning" class="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
       {{ t("summaryCards.profitIncomplete") }} {{ costWarning }}
     </p>
+
+    <SummaryCardDetail v-model:metric="openCard" :title="openCardTitle" />
   </div>
 </template>

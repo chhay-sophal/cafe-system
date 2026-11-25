@@ -238,7 +238,5 @@ function openDetail(order: OrderSummary) {
     </div>
 
     <TablePagination :table="table" />
-
-    <OrderDetailModal />
   </div>
 </template>

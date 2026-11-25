@@ -20,6 +20,14 @@ watch(
     if (isVisible.value) store.loadIfStale();
   },
 );
+// An order voided or edited from a card's details marks the report stale
+// (stores/orders.ts) - reload it while it's on screen.
+watch(
+  () => store.loadedRange,
+  (range) => {
+    if (range === null && isVisible.value && store.hasLoadedOnce) store.loadIfStale();
+  },
+);
 </script>
 
 <template>

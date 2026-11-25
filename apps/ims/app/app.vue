@@ -353,6 +353,8 @@ watch(
     <InventoryItemModal v-model:open="isItemModalOpen" :item="editingItem" />
     <DeleteConfirmationDialog v-model:open="isDeleteOpen" :item="deletingItem" />
     <UnsavedChangesDialog v-model:open="isUnsavedDialogOpen" @leave="confirmLeaveSettings" />
+    <!-- One for the whole app: Sales History and Analytics both open orders. -->
+    <OrderDetailModal />
     <UserFormModal v-if="isAdmin" v-model:open="isUserModalOpen" :user="editingUser" />
     <ProductFormModal v-model:open="isProductModalOpen" :product="editingProduct" />
     <ProductDeleteConfirmModal v-model:open="isProductDeleteOpen" :product="deletingProduct" />
