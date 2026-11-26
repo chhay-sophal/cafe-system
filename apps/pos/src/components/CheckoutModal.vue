@@ -7,7 +7,9 @@ import { useAuth } from "../composables/useAuth";
 import { useExchangeRate } from "../composables/useExchangeRate";
 import { formatFastCashLabel, useFastCash } from "../composables/useFastCash";
 import { publishPaymentQr, publishSaleCompleted } from "../composables/useCustomerDisplayChannel";
+import { useBakong } from "../composables/useBakong";
 import { useKhqrBanks } from "../composables/useKhqrBanks";
+import { useKhqrPayment } from "../composables/useKhqrPayment";
 import { useNetworkStatus } from "../composables/useNetworkStatus";
 import { useOfflineQueue } from "../composables/useOfflineQueue";
 import { useSalesHistory } from "../composables/useSalesHistory";
@@ -98,7 +100,55 @@ const isQrPayment = computed(() => paymentMethod.value === "QR_CODE");
 // to scan. With none set up, it works as before (customer scans elsewhere).
 const isMissingBank = computed(() => isQrPayment.value && khqrBanks.banks.value.length > 0 && !selectedBank.value);
 
-const canComplete = computed(() => !isInsufficient.value && !isMissingBank.value);
+// Mobile Pay through Bakong KHQR: with the store's Bakong account set up and
+// the register online, Mobile Pay shows a QR for the exact amount and
+// completes the sale by itself once Bakong confirms payment. The cashier can
+// switch to the bank QR images instead (e.g. the customer's app has trouble)
+// and complete by hand, as before.
+const bakong = useBakong();
+const preferBankQr = ref(false);
+// The paid QR's md5, kept for the sale - and for a retry if saving it failed.
+const paidKhqrMd5 = ref<string | null>(null);
+const isKhqrMode = computed(
+  () => isQrPayment.value && bakong.isEnabled.value && network.isOnline.value && !preferBankQr.value,
+);
+const khqrPayment = useKhqrPayment({
+  token: () => props.token,
+  onPaid(md5) {
+    paidKhqrMd5.value = md5;
+    void handleComplete();
+  },
+});
+
+function startKhqr() {
+  // In the currency the customer sees the total in; riel as shown (rounded).
+  const isKhr = mainCurrency.value === "KHR";
+  void khqrPayment.start(isKhr ? exactTotalRiel.value : props.totalAmount, isKhr ? "KHR" : "USD");
+}
+
+watch(
+  [isKhqrMode, phase],
+  ([khqrMode, currentPhase]) => {
+    if (!khqrMode || paidKhqrMd5.value) {
+      if (!paidKhqrMd5.value) khqrPayment.reset();
+      return;
+    }
+    if (currentPhase === "payment" && khqrPayment.state.value === "idle") {
+      startKhqr();
+    }
+  },
+  { immediate: true },
+);
+
+function formatCountdown(seconds: number): string {
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+// KHQR completes itself once paid; Complete is for everything else.
+const canComplete = computed(() =>
+  (isQrPayment.value && paidKhqrMd5.value !== null)
+  || (!isKhqrMode.value && !isInsufficient.value && !isMissingBank.value),
+);
 
 const successLabel = computed(() => {
   if (isQueuedOffline.value) {
@@ -148,12 +198,21 @@ function selectPaymentMethod(method: PaymentMethod) {
 // off - with the tender preset that method needs.
 selectPaymentMethod(enabledMethods.value[0]);
 
-// The customer display shows the chosen bank's KHQR while payment is in
-// progress, and drops it once the sale succeeds or checkout is closed.
-watch([selectedBank, isQrPayment, phase], () => {
+// The customer display shows the QR to scan while payment is in progress -
+// the exact-amount KHQR, or the chosen bank's - and drops it once the sale
+// succeeds or checkout is closed.
+watch([selectedBank, isQrPayment, isKhqrMode, khqrPayment.image, khqrPayment.state, phase], () => {
+  if (!isQrPayment.value || phase.value === "success") {
+    publishPaymentQr(null);
+    return;
+  }
+  if (isKhqrMode.value) {
+    const image = khqrPayment.image.value;
+    publishPaymentQr(image && khqrPayment.state.value === "waiting" ? { bankName: "KHQR", qrImage: image } : null);
+    return;
+  }
   const bank = selectedBank.value;
-  const showQr = bank && isQrPayment.value && phase.value !== "success";
-  publishPaymentQr(showQr ? { bankName: bank.name, qrImage: bank.qrImage } : null);
+  publishPaymentQr(bank ? { bankName: bank.name, qrImage: bank.qrImage } : null);
 });
 
 onUnmounted(() => publishPaymentQr(null));
@@ -239,6 +298,7 @@ function buildOrderPayload(): OrderPayload {
     amountTenderedRiel: amountTenderedRiel.value,
     taxAmount: props.taxAmount,
     discountAmount: props.discountAmount,
+    ...(isQrPayment.value && paidKhqrMd5.value ? { khqrMd5: paidKhqrMd5.value } : {}),
   };
 }
 
@@ -534,6 +594,33 @@ function handleDone() {
             <button type="button" class="tendered-clear" @click="clearTendered">{{ t("common.clear") }}</button>
           </template>
 
+          <div v-else-if="isQrPayment && isKhqrMode" class="khqr" aria-live="polite">
+            <template v-if="paidKhqrMd5">
+              <p class="khqr__paid">✓ {{ t("checkout.khqr.paid") }}</p>
+            </template>
+            <template v-else-if="khqrPayment.state.value === 'waiting' && khqrPayment.image.value">
+              <img :src="khqrPayment.image.value" :alt="t('checkout.khqr.alt')" class="khqr__image" />
+              <p class="khqr__amount">{{ format(totalAmount) }}</p>
+              <p class="khqr__hint">{{ t("checkout.khqr.scan") }}</p>
+              <p class="khqr__waiting">
+                {{ t("checkout.khqr.waiting", { time: formatCountdown(khqrPayment.secondsLeft.value) }) }}
+              </p>
+            </template>
+            <template v-else-if="khqrPayment.state.value === 'expired'">
+              <p class="khqr__message">{{ t("checkout.khqr.expired") }}</p>
+              <button type="button" class="payment-method" @click="startKhqr">{{ t("checkout.khqr.newQr") }}</button>
+            </template>
+            <template v-else-if="khqrPayment.state.value === 'error'">
+              <p class="khqr__message khqr__message--error">{{ khqrPayment.error.value }}</p>
+              <button type="button" class="payment-method" @click="startKhqr">{{ t("common.tryAgain") }}</button>
+            </template>
+            <p v-else class="khqr__message">{{ t("checkout.khqr.creating") }}</p>
+
+            <button v-if="!paidKhqrMd5" type="button" class="khqr__switch" @click="preferBankQr = true">
+              {{ t("checkout.khqr.useBankQr") }}
+            </button>
+          </div>
+
           <div v-else-if="isQrPayment" class="qr-banks">
             <span class="qr-banks__label">{{ t("checkout.chooseBank") }}</span>
             <p v-if="khqrBanks.banks.value.length === 0" class="checkout-pay__note">{{ t("checkout.noBanks") }}</p>
@@ -549,6 +636,14 @@ function handleDone() {
                 {{ bank.name }}
               </button>
             </div>
+            <button
+              v-if="bakong.isEnabled.value && network.isOnline.value"
+              type="button"
+              class="khqr__switch"
+              @click="preferBankQr = false"
+            >
+              {{ t("checkout.khqr.useKhqr") }}
+            </button>
           </div>
 
           <p v-else class="checkout-pay__note">{{ t("checkout.cardNote") }}</p>
@@ -560,7 +655,8 @@ function handleDone() {
             <span v-else>{{ t("checkout.changeDue", { amount: formatChangeAmount(changeSplit.usd, changeSplit.riel) }) }}</span>
           </div>
 
-          <button type="button" class="checkout-modal__complete" :disabled="!canComplete" @click="handleComplete">
+          <p v-if="isKhqrMode && !paidKhqrMd5" class="khqr__auto">{{ t("checkout.khqr.completesItself") }}</p>
+          <button v-else type="button" class="checkout-modal__complete" :disabled="!canComplete" @click="handleComplete">
             {{ t("checkout.completePayment") }}
           </button>
         </div>
@@ -793,6 +889,76 @@ function handleDone() {
   background: var(--color-primary);
   border-color: var(--color-primary);
   color: #ffffff;
+}
+
+.khqr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: center;
+}
+
+.khqr__image {
+  width: min(240px, 100%);
+  height: auto;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 0.5rem;
+  border: 2px solid #e2e2e2;
+}
+
+.khqr__amount {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+.khqr__hint,
+.khqr__waiting,
+.khqr__auto {
+  margin: 0;
+  color: #777777;
+  font-size: 0.9rem;
+}
+
+.khqr__waiting {
+  font-variant-numeric: tabular-nums;
+}
+
+.khqr__auto {
+  flex: 1;
+  text-align: center;
+  font-weight: 600;
+}
+
+.khqr__message {
+  margin: 1rem 0 0.5rem;
+  color: #555555;
+  font-weight: 600;
+}
+
+.khqr__message--error {
+  color: #c0392b;
+}
+
+.khqr__paid {
+  margin: 2rem 0;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #1e7a3c;
+}
+
+.khqr__switch {
+  margin-top: 0.25rem;
+  border: none;
+  background: none;
+  color: #777777;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+  min-height: 44px;
 }
 
 .qr-banks {

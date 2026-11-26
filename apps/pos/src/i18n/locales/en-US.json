@@ -75,7 +75,19 @@
     },
     "chooseBank": "Bank",
     "noBanks": "No banks set up - add them in Settings → KHQR to show a QR code to the customer.",
-    "cardNote": "Take the card payment on the card terminal, then press Complete Payment."
+    "cardNote": "Take the card payment on the card terminal, then press Complete Payment.",
+    "khqr": {
+      "creating": "Creating the KHQR...",
+      "alt": "KHQR to pay this sale",
+      "scan": "Scan with any Cambodian banking app",
+      "waiting": "Waiting for payment · expires in {time}",
+      "paid": "Paid - saving the sale...",
+      "expired": "This QR has expired.",
+      "newQr": "New QR",
+      "useBankQr": "Use bank QR instead",
+      "useKhqr": "Use KHQR with the exact amount",
+      "completesItself": "Completes by itself once Bakong confirms payment"
+    }
   },
   "modifier": {
     "customizeAria": "Customize {name}",
@@ -332,6 +344,16 @@
       "add": "Add Bank",
       "adding": "Adding...",
       "addError": "Couldn't add the bank. Check the file is an image and try again."
+    },
+    "bakong": {
+      "heading": "Bakong KHQR",
+      "hint": "With a Bakong account here, Mobile Pay shows a QR with the exact amount and completes the sale by itself once paid. Leave the account empty to use only the bank QR images below. Shared with IMS.",
+      "accountId": "Bakong account ID",
+      "accountIdInvalid": "Enter the account as name{'@'}bank, e.g. lysin_cafe{'@'}aclb.",
+      "merchantName": "Name shown to the customer",
+      "merchantCity": "City",
+      "save": "Save",
+      "saved": "Saved"
     },
     "about": {
       "version": "Version",

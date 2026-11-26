@@ -25,6 +25,8 @@ export interface OrderPayload {
   amountTenderedRiel?: number;
   taxAmount?: number;
   discountAmount?: number;
+  // The KHQR's md5 when a Mobile Pay sale was paid through Bakong.
+  khqrMd5?: string;
 }
 
 export interface OrderResult {

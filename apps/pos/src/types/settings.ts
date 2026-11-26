@@ -22,6 +22,7 @@ export interface PosSettings {
   khqrBanks: Array<{ id: string; name: string; imageUrl: string }>;
   language: "en-US" | "km-KH";
   hideUnavailableItems: boolean;
+  bakong: { accountId: string; merchantName: string; merchantCity: string };
 }
 
 export interface PosSettingsResponse {

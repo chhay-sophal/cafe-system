@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { getVersion } from "@tauri-apps/api/app";
 import type { Update } from "@tauri-apps/plugin-updater";
-import { computed, onMounted, ref, shallowRef } from "vue";
+import { computed, onMounted, ref, shallowRef, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { setLocale } from "../i18n";
 import { checkForUpdate, installUpdate, updatesEnabled } from "../composables/useAppUpdater";
+import { useBakong, type BakongAccount } from "../composables/useBakong";
 import { useKhqrBanks } from "../composables/useKhqrBanks";
 import { useMenuDisplay } from "../composables/useMenuDisplay";
 import { useNetworkStatus } from "../composables/useNetworkStatus";
@@ -58,6 +59,29 @@ const { customName: customStoreName, storeName, setStoreName } = useStoreName();
 // Edited as a draft and saved on blur/Enter (the input's change event), so
 // the header and customer display don't update on every keystroke.
 const storeNameDraft = ref(customStoreName.value);
+
+// Bakong KHQR account (store-wide, shared with IMS). Edited as a draft and
+// saved together; an empty account id turns exact-amount QRs off.
+const bakong = useBakong();
+const bakongDraft = ref<BakongAccount>({ ...bakong.account.value });
+const bakongSaved = ref(false);
+watch(bakong.account, (account) => {
+  bakongDraft.value = { ...account };
+});
+const isBakongAccountValid = computed(() => {
+  const id = bakongDraft.value.accountId.trim();
+  return id === "" || /^[^\s@]+@[^\s@]+$/.test(id);
+});
+const isBakongDirty = computed(() => JSON.stringify(bakongDraft.value) !== JSON.stringify(bakong.account.value));
+
+function saveBakong() {
+  if (!isBakongAccountValid.value) {
+    return;
+  }
+  bakong.setAccount(bakongDraft.value);
+  bakongSaved.value = true;
+  setTimeout(() => (bakongSaved.value = false), 2500);
+}
 
 function saveStoreName() {
   setStoreName(storeNameDraft.value);
@@ -417,6 +441,40 @@ function handleRemoveBank(id: string) {
           {{ settingsPendingCount > 0 ? t("settings.sync.pending") : t("settings.sync.synced") }}
           <template v-if="settingsPushError"> – {{ settingsPushError }}</template>
         </p>
+        <form class="bakong-form" @submit.prevent="saveBakong">
+          <span class="settings-field__label">{{ t("settings.bakong.heading") }}</span>
+          <span class="settings-field__hint">{{ t("settings.bakong.hint") }}</span>
+          <label class="bakong-form__field">
+            <span>{{ t("settings.bakong.accountId") }}</span>
+            <input
+              v-model="bakongDraft.accountId"
+              type="text"
+              class="settings-input"
+              maxlength="32"
+              placeholder="name@bank"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </label>
+          <p v-if="!isBakongAccountValid" class="bakong-form__error">{{ t("settings.bakong.accountIdInvalid") }}</p>
+          <div class="bakong-form__row">
+            <label class="bakong-form__field">
+              <span>{{ t("settings.bakong.merchantName") }}</span>
+              <input v-model="bakongDraft.merchantName" type="text" class="settings-input" maxlength="25" />
+            </label>
+            <label class="bakong-form__field">
+              <span>{{ t("settings.bakong.merchantCity") }}</span>
+              <input v-model="bakongDraft.merchantCity" type="text" class="settings-input" maxlength="15" />
+            </label>
+          </div>
+          <div class="bakong-form__actions">
+            <span v-if="bakongSaved" class="bakong-form__saved">{{ t("settings.bakong.saved") }}</span>
+            <button type="submit" class="settings-choice__option" :disabled="!isBakongDirty || !isBakongAccountValid">
+              {{ t("settings.bakong.save") }}
+            </button>
+          </div>
+        </form>
+
         <p class="settings__intro">{{ t("settings.khqr.intro") }}</p>
 
         <p v-if="khqrBanks.banks.value.length === 0" class="settings__empty">{{ t("settings.khqr.empty") }}</p>
@@ -880,5 +938,54 @@ function handleRemoveBank(id: string) {
   background: var(--color-primary);
   border-color: var(--color-primary);
   color: var(--color-on-primary);
+}
+.bakong-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  border-radius: 14px;
+  border: 2px solid #e2e2e2;
+}
+
+.bakong-form__field {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  font-size: 0.85rem;
+  color: #777777;
+}
+
+.bakong-form__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.bakong-form__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.bakong-form__error {
+  margin: 0;
+  color: #c0392b;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.bakong-form__saved {
+  color: #1e7a3c;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+:where(:root[data-theme="dark"]) .bakong-form {
+  border-color: #3a3a3a;
 }
 </style>

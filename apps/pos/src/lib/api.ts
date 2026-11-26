@@ -136,6 +136,24 @@ export function submitOrder(payload: OrderPayload, token: string): Promise<Order
 }
 
 // No date params - the backend defaults to the store's local "today".
+// A Bakong KHQR for a sale's exact amount, in the currency shown to the
+// customer, and whether it's been paid (see backend src/lib/bakong.ts).
+export interface Khqr {
+  qrString: string;
+  md5: string;
+  amount: number;
+  currency: "USD" | "KHR";
+  expiresAt: string;
+}
+
+export function createKhqr(amount: number, currency: "USD" | "KHR", token: string): Promise<Khqr> {
+  return postJson<Khqr>("/api/payments/khqr", { amount, currency }, token);
+}
+
+export function fetchKhqrStatus(md5: string, token: string): Promise<{ md5: string; status: "PAID" | "PENDING" }> {
+  return getJson(`/api/payments/khqr/${encodeURIComponent(md5)}/status`, token);
+}
+
 // One day's totals for the end-of-day printout: this cashier's sales, or the
 // whole store's (managers and admins only).
 export function fetchEndOfDayReport(token: string, date: string, scope: "mine" | "all"): Promise<EndOfDayReport> {

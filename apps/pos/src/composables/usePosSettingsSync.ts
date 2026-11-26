@@ -5,6 +5,7 @@ import { onPosSettingChanged, type PosSettingsSection } from "../lib/settingsEve
 import type { PosSettings, PosSettingsResponse } from "../types/settings";
 import { useAuth } from "./useAuth";
 import { useFastCash } from "./useFastCash";
+import { useBakong } from "./useBakong";
 import { useKhqrBanks } from "./useKhqrBanks";
 import { useMenuDisplay } from "./useMenuDisplay";
 import { usePaymentMethods } from "./usePaymentMethods";
@@ -12,7 +13,8 @@ import { useStoreDetails } from "./useStoreDetails";
 import { useStoreName } from "./useStoreName";
 
 // Keeps the store-wide POS settings (store name & details, payment methods,
-// fast cash, KHQR banks, language, hiding unavailable items) in step with the server, where IMS edits
+// fast cash, KHQR banks, language, hiding unavailable items, Bakong account)
+// in step with the server, where IMS edits
 // them too.
 // The composables keep their local copies, so checkout works offline; this
 // moves changes both ways:
@@ -35,6 +37,7 @@ const ALL_SECTIONS: PosSettingsSection[] = [
   "khqrBanks",
   "language",
   "hideUnavailableItems",
+  "bakong",
 ];
 // PUT /api/settings/pos is for managers and admins only.
 const SAVE_ROLES = ["MANAGER", "ADMIN"];
@@ -99,6 +102,8 @@ async function sectionValue(section: PosSettingsSection, token: string): Promise
       return { language: i18n.global.locale.value as PosSettings["language"] };
     case "hideUnavailableItems":
       return { hideUnavailableItems: useMenuDisplay().hideUnavailableItems.value };
+    case "bakong":
+      return { bakong: { ...useBakong().account.value } };
     case "khqrBanks": {
       const khqr = useKhqrBanks();
       for (const bank of khqr.banks.value) {
@@ -179,6 +184,7 @@ async function syncPosSettings(prefetched?: PosSettingsResponse): Promise<void> 
   if (take("fastCash")) useFastCash().applyFromServer(settings.fastCash);
   if (take("language")) setLocale(settings.language, { fromServer: true });
   if (take("hideUnavailableItems")) useMenuDisplay().applyFromServer(settings.hideUnavailableItems);
+  if (take("bakong")) useBakong().applyFromServer(settings.bakong);
   if (take("khqrBanks")) await useKhqrBanks().applyFromServer(settings.khqrBanks).catch(() => {});
 
   await pushPending();
