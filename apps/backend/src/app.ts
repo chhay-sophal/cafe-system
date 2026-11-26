@@ -1958,6 +1958,106 @@ function createApp() {
     }
   });
 
+  // The end-of-day report a register prints when closing: one day's sales
+  // for the cashier asking (scope=mine, anyone) or the whole store
+  // (scope=all, managers and admins). The cash section is the money that
+  // should be in the drawer, per currency: what customers handed over less
+  // the change given back, in USD and in riel as they physically moved -
+  // the opening float isn't known here, so it's left to the cashier.
+  app.get('/api/reports/end-of-day', authenticate, async (req, res) => {
+    const date = (req.query.date as string) || storeTodayDateString();
+    const scope = req.query.scope === 'all' ? 'all' : 'mine';
+    if (!isDateString(date)) {
+      return res.status(400).json({ error: 'date must be YYYY-MM-DD' });
+    }
+    if (scope === 'all' && !['MANAGER', 'ADMIN'].includes(req.user?.role ?? '')) {
+      return res.status(403).json({ error: 'Only managers and admins can print the whole store\'s report' });
+    }
+
+    const localCreatedAt = sql`datetime(${orders.createdAt}, ${STORE_UTC_OFFSET_SQL_MODIFIER})`;
+    const onDay = and(
+      gte(localCreatedAt, `${date} 00:00:00`),
+      lte(localCreatedAt, `${date} 23:59:59`),
+      scope === 'mine' ? eq(orders.userId, req.user!.id) : undefined,
+    );
+    const completedOnDay = and(onDay, eq(orders.status, 'COMPLETED'));
+
+    try {
+      const [totals, voided, paymentRows, itemRows] = await Promise.all([
+        db.select({
+          orders: sql<number>`count(${orders.id})`,
+          gross: sql<number>`coalesce(sum(${orders.subtotal}), 0)`,
+          discounts: sql<number>`coalesce(sum(${orders.discountAmount}), 0)`,
+          tax: sql<number>`coalesce(sum(${orders.taxAmount}), 0)`,
+          net: sql<number>`coalesce(sum(${orders.totalAmount}), 0)`,
+          firstSaleAt: sql<string | null>`min(${localCreatedAt})`,
+          lastSaleAt: sql<string | null>`max(${localCreatedAt})`,
+        }).from(orders).where(completedOnDay).get(),
+        db.select({
+          count: sql<number>`count(${orders.id})`,
+          amount: sql<number>`coalesce(sum(${orders.totalAmount}), 0)`,
+        }).from(orders).where(and(onDay, eq(orders.status, 'VOIDED'))).get(),
+        db.select({
+          method: payments.paymentMethod,
+          count: sql<number>`count(${payments.id})`,
+          // Sale totals - what each method brought in.
+          amount: sql<number>`coalesce(sum(${orders.totalAmount}), 0)`,
+          tenderedUsd: sql<number>`coalesce(sum(${payments.amountTenderedUsd}), 0)`,
+          tenderedRiel: sql<number>`coalesce(sum(${payments.amountTenderedRiel}), 0)`,
+          changeUsd: sql<number>`coalesce(sum(${payments.changeGivenUsd}), 0)`,
+          changeRiel: sql<number>`coalesce(sum(${payments.changeGivenRiel}), 0)`,
+        }).from(payments).innerJoin(orders, eq(payments.orderId, orders.id)).where(completedOnDay).groupBy(payments.paymentMethod).all(),
+        db.select({
+          name: sql<string>`max(${orderItems.productName})`,
+          quantity: sql<number>`sum(${orderItems.quantity})`,
+          amount: sql<number>`sum((${orderItems.unitPrice} + coalesce((
+            select sum(${orderItemModifiers.priceExtra}) from ${orderItemModifiers}
+            where ${orderItemModifiers.orderItemId} = ${orderItems.id}
+          ), 0)) * ${orderItems.quantity})`,
+        }).from(orderItems).innerJoin(orders, eq(orderItems.orderId, orders.id)).where(completedOnDay)
+          .groupBy(orderItems.productId)
+          .orderBy(desc(sql`sum(${orderItems.quantity})`))
+          .all(),
+      ]);
+
+      const cash = paymentRows.find((row) => row.method === 'CASH');
+      const cashierName = scope === 'mine'
+        ? (await db.select({ name: users.name }).from(users).where(eq(users.id, req.user!.id)).get())?.name ?? null
+        : null;
+
+      res.json({
+        date,
+        scope,
+        cashierName,
+        firstSaleAt: totals?.firstSaleAt ?? null,
+        lastSaleAt: totals?.lastSaleAt ?? null,
+        orders: totals?.orders ?? 0,
+        itemsSold: itemRows.reduce((sum, row) => sum + row.quantity, 0),
+        voided: { count: voided?.count ?? 0, amount: round2(voided?.amount ?? 0) },
+        sales: {
+          gross: round2(totals?.gross ?? 0),
+          discounts: round2(totals?.discounts ?? 0),
+          tax: round2(totals?.tax ?? 0),
+          net: round2(totals?.net ?? 0),
+        },
+        payments: paymentRows.map((row) => ({ method: row.method, count: row.count, amount: round2(row.amount) })),
+        cash: {
+          tenderedUsd: round2(cash?.tenderedUsd ?? 0),
+          tenderedRiel: Math.round(cash?.tenderedRiel ?? 0),
+          changeUsd: round2(cash?.changeUsd ?? 0),
+          changeRiel: Math.round(cash?.changeRiel ?? 0),
+          // In the drawer from today's cash sales, per currency.
+          inDrawerUsd: round2((cash?.tenderedUsd ?? 0) - (cash?.changeUsd ?? 0)),
+          inDrawerRiel: Math.round((cash?.tenderedRiel ?? 0) - (cash?.changeRiel ?? 0)),
+        },
+        items: itemRows.map((row) => ({ name: row.name, quantity: row.quantity, amount: round2(row.amount) })),
+      });
+    } catch (error) {
+      console.error('End-of-day report error:', error);
+      res.status(500).json({ error: 'Failed to generate the end-of-day report' });
+    }
+  });
+
   return app;
 }
 

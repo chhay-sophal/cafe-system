@@ -661,6 +661,96 @@ describe('daily summary date range (store-local timezone)', () => {
   });
 });
 
+describe('end-of-day report', () => {
+  beforeEach(async () => {
+    await db.delete(payments).run();
+    await db.delete(orderItemModifiers).run();
+    await db.delete(orderItems).run();
+    await db.delete(orders).run();
+    await db.delete(stockAdjustments).run();
+    await db.delete(users).run();
+  });
+
+  async function tokenFor(id: string, role: 'CASHIER' | 'MANAGER') {
+    await db.insert(users).values({ id, name: `Name ${id}`, pinHash: await hashPin(id), role, isActive: true }).run();
+    return signToken({ id, name: `Name ${id}`, role });
+  }
+
+  // Store-local Sep 1 (UTC+7) - 03:00 UTC is 10:00 local.
+  async function sale(options: {
+    id: string; userId: string; total: number; discount?: number; status?: 'COMPLETED' | 'VOIDED'; method: 'CASH' | 'CARD';
+    tenderedUsd?: number; tenderedRiel?: number; changeUsd?: number; changeRiel?: number; productId: string; quantity: number;
+  }) {
+    await db.insert(orders).values({
+      id: options.id, userId: options.userId, orderNumber: 1, subtotal: options.total + (options.discount ?? 0),
+      discountAmount: options.discount ?? 0, totalAmount: options.total, status: options.status ?? 'COMPLETED', createdAt: '2026-09-01 03:00:00',
+    }).run();
+    await db.insert(orderItems).values({
+      id: `${options.id}-item`, orderId: options.id, productId: options.productId, productName: 'EOD Latte',
+      quantity: options.quantity, unitPrice: (options.total + (options.discount ?? 0)) / options.quantity, totalPrice: options.total,
+    }).run();
+    await db.insert(payments).values({
+      id: `${options.id}-pay`, orderId: options.id, paymentMethod: options.method, exchangeRateRielPerUsd: 4000,
+      amountTenderedUsd: options.tenderedUsd ?? 0, amountTenderedRiel: options.tenderedRiel ?? 0,
+      changeGivenUsd: options.changeUsd ?? 0, changeGivenRiel: options.changeRiel ?? 0,
+    }).run();
+  }
+
+  it("totals a cashier's own day, with the cash in the drawer per currency", async () => {
+    const cashier = await tokenFor('eod-cashier', 'CASHIER');
+    await tokenFor('eod-other', 'CASHIER');
+    const categoryId = randomUUID();
+    const productId = randomUUID();
+    await db.insert(categories).values({ id: categoryId, name: 'EOD' }).run();
+    await db.insert(products).values({ id: productId, categoryId, name: 'EOD Latte', basePrice: 2 }).run();
+
+    try {
+      // $10 note for a $8 sale, change 8,000 riel; a $4 card sale with a $1
+      // discount; a voided sale; and another cashier's sale.
+      await sale({ id: 'eod-1', userId: 'eod-cashier', total: 8, method: 'CASH', tenderedUsd: 10, changeRiel: 8000, productId, quantity: 4 });
+      await sale({ id: 'eod-2', userId: 'eod-cashier', total: 3, discount: 1, method: 'CARD', productId, quantity: 2 });
+      await sale({ id: 'eod-3', userId: 'eod-cashier', total: 5, status: 'VOIDED', method: 'CASH', tenderedUsd: 5, productId, quantity: 1 });
+      await sale({ id: 'eod-4', userId: 'eod-other', total: 6, method: 'CASH', tenderedRiel: 24000, productId, quantity: 3 });
+
+      const response = await request(app).get('/api/reports/end-of-day?date=2026-09-01').set('Authorization', `Bearer ${cashier}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({
+        date: '2026-09-01',
+        scope: 'mine',
+        cashierName: 'Name eod-cashier',
+        orders: 2,
+        itemsSold: 6,
+        voided: { count: 1, amount: 5 },
+        sales: { gross: 12, discounts: 1, tax: 0, net: 11 },
+        cash: { tenderedUsd: 10, tenderedRiel: 0, changeUsd: 0, changeRiel: 8000, inDrawerUsd: 10, inDrawerRiel: -8000 },
+        items: [{ name: 'EOD Latte', quantity: 6, amount: 12 }],
+      });
+      expect(response.body.payments).toEqual(expect.arrayContaining([
+        { method: 'CASH', count: 1, amount: 8 },
+        { method: 'CARD', count: 1, amount: 3 },
+      ]));
+
+      // The whole store is for managers only.
+      expect((await request(app).get('/api/reports/end-of-day?date=2026-09-01&scope=all').set('Authorization', `Bearer ${cashier}`)).status).toBe(403);
+      const manager = await tokenFor('eod-manager', 'MANAGER');
+      const store = await request(app).get('/api/reports/end-of-day?date=2026-09-01&scope=all').set('Authorization', `Bearer ${manager}`);
+      expect(store.body).toMatchObject({ scope: 'all', cashierName: null, orders: 3, cash: { inDrawerUsd: 10, inDrawerRiel: 16000 } });
+    } finally {
+      await db.delete(payments).run();
+      await db.delete(orderItems).run();
+      await db.delete(orders).run();
+      await db.delete(products).where(eq(products.id, productId)).run();
+      await db.delete(categories).where(eq(categories.id, categoryId)).run();
+    }
+  });
+
+  it('rejects a malformed date', async () => {
+    const cashier = await tokenFor('eod-cashier', 'CASHIER');
+    expect((await request(app).get('/api/reports/end-of-day?date=2026-9-1').set('Authorization', `Bearer ${cashier}`)).status).toBe(400);
+  });
+});
+
 describe('inventory and recipe reads', () => {
   beforeEach(async () => {
     await db.delete(payments).run();
