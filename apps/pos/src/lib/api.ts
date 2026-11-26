@@ -2,7 +2,7 @@ import { t } from "../i18n";
 import type { AuthSession } from "../types/auth";
 import type { Category, Product } from "../types/catalog";
 import type { ModifierGroupWithProducts } from "../types/cart";
-import type { OrderDetail, OrderListRow, OrderPayload, OrderResult } from "../types/order";
+import type { EndOfDayReport, OrderDetail, OrderListRow, OrderPayload, OrderResult } from "../types/order";
 import type { PosSettings, PosSettingsResponse, StoreSettings } from "../types/settings";
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
@@ -136,6 +136,13 @@ export function submitOrder(payload: OrderPayload, token: string): Promise<Order
 }
 
 // No date params - the backend defaults to the store's local "today".
+// One day's totals for the end-of-day printout: this cashier's sales, or the
+// whole store's (managers and admins only).
+export function fetchEndOfDayReport(token: string, date: string, scope: "mine" | "all"): Promise<EndOfDayReport> {
+  const query = new URLSearchParams({ date, scope });
+  return getJson<EndOfDayReport>(`/api/reports/end-of-day?${query}`, token);
+}
+
 export function fetchMyOrdersToday(token: string): Promise<OrderListRow[]> {
   return getJson<OrderListRow[]>("/api/orders?mine=true", token);
 }

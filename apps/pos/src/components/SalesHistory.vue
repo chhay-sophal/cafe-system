@@ -5,6 +5,7 @@ import { formatMain, formatSecondary } from "../lib/currency";
 import { useExchangeRate } from "../composables/useExchangeRate";
 import { useOfflineQueue } from "../composables/useOfflineQueue";
 import { useSalesHistory } from "../composables/useSalesHistory";
+import EndOfDayReportModal from "./EndOfDayReportModal.vue";
 import OrderDetailModal from "./OrderDetailModal.vue";
 import type { PaymentMethod } from "../types/order";
 
@@ -24,6 +25,7 @@ const orders = salesHistory.orders;
 const isLoading = ref(false);
 const errorMessage = ref<string | null>(null);
 const selectedOrderId = ref<string | null>(null);
+const isEndOfDayOpen = ref(false);
 
 // Finding a sale in the table: by order number or item name (search), or by
 // an item sold today (select). The summary cards keep counting all sales.
@@ -127,9 +129,14 @@ onMounted(() => loadOrders());
           {{ t("salesHistory.matchCount", { shown: visibleOrders.length, total: orders.length }) }}
         </span>
       </h2>
-      <button type="button" class="sales-history__refresh" :disabled="isLoading" @click="loadOrders(true)">
-        {{ t("salesHistory.refresh") }}
-      </button>
+      <div class="sales-history__actions">
+        <button type="button" class="sales-history__refresh" @click="isEndOfDayOpen = true">
+          {{ t("endOfDay.button") }}
+        </button>
+        <button type="button" class="sales-history__refresh" :disabled="isLoading" @click="loadOrders(true)">
+          {{ t("salesHistory.refresh") }}
+        </button>
+      </div>
     </div>
 
     <p v-if="offlineQueue.pendingCount.value > 0" class="sales-history__pending">
@@ -208,6 +215,8 @@ onMounted(() => loadOrders());
       </table>
     </div>
 
+    <EndOfDayReportModal v-if="isEndOfDayOpen" @close="isEndOfDayOpen = false" />
+
     <OrderDetailModal
       v-if="selectedOrderId"
       :order-id="selectedOrderId"
@@ -233,6 +242,11 @@ onMounted(() => loadOrders());
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.sales-history__actions {
+  display: flex;
+  gap: 0.75rem;
 }
 
 .sales-history__heading {

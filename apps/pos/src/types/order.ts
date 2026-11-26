@@ -93,3 +93,29 @@ export interface OrderDetail {
   items: OrderDetailItem[];
   payment: OrderDetailPayment | null;
 }
+
+// GET /api/reports/end-of-day - one day's sales for this cashier ("mine") or
+// the whole store ("all"). Amounts in USD except the riel cash figures.
+export interface EndOfDayReport {
+  date: string;
+  scope: "mine" | "all";
+  cashierName: string | null;
+  // Store-local "YYYY-MM-DD HH:MM:SS", null with no sales.
+  firstSaleAt: string | null;
+  lastSaleAt: string | null;
+  orders: number;
+  itemsSold: number;
+  voided: { count: number; amount: number };
+  sales: { gross: number; discounts: number; tax: number; net: number };
+  payments: Array<{ method: PaymentMethod; count: number; amount: number }>;
+  // Cash as it physically moved, per currency; inDrawer = tendered - change.
+  cash: {
+    tenderedUsd: number;
+    tenderedRiel: number;
+    changeUsd: number;
+    changeRiel: number;
+    inDrawerUsd: number;
+    inDrawerRiel: number;
+  };
+  items: Array<{ name: string; quantity: number; amount: number }>;
+}
