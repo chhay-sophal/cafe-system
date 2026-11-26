@@ -170,6 +170,10 @@ export const payments = sqliteTable('payments', {
   // Snapshot of the store's USD->Riel rate at sale time - the rate drifts over
   // time, but a receipt/report must reflect what actually applied at sale.
   exchangeRateRielPerUsd: real('exchange_rate_riel_per_usd').notNull(),
+  // Set when a Mobile Pay sale was paid through a Bakong KHQR for its exact
+  // amount and Bakong confirmed it - the QR's md5, Bakong's reference for
+  // the transaction. Null for the fixed bank QR images and other methods.
+  khqrMd5: text('khqr_md5'),
   createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
 });
 
@@ -192,6 +196,17 @@ export const posSettings = sqliteTable('pos_settings', {
   settings: text('settings').notNull(),
   updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`),
   updatedBy: text('updated_by').references(() => users.id),
+});
+
+// What the backend uses to ask Bakong whether a KHQR has been paid: the email
+// registered for the Bakong Open API, and the API token renewed with it.
+// Its own table, never part of the POS settings the registers download - the
+// token stays on the server. One row; absent until an admin sets the email.
+export const bakongCredentials = sqliteTable('bakong_credentials', {
+  id: text('id').primaryKey().default('default'),
+  registeredEmail: text('registered_email'),
+  apiToken: text('api_token'),
+  apiTokenUpdatedAt: text('api_token_updated_at'),
 });
 
 export const storeSettings = sqliteTable('store_settings', {

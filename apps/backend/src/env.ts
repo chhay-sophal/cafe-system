@@ -32,6 +32,9 @@ const envSchema = z.object({
   // Escape hatch for the remote-database guard below - set to "true" only to
   // deliberately run a dev command against the hosted database.
   ALLOW_REMOTE_DB: z.string().optional(),
+  // The Bakong Open API, for checking KHQR payments (src/lib/bakong.ts).
+  // Bakong's test environment is https://sit-api-bakong.nbc.gov.kh.
+  BAKONG_API_BASE_URL: z.string().url().default('https://api-bakong.nbc.gov.kh'),
 });
 
 // Outside production, only a local file database is allowed: .env is for

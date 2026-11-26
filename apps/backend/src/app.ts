@@ -16,12 +16,15 @@ import { authenticate, hashPin, requireRole, signToken, verifyPin } from './midd
 import { validateBody } from './middleware/validate.js';
 import { productImageUpload, saveProductImage } from './lib/uploads.js';
 import { computeChange, isTenderSufficient, round2 } from './lib/cash.js';
+import { BakongError, checkKhqrPaid, credentialView, generateKhqr, setRegisteredEmail } from './lib/bakong.js';
 import {
+  bakongCredentialSchema,
   categoryOrderSchema,
   categorySchema,
   exchangeRateSchema,
   inventoryAdjustmentSchema,
   inventoryItemSchema,
+  khqrRequestSchema,
   mainCurrencySchema,
   managerApprovalSchema,
   modifierGroupSchema,
@@ -203,6 +206,7 @@ const DEFAULT_POS_SETTINGS: PosSettings = {
   khqrBanks: [],
   language: 'en-US',
   hideUnavailableItems: false,
+  bakong: { accountId: '', merchantName: '', merchantCity: 'Phnom Penh' },
 };
 
 // GET /api/settings/pos's body. Sections never saved (all of them before the
@@ -337,6 +341,7 @@ async function loadOrderDetail(id: string) {
     changeGivenUsd: payments.changeGivenUsd,
     changeGivenRiel: payments.changeGivenRiel,
     exchangeRateRielPerUsd: payments.exchangeRateRielPerUsd,
+    khqrMd5: payments.khqrMd5,
   }).from(payments).where(eq(payments.orderId, id)).get();
 
   return {
@@ -972,6 +977,7 @@ function createApp() {
   app.post('/api/orders', authenticate, validateBody(orderSchema), async (req, res) => {
     const {
       clientOrderId, soldAt, exchangeRateRielPerUsd: saleExchangeRate, items, paymentMethod, amountTenderedUsd = 0, amountTenderedRiel = 0, taxAmount: requestedTaxAmount = 0, discountAmount = 0,
+      khqrMd5,
     } = req.body;
     const actingUserId = req.user?.id;
 
@@ -1068,6 +1074,7 @@ function createApp() {
           changeGivenUsd: changeUsd,
           changeGivenRiel: changeRiel,
           exchangeRateRielPerUsd: exchangeRate,
+          khqrMd5: paymentMethod === 'QR_CODE' ? khqrMd5 ?? null : null,
         }).run();
 
         for (const item of items) {
@@ -1347,6 +1354,8 @@ function createApp() {
         await tx.update(payments)
           .set({
             paymentMethod,
+            // The Bakong confirmation only describes a Mobile Pay sale.
+            ...(paymentMethod === 'QR_CODE' ? {} : { khqrMd5: null }),
             amountTenderedUsd: tendered.usd,
             amountTenderedRiel: tendered.riel,
             changeGivenUsd: change.usd,
@@ -1955,6 +1964,60 @@ function createApp() {
     } catch (error) {
       console.error('Daily summary report error:', error);
       res.status(500).json({ error: 'Failed to generate report' });
+    }
+  });
+
+  // Bakong KHQR for Mobile Pay (src/lib/bakong.ts). Any logged-in register
+  // can make a QR for a sale and ask whether it's been paid; the QR uses the
+  // store's Bakong account from the POS settings.
+  const sendBakongError = (res: express.Response, error: unknown, fallback: string) => {
+    if (error instanceof BakongError) {
+      return res.status(error.status).json({ error: error.message });
+    }
+    console.error(fallback, error);
+    return res.status(500).json({ error: fallback });
+  };
+
+  app.post('/api/payments/khqr', authenticate, validateBody(khqrRequestSchema), async (req, res) => {
+    try {
+      const { settings } = await loadPosSettings();
+      if (!settings.bakong.accountId) {
+        return res.status(409).json({ error: 'No Bakong account is set up for KHQR - add it in POS Settings' });
+      }
+      const { amount, currency } = req.body as { amount: number; currency: 'USD' | 'KHR' };
+      res.json(generateKhqr(settings.bakong, amount, currency, settings.storeDetails.phones[0]));
+    } catch (error) {
+      sendBakongError(res, error, 'Failed to create the KHQR');
+    }
+  });
+
+  app.get('/api/payments/khqr/:md5/status', authenticate, async (req, res) => {
+    const md5 = String(req.params.md5);
+    if (!/^[a-f0-9]{32}$/.test(md5)) {
+      return res.status(400).json({ error: 'Invalid KHQR reference' });
+    }
+    try {
+      res.json({ md5, status: await checkKhqrPaid(md5) });
+    } catch (error) {
+      sendBakongError(res, error, 'Failed to check the KHQR payment');
+    }
+  });
+
+  // The email registered for the Bakong Open API - admins only. The token
+  // issued to it is never sent out, only whether there is one.
+  app.get('/api/settings/bakong-credential', authenticate, requireRole(['ADMIN']), async (_req, res) => {
+    try {
+      res.json(await credentialView());
+    } catch (error) {
+      sendBakongError(res, error, 'Failed to load the Bakong settings');
+    }
+  });
+
+  app.put('/api/settings/bakong-credential', authenticate, requireRole(['ADMIN']), validateBody(bakongCredentialSchema), async (req, res) => {
+    try {
+      res.json(await setRegisteredEmail((req.body as { registeredEmail: string }).registeredEmail));
+    } catch (error) {
+      sendBakongError(res, error, 'Failed to save the Bakong settings');
     }
   });
 

@@ -35,6 +35,9 @@ export const orderSchema = z.object({
   amountTenderedRiel: z.number().nonnegative().optional(),
   taxAmount: z.number().nonnegative().optional(),
   discountAmount: z.number().nonnegative().optional(),
+  // A Mobile Pay sale paid through a Bakong KHQR for its exact amount: the
+  // QR's md5, which Bakong confirmed as paid (POST /api/payments/khqr).
+  khqrMd5: z.string().regex(/^[a-f0-9]{32}$/).optional(),
 });
 
 // A manager's correction of a completed sale (PUT /api/orders/:id): the full
@@ -179,6 +182,27 @@ export const posSettingsSchema = z.object({
   // Leave items marked unavailable (sold out) off the register's menu,
   // instead of showing them greyed out.
   hideUnavailableItems: z.boolean(),
+  // The store's Bakong account, for Mobile Pay QRs with the exact amount
+  // (KHQR). An empty accountId turns them off - the bank QR images remain.
+  // Lengths are the KHQR standard's limits.
+  bakong: z.object({
+    accountId: z.union([z.literal(''), z.string().trim().regex(/^[^\s@]+@[^\s@]+$/).max(32)]),
+    merchantName: z.string().trim().max(25),
+    merchantCity: z.string().trim().max(15),
+  }),
+});
+
+// POST /api/payments/khqr - a KHQR for one sale's total, in the currency
+// shown to the customer.
+export const khqrRequestSchema = z.object({
+  amount: z.number().positive(),
+  currency: z.enum(['USD', 'KHR']),
+});
+
+// PUT /api/settings/bakong-credential - the email registered for the Bakong
+// Open API, used to get the token for checking payments.
+export const bakongCredentialSchema = z.object({
+  registeredEmail: z.email(),
 });
 
 // PUT /api/settings/pos - any subset of the sections; the rest are kept.

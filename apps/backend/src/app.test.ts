@@ -1,11 +1,11 @@
 import { randomUUID } from 'crypto';
 import request from 'supertest';
-import { afterEach, describe, expect, it, beforeEach } from 'vitest';
+import { afterEach, describe, expect, it, beforeEach, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { createApp } from './app.js';
 import { db } from './db/index.js';
 import {
-  categories, inventoryItems, modifierGroups, modifiers, orderItemModifiers, orderItems, orders, payments, posSettings, productModifiers, products, recipes,
+  bakongCredentials, categories, inventoryItems, modifierGroups, modifiers, orderItemModifiers, orderItems, orders, payments, posSettings, productModifiers, products, recipes,
   stockAdjustments, storeSettings, users,
 } from './db/schema.js';
 import { hashPin, signToken } from './middleware/auth.js';
@@ -748,6 +748,140 @@ describe('end-of-day report', () => {
   it('rejects a malformed date', async () => {
     const cashier = await tokenFor('eod-cashier', 'CASHIER');
     expect((await request(app).get('/api/reports/end-of-day?date=2026-9-1').set('Authorization', `Bearer ${cashier}`)).status).toBe(400);
+  });
+});
+
+describe('Bakong KHQR', () => {
+  const md5 = 'a'.repeat(32);
+
+  beforeEach(async () => {
+    await db.delete(posSettings).run();
+    await db.delete(bakongCredentials).run();
+    await db.delete(payments).run();
+    await db.delete(orderItemModifiers).run();
+    await db.delete(orderItems).run();
+    await db.delete(orders).run();
+    await db.delete(stockAdjustments).run();
+    await db.delete(users).run();
+  });
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    await db.delete(posSettings).run();
+    await db.delete(bakongCredentials).run();
+  });
+
+  async function tokenFor(id: string, role: 'CASHIER' | 'MANAGER' | 'ADMIN') {
+    await db.insert(users).values({ id, name: id, pinHash: await hashPin(id), role, isActive: true }).run();
+    return signToken({ id, name: id, role });
+  }
+
+  async function setAccount(manager: string) {
+    const response = await request(app).put('/api/settings/pos').set('Authorization', `Bearer ${manager}`)
+      .send({ bakong: { accountId: 'lysin_cafe@aclb', merchantName: 'Lysin Cafe', merchantCity: 'Siem Reap' } });
+    expect(response.status).toBe(200);
+  }
+
+  // Bakong's API, answered in order - each entry a [status, body].
+  function mockBakong(...answers: Array<[number, unknown]>) {
+    const calls: Array<{ url: string; body: unknown; auth?: string }> = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const [status, body] = answers.shift() ?? [500, {}];
+      calls.push({
+        url: String(input),
+        body: JSON.parse(String(init?.body ?? 'null')),
+        auth: (init?.headers as Record<string, string> | undefined)?.Authorization,
+      });
+      return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+    });
+    return calls;
+  }
+
+  it('makes a QR for the exact amount once the store has a Bakong account', async () => {
+    const cashier = await tokenFor('khqr-cashier', 'CASHIER');
+    const manager = await tokenFor('khqr-manager', 'MANAGER');
+    const make = () => request(app).post('/api/payments/khqr').set('Authorization', `Bearer ${cashier}`).send({ amount: 12345.4, currency: 'KHR' });
+
+    expect((await make()).status).toBe(409);
+    await setAccount(manager);
+    const response = await make();
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ amount: 12345, currency: 'KHR' });
+    expect(response.body.md5).toMatch(/^[a-f0-9]{32}$/);
+    expect(response.body.qrString).toContain('lysin_cafe@aclb');
+    expect(Date.parse(response.body.expiresAt)).toBeGreaterThan(Date.now());
+  });
+
+  it('rejects an account id that is not name@bank', async () => {
+    const manager = await tokenFor('khqr-manager', 'MANAGER');
+    const response = await request(app).put('/api/settings/pos').set('Authorization', `Bearer ${manager}`)
+      .send({ bakong: { accountId: 'not-an-account', merchantName: 'X', merchantCity: 'Y' } });
+    expect(response.status).toBe(400);
+  });
+
+  it('checks payment with a token renewed from the registered email, and renews it again when rejected', async () => {
+    const cashier = await tokenFor('khqr-cashier', 'CASHIER');
+    const admin = await tokenFor('khqr-admin', 'ADMIN');
+    const status = () => request(app).get(`/api/payments/khqr/${md5}/status`).set('Authorization', `Bearer ${cashier}`);
+
+    // No email yet: can't ask Bakong.
+    expect((await status()).status).toBe(409);
+
+    // The email is admin-only.
+    expect((await request(app).put('/api/settings/bakong-credential').set('Authorization', `Bearer ${cashier}`)
+      .send({ registeredEmail: 'owner@example.com' })).status).toBe(403);
+    const saved = await request(app).put('/api/settings/bakong-credential').set('Authorization', `Bearer ${admin}`)
+      .send({ registeredEmail: 'owner@example.com' });
+    expect(saved.body).toEqual({ registeredEmail: 'owner@example.com', hasToken: false, tokenUpdatedAt: null });
+
+    // First check: renew a token, then ask - not paid yet.
+    let calls = mockBakong([200, { responseCode: 0, data: { token: 'token-1' } }], [200, { responseCode: 1 }]);
+    expect((await status()).body).toEqual({ md5, status: 'PENDING' });
+    expect(calls.map((call) => call.url)).toEqual([
+      'https://api-bakong.nbc.gov.kh/v1/renew_token',
+      'https://api-bakong.nbc.gov.kh/v1/check_transaction_by_md5',
+    ]);
+    expect(calls[0]!.body).toEqual({ email: 'owner@example.com' });
+    expect(calls[1]).toMatchObject({ body: { md5 }, auth: 'Bearer token-1' });
+    vi.restoreAllMocks();
+
+    // Token expired: renewed once, then paid.
+    calls = mockBakong([401, {}], [200, { responseCode: 0, data: { token: 'token-2' } }], [200, { responseCode: 0, data: { hash: 'x' } }]);
+    expect((await status()).body).toEqual({ md5, status: 'PAID' });
+    expect(calls.map((call) => call.auth)).toEqual(['Bearer token-1', undefined, 'Bearer token-2']);
+
+    // The token itself never leaves the server.
+    const view = await request(app).get('/api/settings/bakong-credential').set('Authorization', `Bearer ${admin}`);
+    expect(view.body).toMatchObject({ registeredEmail: 'owner@example.com', hasToken: true });
+    expect(JSON.stringify(view.body)).not.toContain('token-2');
+  });
+
+  it('records the KHQR reference on a Mobile Pay sale, and only there', async () => {
+    const cashier = await tokenFor('khqr-cashier', 'CASHIER');
+    const categoryId = randomUUID();
+    const productId = randomUUID();
+    await db.insert(categories).values({ id: categoryId, name: 'KHQR' }).run();
+    await db.insert(products).values({ id: productId, categoryId, name: 'KHQR Latte', basePrice: 2 }).run();
+    const sell = (paymentMethod: 'QR_CODE' | 'CARD') => request(app).post('/api/orders').set('Authorization', `Bearer ${cashier}`).send({
+      items: [{ productId, productName: 'KHQR Latte', quantity: 1, unitPrice: 2 }],
+      paymentMethod,
+      khqrMd5: md5,
+    });
+
+    try {
+      const qrSale = await sell('QR_CODE');
+      const cardSale = await sell('CARD');
+      const detail = (id: string) => request(app).get(`/api/orders/${id}`).set('Authorization', `Bearer ${cashier}`);
+
+      expect((await detail(qrSale.body.orderId)).body.payment.khqrMd5).toBe(md5);
+      expect((await detail(cardSale.body.orderId)).body.payment.khqrMd5).toBeNull();
+    } finally {
+      await db.delete(payments).run();
+      await db.delete(orderItems).run();
+      await db.delete(orders).run();
+      await db.delete(products).where(eq(products.id, productId)).run();
+      await db.delete(categories).where(eq(categories.id, categoryId)).run();
+    }
   });
 });
 
@@ -1660,7 +1794,7 @@ describe('POS settings', () => {
     expect(response.status).toBe(200);
     expect(response.body.configured).toBe(false);
     expect(response.body.settings).toMatchObject({ storeName: '', paymentMethods: ['CASH', 'CARD', 'QR_CODE'], khqrBanks: [], language: 'en-US' });
-    expect(response.body.unsetSections).toHaveLength(7);
+    expect(response.body.unsetSections).toHaveLength(8);
   });
 
   it('lists the sections never saved, so the POS uploads its own instead of taking the default', async () => {
@@ -1669,7 +1803,7 @@ describe('POS settings', () => {
     const response = await put(token, { storeName: 'Lysin Cafe', language: 'km-KH' });
 
     expect(response.body.settings).toMatchObject({ storeName: 'Lysin Cafe', language: 'km-KH', paymentMethods: ['CASH', 'CARD', 'QR_CODE'] });
-    expect(response.body.unsetSections.sort()).toEqual(['fastCash', 'hideUnavailableItems', 'khqrBanks', 'paymentMethods', 'storeDetails']);
+    expect(response.body.unsetSections.sort()).toEqual(['bakong', 'fastCash', 'hideUnavailableItems', 'khqrBanks', 'paymentMethods', 'storeDetails']);
   });
 
   it('saves sections independently, keeping the ones not sent', async () => {
