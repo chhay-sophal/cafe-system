@@ -42,6 +42,8 @@ export interface OrderPaymentDetail {
   changeGivenUsd: number;
   changeGivenRiel: number;
   exchangeRateRielPerUsd: number;
+  // Set when Bakong confirmed a Mobile Pay KHQR for this sale (its md5).
+  khqrMd5?: string | null;
 }
 
 export interface OrderDetail {

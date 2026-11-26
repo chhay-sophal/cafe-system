@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch, type Ref } from "vue";
 import { Trash2 } from "@lucide/vue";
-import type { PosPaymentMethod, PosSettings, PosSocialPlatform } from "~/types/settings";
+import type { BakongCredential, PosPaymentMethod, PosSettings, PosSocialPlatform } from "~/types/settings";
 
 // The store-wide POS settings, shared with the register's own Settings tab -
 // either side can change them; the register picks up changes from here when
@@ -201,6 +201,64 @@ const menuSection = useSection(
   (draft) => ({ hideUnavailableItems: draft.hideUnavailableItems }),
 );
 const isMenuUnset = computed(() => store.response?.unsetSections.includes("hideUnavailableItems") ?? false);
+
+// --- Bakong KHQR -------------------------------------------------------------
+
+// The account the exact-amount Mobile Pay QRs pay into. Limits are the KHQR
+// standard's; an empty account id turns those QRs off.
+const BAKONG_ACCOUNT_PATTERN = /^[^\s@]+@[^\s@]+$/;
+const bakongSection = useSection(
+  (saved) => ({ bakong: clone(saved.bakong ?? { accountId: "", merchantName: "", merchantCity: "Phnom Penh" }) }),
+  (draft) => ({
+    bakong: {
+      accountId: draft.bakong.accountId.trim(),
+      merchantName: draft.bakong.merchantName.trim(),
+      merchantCity: draft.bakong.merchantCity.trim(),
+    },
+  }),
+);
+const isBakongAccountValid = computed(() => {
+  const id = bakongSection.draft?.bakong.accountId.trim() ?? "";
+  return id === "" || BAKONG_ACCOUNT_PATTERN.test(id);
+});
+
+// Admins only: the email registered for the Bakong Open API, which the
+// server uses to check whether a KHQR has been paid.
+const isAdmin = computed(() => useAuth().session.value?.user.role === "ADMIN");
+const bakongCredential = ref<BakongCredential | null>(null);
+const bakongEmailDraft = ref("");
+const isSavingBakongEmail = ref(false);
+const bakongEmailError = ref<string | null>(null);
+const bakongEmailSaved = ref(false);
+
+async function loadBakongCredential() {
+  if (!isAdmin.value) return;
+  try {
+    bakongCredential.value = await useApi().fetchBakongCredential(useAuth().requireToken());
+    bakongEmailDraft.value = bakongCredential.value.registeredEmail ?? "";
+  } catch (error) {
+    bakongEmailError.value = error instanceof Error ? error.message : t("posSettings.bakong.emailLoadError");
+  }
+}
+
+async function saveBakongEmail() {
+  if (isSavingBakongEmail.value || !bakongEmailDraft.value.trim()) return;
+  isSavingBakongEmail.value = true;
+  bakongEmailError.value = null;
+  try {
+    bakongCredential.value = await useApi().saveBakongCredential(bakongEmailDraft.value.trim(), useAuth().requireToken());
+    bakongEmailSaved.value = true;
+    setTimeout(() => (bakongEmailSaved.value = false), 2500);
+  } catch (error) {
+    bakongEmailError.value = error instanceof Error ? error.message : t("posSettings.saveError");
+  } finally {
+    isSavingBakongEmail.value = false;
+  }
+}
+
+usePageVisible(() => {
+  if (!bakongCredential.value) void loadBakongCredential();
+});
 
 // --- KHQR banks (saved straight away, like on the register) ---------------
 
@@ -455,6 +513,77 @@ const SMALL_BUTTON = "shrink-0 whitespace-nowrap rounded-lg border border-slate-
           >
             {{ menuSection.isSaving ? t("common.saving") : t("common.save") }}
           </button>
+        </div>
+      </section>
+
+      <!-- Bakong KHQR -->
+      <section v-if="bakongSection.draft" class="mt-6 rounded-lg border border-slate-200 bg-white p-5">
+        <h3 class="font-semibold text-slate-900">{{ t("posSettings.bakong.heading") }}</h3>
+        <p class="text-xs text-slate-500">{{ t("posSettings.bakong.hint") }}</p>
+        <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <label class="block sm:col-span-3">
+            <span class="text-xs font-medium text-slate-600">{{ t("posSettings.bakong.accountId") }}</span>
+            <input
+              v-model="bakongSection.draft.bakong.accountId"
+              type="text"
+              maxlength="32"
+              placeholder="name@bank"
+              autocomplete="off"
+              spellcheck="false"
+              :class="INPUT"
+              class="mt-1"
+            />
+            <span v-if="!isBakongAccountValid" class="mt-1 block text-xs font-medium text-red-700">{{ t("posSettings.bakong.accountIdInvalid") }}</span>
+          </label>
+          <label class="block sm:col-span-2">
+            <span class="text-xs font-medium text-slate-600">{{ t("posSettings.bakong.merchantName") }}</span>
+            <input v-model="bakongSection.draft.bakong.merchantName" type="text" maxlength="25" :class="INPUT" class="mt-1" />
+          </label>
+          <label class="block">
+            <span class="text-xs font-medium text-slate-600">{{ t("posSettings.bakong.merchantCity") }}</span>
+            <input v-model="bakongSection.draft.bakong.merchantCity" type="text" maxlength="15" :class="INPUT" class="mt-1" />
+          </label>
+        </div>
+        <div class="mt-5 flex items-center justify-end gap-2">
+          <p v-if="bakongSection.error" class="mr-auto text-xs font-medium text-red-700">{{ bakongSection.error }}</p>
+          <p v-else-if="bakongSection.justSaved" class="mr-auto text-xs font-medium text-emerald-700">{{ t("posSettings.saved") }}</p>
+          <button v-if="bakongSection.isDirty" type="button" :class="SMALL_BUTTON" @click="bakongSection.discard()">{{ t("posSettings.discard") }}</button>
+          <button
+            type="button"
+            class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40"
+            :disabled="!bakongSection.isDirty || bakongSection.isSaving || !isBakongAccountValid"
+            @click="bakongSection.save()"
+          >
+            {{ bakongSection.isSaving ? t("common.saving") : t("common.save") }}
+          </button>
+        </div>
+
+        <!-- Admins: the Bakong Open API email used to check payments -->
+        <div v-if="isAdmin" class="mt-6 border-t border-slate-100 pt-5">
+          <h4 class="text-sm font-semibold text-slate-900">{{ t("posSettings.bakong.emailHeading") }}</h4>
+          <p class="text-xs text-slate-500">{{ t("posSettings.bakong.emailHint") }}</p>
+          <form class="mt-3 flex flex-wrap items-center gap-2" @submit.prevent="saveBakongEmail">
+            <input
+              v-model="bakongEmailDraft"
+              type="email"
+              autocomplete="off"
+              :placeholder="t('posSettings.bakong.emailPlaceholder')"
+              :class="ROW_INPUT"
+            />
+            <button
+              type="submit"
+              class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40"
+              :disabled="isSavingBakongEmail || !bakongEmailDraft.trim() || bakongEmailDraft.trim() === bakongCredential?.registeredEmail"
+            >
+              {{ isSavingBakongEmail ? t("common.saving") : t("common.save") }}
+            </button>
+          </form>
+          <p v-if="bakongEmailError" class="mt-2 text-xs font-medium text-red-700">{{ bakongEmailError }}</p>
+          <p v-else-if="bakongEmailSaved" class="mt-2 text-xs font-medium text-emerald-700">{{ t("posSettings.saved") }}</p>
+          <p v-else-if="bakongCredential?.registeredEmail" class="mt-2 text-xs text-slate-500">
+            {{ bakongCredential.hasToken ? t("posSettings.bakong.tokenActive") : t("posSettings.bakong.tokenPending") }}
+          </p>
+          <p v-else class="mt-2 text-xs text-amber-800">{{ t("posSettings.bakong.emailMissing") }}</p>
         </div>
       </section>
 

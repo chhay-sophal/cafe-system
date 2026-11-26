@@ -532,7 +532,8 @@
       "error": "Couldn't save the changes.",
       "editedBy": "Last edited by {name} on {time}"
     },
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "bakongConfirmed": "Confirmed by Bakong"
   },
   "posSettings": {
     "heading": "POS Settings",
@@ -584,6 +585,21 @@
       "unset": "Not set here yet - the register keeps its own choice and uploads it the next time a manager or admin logs in on it.",
       "show": "Show as sold out",
       "hide": "Hide from the register"
+    },
+    "bakong": {
+      "heading": "Bakong KHQR",
+      "hint": "With a Bakong account here, the register's Mobile Pay shows a QR with the exact amount and completes the sale by itself once Bakong confirms payment. Leave the account empty to use only the bank QR images. Changing it on the register changes it here too.",
+      "accountId": "Bakong account ID",
+      "accountIdInvalid": "Enter the account as name{'@'}bank, e.g. lysin_cafe{'@'}aclb.",
+      "merchantName": "Name shown to the customer",
+      "merchantCity": "City",
+      "emailHeading": "Payment checks (admins)",
+      "emailHint": "The email registered on the Bakong Open API portal (api-bakong.nbc.gov.kh). The server uses it to get the token for checking whether a KHQR has been paid, and renews the token by itself.",
+      "emailPlaceholder": "owner{'@'}example.com",
+      "emailMissing": "Not set - registers can show KHQRs but can't confirm payment until it is.",
+      "tokenActive": "Connected to Bakong.",
+      "tokenPending": "Saved - the server connects to Bakong at the first payment check.",
+      "emailLoadError": "Failed to load the Bakong email."
     },
     "khqr": {
       "heading": "KHQR banks",

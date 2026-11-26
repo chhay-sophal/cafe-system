@@ -6,7 +6,7 @@ import type { InventoryItem, InventoryItemPayload, StockAdjustmentPayload } from
 import type { OrderDetail, OrderEditPayload, OrderSummary } from "~/types/orders";
 import type { RecipeIngredientRecord, RecipeSummary, RecipeTarget, RecipeUpdatePayload } from "~/types/recipe";
 import type { DailySummaryReport } from "~/types/reports";
-import type { ExchangeRateSetting, MainCurrencySetting, PosSettings, PosSettingsResponse, StoreSettings, TaxSetting } from "~/types/settings";
+import type { BakongCredential, ExchangeRateSetting, MainCurrencySetting, PosSettings, PosSettingsResponse, StoreSettings, TaxSetting } from "~/types/settings";
 import type { StaffUser, UserCreatePayload, UserUpdatePayload } from "~/types/user";
 
 export class HttpError extends Error {
@@ -246,6 +246,14 @@ export function useApi() {
     return sendJson<PosSettingsResponse>("PUT", "/api/settings/pos", update, token);
   }
 
+  function fetchBakongCredential(token: string): Promise<BakongCredential> {
+    return getJson<BakongCredential>("/api/settings/bakong-credential", token);
+  }
+
+  function saveBakongCredential(registeredEmail: string, token: string): Promise<BakongCredential> {
+    return sendJson<BakongCredential>("PUT", "/api/settings/bakong-credential", { registeredEmail }, token);
+  }
+
   function fetchExchangeRate(): Promise<StoreSettings> {
     return getJson<StoreSettings>("/api/settings/exchange-rate");
   }
@@ -296,6 +304,8 @@ export function useApi() {
     fetchExchangeRate,
     fetchPosSettings,
     savePosSettings,
+    fetchBakongCredential,
+    saveBakongCredential,
     updateExchangeRate,
     updateMainCurrency,
     updateTaxSetting,

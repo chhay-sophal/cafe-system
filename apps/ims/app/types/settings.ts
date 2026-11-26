@@ -36,6 +36,17 @@ export interface PosSettings {
   khqrBanks: Array<{ id: string; name: string; imageUrl: string }>;
   language: "en-US" | "km-KH";
   hideUnavailableItems: boolean;
+  // The store's Bakong account for exact-amount Mobile Pay QRs (KHQR); an
+  // empty accountId turns them off.
+  bakong: { accountId: string; merchantName: string; merchantCity: string };
+}
+
+// GET/PUT /api/settings/bakong-credential (admins): the email registered for
+// the Bakong Open API. The token issued to it stays on the server.
+export interface BakongCredential {
+  registeredEmail: string | null;
+  hasToken: boolean;
+  tokenUpdatedAt: string | null;
 }
 
 export interface PosSettingsResponse {

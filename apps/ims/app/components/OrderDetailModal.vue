@@ -146,6 +146,13 @@ const dismiss = useDismiss(() => isOpen.value, close, () => isVoiding.value);
         <div v-if="ordersStore.selectedOrder.payment" class="mt-4 rounded-lg bg-slate-50 p-3 text-sm">
           <p class="font-semibold text-slate-700">
             {{ t(`paymentBreakdown.methods.${ordersStore.selectedOrder.payment.paymentMethod}`) }}
+            <span
+              v-if="ordersStore.selectedOrder.payment.khqrMd5"
+              class="ml-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700"
+              :title="ordersStore.selectedOrder.payment.khqrMd5"
+            >
+              {{ t("orders.bakongConfirmed") }}
+            </span>
           </p>
           <template v-if="ordersStore.selectedOrder.payment.paymentMethod === 'CASH'">
             <p class="mt-1 text-slate-600">
